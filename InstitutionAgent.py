@@ -19,12 +19,25 @@ class InstitutionAgent(Agent):
         self.accounts = accounts
         self.allowPartial = allowPartial
 
+        self.model.log_object(
+            object_id=self.institutionID,
+            object_type="Institution",
+            attributes={
+                "allowPartial": self.allowPartial
+            }
+        )
+
     def opt_out_partial(self):
         if not self.allowPartial:
             print("Institution Already opted out, cannot opt out again")
         else:
             self.allowPartiala = False
             print("Institution opted out of partial settlement")
+            self.model.log_event(
+                event_type="institution_opt_out_partial",
+                object_ids=[self.institutionID],
+                attributes={"allowPartial": self.allowPartial}
+            )
 
     def opt_in_partial(self):
         if self.allowPartial:
@@ -32,6 +45,11 @@ class InstitutionAgent(Agent):
         else:
             self.allow_partial = True
             print("Institution opted in of partial settlements")
+            self.model.log_event(
+                event_type="institution_opt_in_partial",
+                object_ids=[self.institutionID],
+                attributes={"allowPartial": self.allowPartial}
+            )
 
     def check_partial_allowed(self):
         if self.allowPartial == True:
@@ -100,6 +118,22 @@ class InstitutionAgent(Agent):
             self.model.instructions.append(new_instructionAgent)
             self.model.instructions.append(counter_instructionAgent)
 
+        #new logging
+        self.model.log_event(
+            event_type="instruction_pair_created",
+            object_ids=[
+                new_instructionAgent.uniqueID,
+                counter_instructionAgent.uniqueID,
+                self.institutionID,
+                other_institution.institutionID
+            ],
+            attributes={
+                "securityType": securityType,
+                "amount": amount,
+                "linkcode": linkcode
+            }
+        )
+        #old logging
         self.model.log_ocel_event(
             activity="Instruction Pair Created",
             object_refs=[

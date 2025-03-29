@@ -18,6 +18,22 @@ class TransactionAgent(Agent):
         #logging ( don't know why is_transaction = True)
         # self.model.log_event(f"Transaction {self.transactionID} created from account {self.deliverer.get_securitiesAccount().getAccountID()} to account {self.receiver.get_cashAccount().getAccountID()}", self.transactionID, is_transaction = True)
 
+        self.model.log_object(
+            object_id=self.transactionID,
+            object_type="Transaction",
+            attributes={
+                "status": self.status,
+                "delivererID": self.deliverer.uniqueID,
+                "receiverID": self.receiver.uniqueID
+            }
+        )
+
+        self.model.log_event(
+            event_type="transaction_created",
+            object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+            attributes={"status": self.status}
+        )
+
     def get_transactionID(self):
         return self.transactionID
 
@@ -30,6 +46,14 @@ class TransactionAgent(Agent):
     def settle(self):
         #logging
         #self.model.log_event(f"Transaction {self.transactionID} attempting to settle.", self.transactionID, is_transaction = True)
+        #new logging
+        self.model.log_event(
+            event_type="transaction_attempting_to_settle",
+            object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+            attributes={"status": self.status}
+        )
+
+        #old logging
         self.model.log_ocel_event(
             activity="Attempting to Settle",
             object_refs=[
@@ -59,6 +83,15 @@ class TransactionAgent(Agent):
                         self.deliverer.set_status("Cancelled due to error")
                         self.receiver.set_status("Cancelled due to error")
                         self.status = "Cancelled due to error"
+
+                        #new logging
+                        self.model.log_event(
+                            event_type="transaction_cancelled_error",
+                            object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+                            attributes={"status": self.status}
+                        )
+
+                        #old logging
                         self.model.log_ocel_event(
                             activity="Cancelled due to error",
                             object_refs=[
@@ -76,6 +109,14 @@ class TransactionAgent(Agent):
                             # logging
                             #self.model.log_event(f"Transaction {self.transactionID} settled fully late.", self.transactionID,
                             #                     is_transaction=True)
+                            #new logging
+
+                            self.model.log_event(
+                                event_type="transaction_settled_late",
+                                object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+                                attributes={"status": self.status}
+                            )
+
                             self.model.log_ocel_event(
                                 activity="Settled Late",
                                 object_refs=[
@@ -92,6 +133,17 @@ class TransactionAgent(Agent):
                             #self.model.log_event(f"Transaction {self.transactionID} settled fully on time.",
                             #                     self.transactionID,
                                                #  is_transaction=True)
+
+                            #new logging
+
+                            self.model.log_event(
+                                event_type="transaction_settled_on_time",
+                                object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+                                attributes={"status": self.status}
+                            )
+
+
+                            #old logging
                             self.model.log_ocel_event(
                             activity = "Settled On Time",
                             object_refs = [
@@ -100,6 +152,11 @@ class TransactionAgent(Agent):
                                 {"object_id": self.receiver.uniqueID, "object_type": "ReceiptInstruction"}
                                 ]
                             )
+
+
+
+
+
                     #remove the transaction and instructions from the model if fully settled or cancelled due to error
                     self.model.remove_transaction(self)
                     self.model.agents.remove(self.deliverer)
@@ -109,6 +166,15 @@ class TransactionAgent(Agent):
 
             elif self.deliverer.get_amount() == 0 or self.receiver.get_amount() == 0:
                 #will do nothing if there is no cash or securities available
+
+                #new logging
+                self.model.log_event(
+                    event_type="transaction_settlement_failed_due_to_insufficient_funds",
+                    object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+                    attributes={"status": self.status}
+                )
+
+                #old logging
                 self.model.log_ocel_event(
                     activity="Settlement Failed: Insufficient Funds",
                     object_refs=[
@@ -134,6 +200,14 @@ class TransactionAgent(Agent):
                         #    self.transactionID,
                         #    is_transaction=True
                         #)
+                        #new logging
+                        self.model.log_event(
+                            event_type="Partial_settlement_aborted",
+                            object_ids=[self.transactionID,self.deliverer.uniqueID,self.receiver.uniqueID],
+                            attributes={"status": self.status}
+                        )
+
+                        #old logging
                         self.model.log_ocel_event(
                             activity="Partial Settlement Aborted",
                             object_refs=[
@@ -159,6 +233,14 @@ class TransactionAgent(Agent):
                         #    self.transactionID,
                         #    is_transaction=True
                         #)
+                        #new logging
+                        self.model.log_event(
+                            event_type="transaction_partially_settled",
+                            object_ids=[self.transactionID,self.deliverer.uniqueID,self.receiver.uniqueID],
+                            attributes={"status": self.status}
+                        )
+
+                        #old logging
                         self.model.log_ocel_event(
                             activity="Partially Settled",
                             object_refs=[
@@ -170,6 +252,13 @@ class TransactionAgent(Agent):
                         self.cancel_partial()
         else:
         #    self.model.log_event(f"One of the instructions or transaction not in the correct state", self.transactionID, is_transaction = True)
+            self.model.log_event(
+                event_type="transaction_settlement_failed_incorrect_status",
+                object_ids=[self.transactionID,self.deliverer.uniqueID,self.receiver.uniqueID],
+                attributes={"status": self.status}
+            )
+
+            #old logging
             self.model.log_ocel_event(
                 activity="Settlement Failed: Incorrect Status",
                 object_refs=[
@@ -202,6 +291,15 @@ class TransactionAgent(Agent):
         self.status = "Cancelled due to partial settlement"
         self.deliverer.set_status("Cancelled due to partial settlement")
         self.receiver.set_status("Cancelled due to partial settlement")
+
+        #new logging
+        self.model.log_event(
+            event_type="transaction_cancelled_partial_settlement",
+            object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+            attributes={"status": self.status}
+        )
+
+        #old logging
         self.model.log_ocel_event(
             activity="Cancelled due to Partial Settlement",
             object_refs=[

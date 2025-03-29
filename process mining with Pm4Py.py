@@ -3,7 +3,7 @@ import pm4py
 
 
 # Read the OCEL
-ocel = pm4py.read.read_ocel2_json("sample_ocel_log.jsonocel", encoding= 'utf-8')
+ocel = pm4py.read.read_ocel2_json("simulation_log2.jsonocel", encoding= 'utf-8')
 
 # Get the list of object types in the OCEL
 object_types = pm4py.ocel_get_object_types(ocel)

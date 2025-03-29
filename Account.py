@@ -9,6 +9,7 @@ class Account:
         self.newSecurities = newSecurities
         self.usedCredit = 0
 
+
         #logging
         #self.model.log_event(f"Account {accountID} of type {accountType} created with balance {balance} and credit limit {creditLimit}", accountID, is_transaction = False)
 

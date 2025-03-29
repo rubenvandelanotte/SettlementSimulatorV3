@@ -5,6 +5,7 @@ import pandas as pd
 import InstitutionAgent
 import Account
 import random
+from jsonocellogger import JSONOCELLogger
 
 def generate_iban():
     """Generate a simple IBAN-like string.
@@ -27,6 +28,7 @@ class SettlementModel(Model):
         self.simulation_duration_days = 15
         self.min_settlement_amount = 100
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D"]
+        self.logger = JSONOCELLogger()
 
 
 
@@ -61,6 +63,27 @@ class SettlementModel(Model):
         self.event_counter += 1
         return event_id
 
+    def log_object(self, object_id: str, object_type: str, attributes: dict = None):
+        if attributes is None:
+            attributes = {}
+        attributes_list = [{"name": k, "value": v, "time": self.simulated_time.isoformat() + "Z"}
+                        for k, v in attributes.items()]
+        self.logger.log_object(oid=object_id, otype=object_type, attributes=attributes_list)
+
+    def log_event(self, event_type: str, object_ids: list, attributes: dict = None):
+        if attributes is None:
+            attributes = {}
+        self.logger.log_event(
+            event_type=event_type,
+            object_ids=object_ids,
+            event_attributes=attributes,
+            timestamp=self.simulated_time.isoformat() + "Z"
+        )
+
+    def save_ocel_log(self, filename: str = "simulation_log.jsonocel"):
+        self.logger.export_log(filename)
+
+    #old logger
     def log_ocel_event(self, activity: str, object_refs: list):
         """
         Log an event in OCEL format.
@@ -76,13 +99,14 @@ class SettlementModel(Model):
         self.event_log.append(event_entry)
         print(f"Logged event: {event_entry}")
 
+    #old logger
     def register_object(self, object_id: str, object_type: str, attributes: dict):
         self.objects_catalog[object_id] = {
             "object_id": object_id,
             "object_type": object_type,
             "attributes": attributes
         }
-
+    #old logger
     def save_log(self, filename=None, activity_filename=None):
         if filename is None:
             filename = "ocel_event_log.csv"
@@ -146,6 +170,15 @@ class SettlementModel(Model):
             new_cash_Account = Account.Account(accountID=new_cash_accountID, accountType= new_cash_accountType, balance= new_cash_balance, creditLimit=new_cash_creditLimit)
             inst_accounts.append(new_cash_Account)
             self.accounts.append(new_cash_Account)
+            self.log_object(
+                object_id=new_cash_accountID,
+                object_type="Account",
+                attributes={
+                    "accountType": new_cash_accountType,
+                    "balance": new_cash_balance,
+                    "creditLimit": new_cash_creditLimit
+                }
+            )
             print(new_cash_Account.__repr__())
             for _ in range(total_accounts - 1):
                 new_security_accountID = generate_iban()
@@ -155,6 +188,15 @@ class SettlementModel(Model):
                 new_security_Account = Account.Account(accountID=new_security_accountID, accountType= new_security_accountType, balance= new_security_balance, creditLimit= new_security_creditLimit)
                 inst_accounts.append(new_security_Account)
                 self.accounts.append(new_security_Account)
+                self.log_object(
+                    object_id=new_security_accountID,
+                    object_type="Account",
+                    attributes={
+                        "accountType": new_security_accountType,
+                        "balance": new_security_balance,
+                        "creditLimit": new_security_creditLimit
+                    }
+                )
                 print(new_security_Account.__repr__())
             new_institution = InstitutionAgent.InstitutionAgent(institutionID= inst_id, accounts= inst_accounts, model=self, allowPartial=self.partialsallowed[i-1])
             self.institutions.append(new_institution)
@@ -348,6 +390,7 @@ if __name__ == "__main__":
                 print(event)
             print("Saving final event log...")
             model.save_log(log_path)
+            model.save_ocel_log(filename="simulation_log2.jsonocel")
             print("---------------------------------------------------------------")
             model.print_settlement_efficiency()
             model.save_settlement_efficiency_to_csv()

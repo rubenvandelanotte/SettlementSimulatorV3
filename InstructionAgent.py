@@ -88,6 +88,14 @@ class InstructionAgent (Agent):
                 self.status = 'Pending'
                 # logging
                 #self.model.log_event(f"Instruction {self.uniqueID} inserted.", self.uniqueID, is_transaction=True)
+                #new logging
+                self.model.log_event(
+                    event_type="instruction_inserted",
+                    object_ids=[self.uniqueID],
+                    attributes={"status": self.status}
+                )
+
+                #old logging
                 self.model.log_ocel_event(
                     activity="Instruction Inserted",
                     object_refs=[{"object_id": self.uniqueID, "object_type": "Instruction"}]
@@ -97,6 +105,14 @@ class InstructionAgent (Agent):
             self.set_status('Validated')
             #logging
             #self.model.log_event(f"Instruction {self.uniqueID} validated.", self.uniqueID, is_transaction = True)
+            #new logging
+            self.model.log_event(
+                event_type="instruction_validated",
+                object_ids=[self.uniqueID],
+                attributes={"status": self.status}
+            )
+            #old logging
+
             self.model.log_ocel_event(
                 activity="Instruction Validated",
                 object_refs=[{"object_id": self.uniqueID, "object_type": "Instruction"}]
