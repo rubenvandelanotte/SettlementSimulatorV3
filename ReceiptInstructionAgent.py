@@ -125,7 +125,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         #    is_transaction=True
         #)
         self.model.log_ocel_event(
-            activity="Matching Attempt",
+            activity="Attempting to Match",
             object_refs=[{"object_id": self.uniqueID, "object_type": "ReceiptInstruction"}]
         )
 

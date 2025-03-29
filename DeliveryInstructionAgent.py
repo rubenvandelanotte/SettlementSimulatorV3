@@ -96,7 +96,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         """Matches this DeliveryInstructionAgent with a ReceiptInstructionAgent
         that has the same link code and creates a TransactionAgent."""
         self.model.log_ocel_event(
-            activity="Matching Attempt",
+            activity="Attempting to Match",
             object_refs=[{"object_id": self.uniqueID, "object_type": "DeliveryInstruction"}]
         )
         #self.model.log_event(
