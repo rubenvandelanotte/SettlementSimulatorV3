@@ -1,0 +1,172 @@
+{
+    "eventTypes": [
+        {
+            "name": "delivery_instruction_created",
+            "attributes": [
+                {
+                    "name": "securityType",
+                    "type": "string"
+                },
+                {
+                    "name": "amount",
+                    "type": "number"
+                },
+                {
+                    "name": "status",
+                    "type": "string"
+                },
+                {
+                    "name": "linkcode",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "receipt_instruction_created",
+            "attributes": [
+                {
+                    "name": "securityType",
+                    "type": "string"
+                },
+                {
+                    "name": "amount",
+                    "type": "number"
+                },
+                {
+                    "name": "status",
+                    "type": "string"
+                },
+                {
+                    "name": "linkcode",
+                    "type": "string"
+                }
+            ]
+        }
+    ],
+    "objectTypes": [
+        {
+            "name": "DeliveryInstruction",
+            "attributes": []
+        },
+        {
+            "name": "ReceiptInstruction",
+            "attributes": []
+        },
+        {
+            "name": "Institution",
+            "attributes": []
+        },
+        {
+            "name": "Account",
+            "attributes": []
+        }
+    ],
+    "events": [
+        {
+            "id": "e5664da3-db25-41e9-a677-028a16c2277a",
+            "type": "delivery_instruction_created",
+            "time": "2025-03-29T10:00:00Z",
+            "attributes": [
+                {
+                    "name": "securityType",
+                    "value": "Bond-A"
+                },
+                {
+                    "name": "amount",
+                    "value": 25000000
+                },
+                {
+                    "name": "status",
+                    "value": "Exists"
+                },
+                {
+                    "name": "linkcode",
+                    "value": "LINK-1001"
+                }
+            ],
+            "relationships": [
+                {
+                    "objectId": "D100",
+                    "qualifier": "deliveryInstruction"
+                },
+                {
+                    "objectId": "INST-1",
+                    "qualifier": "institution"
+                },
+                {
+                    "objectId": "ACC123",
+                    "qualifier": "account"
+                }
+            ]
+        },
+        {
+            "id": "235b263a-b394-4a53-8ca1-c925141ffeff",
+            "type": "receipt_instruction_created",
+            "time": "2025-03-29T10:00:05Z",
+            "attributes": [
+                {
+                    "name": "securityType",
+                    "value": "Bond-A"
+                },
+                {
+                    "name": "amount",
+                    "value": 25000000
+                },
+                {
+                    "name": "status",
+                    "value": "Exists"
+                },
+                {
+                    "name": "linkcode",
+                    "value": "LINK-1001"
+                }
+            ],
+            "relationships": [
+                {
+                    "objectId": "R100",
+                    "qualifier": "receiptInstruction"
+                },
+                {
+                    "objectId": "INST-2",
+                    "qualifier": "institution"
+                },
+                {
+                    "objectId": "ACC789",
+                    "qualifier": "account"
+                }
+            ]
+        }
+    ],
+    "objects": [
+        {
+            "id": "D100",
+            "type": "DeliveryInstruction",
+            "attributes": []
+        },
+        {
+            "id": "INST-1",
+            "type": "Institution",
+            "attributes": []
+        },
+        {
+            "id": "ACC123",
+            "type": "Account",
+            "attributes": []
+        },
+        {
+            "id": "R100",
+            "type": "ReceiptInstruction",
+            "attributes": []
+        },
+        {
+            "id": "INST-2",
+            "type": "Institution",
+            "attributes": []
+        },
+        {
+            "id": "ACC789",
+            "type": "Account",
+            "attributes": []
+        }
+    ]
+}
