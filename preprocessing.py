@@ -13,7 +13,7 @@ def split_ocel_event_log_to_traditional(filename="ocel_event_log.csv"):
     The function saves each traditional event log as a separate CSV file.
     """
     # Load the OCEL event log CSV file
-    ocel_df = pd.read_csv(filename)
+    ocel_df = pd.read_csv(r"C:\Users\kathy\OneDrive\Documents\GitHub\SettlementSimulatorV3\event_log.csv")
 
     # Dictionary to collect traditional log events for each object type
     logs_by_object = {}
@@ -33,7 +33,7 @@ def split_ocel_event_log_to_traditional(filename="ocel_event_log.csv"):
             if obj_type:
                 new_event = {
                     "event_id": row.get("event_id"),
-                    "case_id": int(ref.get("object_id")),
+                    "case_id": ref.get("object_id"),
                     "timestamp": row.get("timestamp"),
                     "activity": row.get("activity")
                 }
@@ -44,7 +44,7 @@ def split_ocel_event_log_to_traditional(filename="ocel_event_log.csv"):
     # Save each traditional event log as its own CSV file
     for obj_type, events in logs_by_object.items():
         df = pd.DataFrame(events)
-        out_filename = f"{obj_type}_traditional_event_log.csv"
+        out_filename = f"{obj_type}.csv"
         df.to_csv(out_filename, index=False)
         print(f"Saved traditional event log for {obj_type} to {out_filename}")
 

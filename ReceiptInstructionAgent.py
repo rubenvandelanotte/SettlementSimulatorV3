@@ -37,7 +37,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         #    f"Receipt instruction with ID {uniqueID} created by institution {institution.institutionID} for {securityType} for amount {amount}",
         #    self.uniqueID, is_transaction=True)
         self.model.log_ocel_event(
-            activity="ReceiptInstruction Created",
+            activity="Created",
             object_refs=[
                 {"object_id": self.uniqueID, "object_type": "ReceiptInstruction"},
                 {"object_id": self.institution.institutionID, "object_type": "Institution"},
@@ -110,7 +110,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #    is_transaction=True
             #)
             self.model.log_ocel_event(
-                activity="ReceiptInstruction Partial Creation Failed: Insufficient Funds",
+                activity="Partial Settlement Failed: Insufficient Funds",
                 object_refs=[{"object_id": self.uniqueID, "object_type": "ReceiptInstruction"}]
             )
             return (None, None)
@@ -125,7 +125,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         #    is_transaction=True
         #)
         self.model.log_ocel_event(
-            activity="ReceiptInstruction Matching Attempt",
+            activity="Attempting to Match",
             object_refs=[{"object_id": self.uniqueID, "object_type": "ReceiptInstruction"}]
         )
 
@@ -136,7 +136,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #    is_transaction=True,
             #)
             self.model.log_ocel_event(
-                activity="ReceiptInstruction Match Failed: Incorrect State",
+                activity="Matching Failed: Incorrect State",
                 object_refs=[{"object_id": self.uniqueID, "object_type": "ReceiptInstruction"}]
             )
             return None
@@ -158,7 +158,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #    is_transaction=True,
             #)
             self.model.log_ocel_event(
-                activity="ReceiptInstruction Match Failed: No DeliveryInstruction Found",
+                activity="Matching Failed: No Counter Instruction Found",
                 object_refs=[{"object_id": self.uniqueID, "object_type": "ReceiptInstruction"}]
             )
             return None
@@ -187,7 +187,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         #    is_transaction=True,
         #)
         self.model.log_ocel_event(
-            activity="Instructions Matched",
+            activity="Matched",
             object_refs=[
                 {"object_id": other_instruction.uniqueID, "object_type": "DeliveryInstruction"},
                 {"object_id": self.uniqueID, "object_type": "ReceiptInstruction"},
@@ -204,13 +204,21 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #self.model.log_event(f"Instruction {self.uniqueID} cancelled due to timeout.", self.uniqueID,
             #                     is_transaction=True)
             self.model.log_ocel_event(
-                activity="ReceiptInstruction Cancelled due to Timeout",
+                activity="Cancelled due to Timeout",
                 object_refs=[{"object_id": self.uniqueID, "object_type": "ReceiptInstruction"}]
             )
         if self.status == "Matched":
             self.status = "Cancelled due to timeout"
             self.linkedTransaction.deliverer.set_status("Cancelled due to timeout")
             self.linkedTransaction.set_status("Cancelled due to timeout")
+
+            self.model.log_ocel_event(
+                activity="Cancelled due to Timeout",
+                object_refs=[
+                    {"object_id": self.uniqueID, "object_type": "ReceiptInstruction"},
+                    {"object_id": self.linkedTransaction.transactionID, "object_type": "Transaction"}
+                ]
+            )
 
             self.model.remove_transaction(self.linkedTransaction)
             self.model.agents.remove(self.linkedTransaction.deliverer)
@@ -221,12 +229,6 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
            # self.model.log_event(f"ReceiptInstruction {self.uniqueID} cancelled due to timeout.", self.uniqueID, is_transaction=True)
            # self.model.log_event(f"DeliveryInstruction {self.linkedTransaction.deliverer.get_uniqueID()} cancelled due to timeout.", self.linkedTransaction.deliverer.get_uniqueID(), is_transaction=True)
            # self.model.log_event(f"Transaction {self.linkedTransaction.get_transactionID()} cancelled due to timeout.", self.linkedTransaction.get_transactionID(), is_transaction=True)
-            self.model.log_ocel_event(
-                activity="ReceiptInstruction Matched Cancellation due to Timeout",
-                object_refs=[
-                    {"object_id": self.uniqueID, "object_type": "ReceiptInstruction"},
-                    {"object_id": self.linkedTransaction.transactionID, "object_type": "Transaction"}
-                ]
-            )
+
 
 #
