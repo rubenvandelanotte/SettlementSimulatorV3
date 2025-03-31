@@ -45,7 +45,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             }
         )
         self.model.log_event(
-            event_type="receipt_instruction_created",
+            event_type="ReceiptInstruction Created",
             object_ids=[self.uniqueID, self.institution.institutionID, self.securitiesAccount.getAccountID()],
             attributes={
                 "securityType": self.securityType,
@@ -126,7 +126,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             self.model.agents.add(receipt_child_1)
             self.model.agents.add(receipt_child_2)
             self.model.log_event(
-                event_type="partial_receipt_children_created",
+                event_type="Receipt Children Created",
                 object_ids=[receipt_child_1.uniqueID, receipt_child_2.uniqueID, self.uniqueID],
                 attributes={"parentInstructionID": self.uniqueID}
             )
@@ -138,6 +138,13 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #    self.uniqueID,
             #    is_transaction=True
             #)
+
+            #new logging
+            self.model.log_event(
+                event_type="Partial Settlement Failed: Insufficient Funds",
+                object_ids=[self.uniqueID],
+                attributes={"status": self.status}
+            )
 
 
             #old logging
@@ -158,7 +165,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         #)
         #new logging
         self.model.log_event(
-            event_type="instruction_attempting_to_match",
+            event_type="Attempting to Match",
             object_ids=[self.uniqueID],
             attributes={"status": self.status}
         )
@@ -177,7 +184,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #)
             #new logging
             self.model.log_event(
-                event_type="instruction_matched_failed_due_to_incorrect_state",
+                event_type="Matching Failed: Incorrect State",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
@@ -206,7 +213,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #)
             #new logging
             self.model.log_event(
-                event_type="instruction_matched_failed: no counter instruction found",
+                event_type="Matching Failed: No Counter Instruction Found",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
@@ -243,7 +250,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         #)
         #new logging
         self.model.log_event(
-            event_type="instruction_matched",
+            event_type="Matched",
             object_ids=[self.uniqueID, other_instruction.uniqueID, transaction.transactionID],
             attributes={"status": "Matched"}
         )
@@ -269,7 +276,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #                     is_transaction=True)
             #new logging
             self.model.log_event(
-                event_type="instruction_cancelled_timeout",
+                event_type="Cancelled due to timeout",
                 object_ids=[self.uniqueID],
                 attributes={"status": "Cancelled due to timeout"}
             )
@@ -284,7 +291,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             self.linkedTransaction.set_status("Cancelled due to timeout")
             #new logging
             self.model.log_event(
-                event_type="instruction_cancelled_timeout",
+                event_type="Cancelled due to timeout",
                 object_ids=[self.uniqueID,self.linkedTransaction.deliverer.uniqueID, self.linkedTransaction.transactionID],
                 attributes={"status": "Cancelled due to timeout"}
             )

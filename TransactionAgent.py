@@ -28,8 +28,9 @@ class TransactionAgent(Agent):
             }
         )
 
+        #new logging (I think this one should be removed)
         self.model.log_event(
-            event_type="transaction_created",
+            event_type="Transaction Created",
             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
             attributes={"status": self.status}
         )
@@ -48,7 +49,7 @@ class TransactionAgent(Agent):
         #self.model.log_event(f"Transaction {self.transactionID} attempting to settle.", self.transactionID, is_transaction = True)
         #new logging
         self.model.log_event(
-            event_type="transaction_attempting_to_settle",
+            event_type="Attempting to Settle",
             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
             attributes={"status": self.status}
         )
@@ -86,7 +87,7 @@ class TransactionAgent(Agent):
 
                         #new logging
                         self.model.log_event(
-                            event_type="transaction_cancelled_error",
+                            event_type="Cancelled due to error",
                             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                             attributes={"status": self.status}
                         )
@@ -112,7 +113,7 @@ class TransactionAgent(Agent):
                             #new logging
 
                             self.model.log_event(
-                                event_type="transaction_settled_late",
+                                event_type="Settled Late",
                                 object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                                 attributes={"status": self.status}
                             )
@@ -137,7 +138,7 @@ class TransactionAgent(Agent):
                             #new logging
 
                             self.model.log_event(
-                                event_type="transaction_settled_on_time",
+                                event_type="Settled On Time",
                                 object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                                 attributes={"status": self.status}
                             )
@@ -169,7 +170,7 @@ class TransactionAgent(Agent):
 
                 #new logging
                 self.model.log_event(
-                    event_type="transaction_settlement_failed_due_to_insufficient_funds",
+                    event_type="Settlement Failed: Insufficient Funds",
                     object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                     attributes={"status": self.status}
                 )
@@ -202,7 +203,7 @@ class TransactionAgent(Agent):
                         #)
                         #new logging
                         self.model.log_event(
-                            event_type="Partial_settlement_aborted",
+                            event_type="Partial Settlement Aborted",
                             object_ids=[self.transactionID,self.deliverer.uniqueID,self.receiver.uniqueID],
                             attributes={"status": self.status}
                         )
@@ -235,7 +236,7 @@ class TransactionAgent(Agent):
                         #)
                         #new logging
                         self.model.log_event(
-                            event_type="transaction_partially_settled",
+                            event_type="Partially Settled",
                             object_ids=[self.transactionID,self.deliverer.uniqueID,self.receiver.uniqueID],
                             attributes={"status": self.status}
                         )
@@ -253,7 +254,7 @@ class TransactionAgent(Agent):
         else:
         #    self.model.log_event(f"One of the instructions or transaction not in the correct state", self.transactionID, is_transaction = True)
             self.model.log_event(
-                event_type="transaction_settlement_failed_incorrect_status",
+                event_type="Settlement Failed: Incorrect Status",
                 object_ids=[self.transactionID,self.deliverer.uniqueID,self.receiver.uniqueID],
                 attributes={"status": self.status}
             )
@@ -294,7 +295,7 @@ class TransactionAgent(Agent):
 
         #new logging
         self.model.log_event(
-            event_type="transaction_cancelled_partial_settlement",
+            event_type="Cancelled due to Partial Settlement",
             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
             attributes={"status": self.status}
         )

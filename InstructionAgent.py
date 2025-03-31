@@ -90,7 +90,7 @@ class InstructionAgent (Agent):
                 #self.model.log_event(f"Instruction {self.uniqueID} inserted.", self.uniqueID, is_transaction=True)
                 #new logging
                 self.model.log_event(
-                    event_type="instruction_inserted",
+                    event_type="Instruction Inserted",
                     object_ids=[self.uniqueID],
                     attributes={"status": self.status}
                 )
@@ -107,7 +107,7 @@ class InstructionAgent (Agent):
             #self.model.log_event(f"Instruction {self.uniqueID} validated.", self.uniqueID, is_transaction = True)
             #new logging
             self.model.log_event(
-                event_type="instruction_validated",
+                event_type="Instruction Validated",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )

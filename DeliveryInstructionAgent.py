@@ -42,7 +42,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         )
 
         self.model.log_event(
-            event_type="delivery_instruction_created",
+            event_type="DeliveryInstruction Created",
             object_ids=[self.uniqueID, self.institution.institutionID, self.securitiesAccount.getAccountID()],
             attributes={
                 "securityType": self.securityType,
@@ -102,7 +102,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             self.model.instructions.append(delivery_child_1)
             self.model.instructions.append(delivery_child_2)
             self.model.log_event(
-                event_type="partial_delivery_children_created",
+                event_type="Delivery Children Created",
                 object_ids=[delivery_child_1.uniqueID, delivery_child_2.uniqueID, self.uniqueID],
                 attributes={"parentInstructionID": self.uniqueID}
             )
@@ -115,6 +115,15 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             #    is_transaction=True
             #)
 
+            #new logging
+            self.model.log_event(
+                event_type="Partial Settlement Failed: Insufficient Funds",
+                object_ids=[self.uniqueID],
+                attributes={"status": self.status}
+            )
+
+
+            #old logging
             self.model.log_ocel_event(
                 activity="Partial Settlement Failed: Insufficient Funds",
                 object_refs=[{"object_id": self.uniqueID, "object_type": "DeliveryInstruction"}]
@@ -127,7 +136,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         that has the same link code and creates a TransactionAgent."""
         #new logging
         self.model.log_event(
-            event_type="instruction_attempting_to_match",
+            event_type="Attempting to Match",
             object_ids=[self.uniqueID],
             attributes={"status": self.status}
         )
@@ -152,7 +161,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             #)
             #new logging
             self.model.log_event(
-                event_type="instruction_matched_failed_due_to_incorrect_state",
+                event_type="Matching Failed: Incorrect State",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
@@ -180,11 +189,17 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             #    self.uniqueID,
             #    is_transaction=True,
             #)
+
+
+            #new logging
             self.model.log_event(
-                event_type="instruction_matched_failed: no counter instruction found",
+                event_type="Matching Failed: No Counter Instruction Found",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
+
+
+            #old logging
             self.model.log_ocel_event(
                 activity="Matching Failed: No Counter Instruction Found",
                 object_refs=[{"object_id": self.uniqueID, "object_type": "DeliveryInstruction"}]
@@ -215,7 +230,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         #    is_transaction=True,
         #)
         self.model.log_event(
-            event_type="instruction_matched",
+            event_type="Matched",
             object_ids=[self.uniqueID, other_instruction.uniqueID, transaction.transactionID],
             attributes={"status": "Matched"}
         )
@@ -236,8 +251,9 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             self.status = "Cancelled due to timeout"
             self.model.agents.remove(self)
 
+            #new logging
             self.model.log_event(
-                event_type="instruction_cancelled_timeout",
+                event_type="Cancelled due to Timeout",
                 object_ids=[self.uniqueID],
                 attributes={"status": "Cancelled due to timeout"}
             )
@@ -253,8 +269,9 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             self.linkedTransaction.receiver.set_status("Cancelled due to timeout")
             self.linkedTransaction.set_status("Cancelled due to timeout")
 
+            #new logging
             self.model.log_event(
-                event_type="instruction_cancelled_timeout",
+                event_type="Cancelled due to Timeout",
                 object_ids=[self.uniqueID, self.linkedTransaction.receiver.uniqueID, self.linkedTransaction.transactionID],
                 attributes={"status": "Cancelled due to timeout"}
             )
