@@ -32,9 +32,10 @@ print("Object interactions summary: ", interactions_summary)
 ocpn = pm4py.discover_oc_petri_net(ocel)
 pm4py.view_ocpn(ocpn, format='svg')
 
+
 #5. Object centric directly follows graph
-ocdfg = pm4py.discover_ocdfg(ocel)
-pm4py.view_ocdfg(ocdfg, annotation='frequency', format='svg')
+#ocdfg = pm4py.discover_ocdfg(ocel)
+#pm4py.view_ocdfg(ocdfg, annotation='frequency', format='svg')
 
 #obj_graph_interaction = pm4py.discover_objects_graph(ocel, graph_type='object_interaction')
 #pm4py.view_object_graph(ocel, obj_graph_interaction, format='svg')

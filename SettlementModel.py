@@ -5,6 +5,7 @@ import pandas as pd
 import InstitutionAgent
 import Account
 import random
+import os
 from jsonocellogger import JSONOCELLogger
 
 def generate_iban():
@@ -22,18 +23,25 @@ class SettlementModel(Model):
         super().__init__()
         self.partialsallowed= partialsallowed
         #parameters of the model
-        self.num_institutions = 5
-        self.min_total_accounts = 2
-        self.max_total_accounts = 6
-        self.simulation_duration_days = 15
+        self.num_institutions = 10
+        self.min_total_accounts = 4
+        self.max_total_accounts = 10
+        self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
         self.min_settlement_amount = 100
-        self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D"]
+        self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
+        self.log_only_main_events= True
 
 
 
         self.simulation_start = datetime(2025, 4, 1, 1, 30)
-        self.simulation_end = self.simulation_start + timedelta(days=self.simulation_duration_days)
+        self.warm_up_period = timedelta(days=2)
+        self.cool_down_period = timedelta(days=2)
+
+        self.simulation_main_duration = timedelta(days=self.simulation_duration_days)
+        self.simulation_total_duration = self.warm_up_period + self.simulation_main_duration + self.cool_down_period
+        self.simulation_end = self.simulation_start + self.simulation_total_duration
+
         self.simulated_time = self.simulation_start
 
         self.trading_start = timedelta(hours=1, minutes=30)
@@ -58,6 +66,12 @@ class SettlementModel(Model):
 
         self.generate_data()
 
+    def in_main_period(self):
+        """Helper method to determine if the current simulated time is within the main period."""
+        main_start = self.simulation_start + self.warm_up_period
+        main_end = self.simulation_end - self.cool_down_period
+        return main_start <= self.simulated_time <= main_end
+
     def next_event_id(self):
         event_id = f"e{self.event_counter}"
         self.event_counter += 1
@@ -71,6 +85,12 @@ class SettlementModel(Model):
         self.logger.log_object(oid=object_id, otype=object_type, attributes=attributes_list)
 
     def log_event(self, event_type: str, object_ids: list, attributes: dict = None):
+
+        #allow for logging only in the main period (no warm-up / cooldown
+        if self.log_only_main_events and not self.in_main_period():
+            return
+
+
         if attributes is None:
             attributes = {}
         self.logger.log_event(
@@ -159,14 +179,15 @@ class SettlementModel(Model):
         print("-----------------------------------------")
         for i in range(1, self.num_institutions+ 1):
             print("-------------------------------------")
+            inst_bondtypes= []
             inst_id = f"INST-{i}"
             inst_accounts = []
             total_accounts = random.randint(self.min_total_accounts, self.max_total_accounts)
             #generate cash account => there has to be at least 1 cash account
             new_cash_accountID = generate_iban()
             new_cash_accountType = "Cash"
-            new_cash_balance =  round(random.uniform(3e9, 5e9), 2)  # Increased balance range
-            new_cash_creditLimit = round(random.uniform(2e9, 4e9), 2)
+            new_cash_balance =  round(random.uniform(6e9, 9e9), 2)  # Increased balance range
+            new_cash_creditLimit = round(random.uniform(0.25, 1), 2)*new_cash_balance
             new_cash_Account = Account.Account(accountID=new_cash_accountID, accountType= new_cash_accountType, balance= new_cash_balance, creditLimit=new_cash_creditLimit)
             inst_accounts.append(new_cash_Account)
             self.accounts.append(new_cash_Account)
@@ -182,11 +203,13 @@ class SettlementModel(Model):
             print(new_cash_Account.__repr__())
             for _ in range(total_accounts - 1):
                 new_security_accountID = generate_iban()
-                new_security_accountType = random.choice(self.bond_types)
+                new_security_accountType = random.choicenew_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
+
                 new_security_balance = round(random.uniform(600e7, 900e7), 2)
                 new_security_creditLimit = 0
                 new_security_Account = Account.Account(accountID=new_security_accountID, accountType= new_security_accountType, balance= new_security_balance, creditLimit= new_security_creditLimit)
                 inst_accounts.append(new_security_Account)
+                inst_bondtypes.append(new_security_accountType)
                 self.accounts.append(new_security_Account)
                 self.log_object(
                     object_id=new_security_accountID,
@@ -209,15 +232,28 @@ class SettlementModel(Model):
 
 
     def step(self):
+            # Determine which period we are in:
+            print(f"Running simulation step {self.steps}...")
+            main_start = self.simulation_start + self.warm_up_period
+            main_end = self.simulation_end - self.cool_down_period
+            if self.simulated_time < main_start:
+                current_period = "warm-up"
+            elif self.simulated_time > main_end:
+                current_period = "cool-down"
+            else:
+                current_period = "main"
+            print("Current simulation period:", current_period)
+
             time_of_day = self.simulated_time.time()
 
             if self.trading_start <= timedelta(hours=time_of_day.hour, minutes=time_of_day.minute) <= self.trading_end:
                 #real-time processing
                 self.batch_processed = False
-                print(f"Running simulation step {self.steps}...")
+
                 #shuffles all agents and then executes their step module once for all of them
                 self.agents.shuffle_do("step")
                 print(f"{len(self.agents)} Agents executed their step module")
+
             elif timedelta(hours=time_of_day.hour, minutes=time_of_day.minute) >= self.batch_start:
                 if not self.batch_processed: #batch processing at 22:00 only one loop of batch_processing
                     self.batch_processing()
@@ -291,10 +327,13 @@ class SettlementModel(Model):
         total_intended_value = 0.0
         total_settled_value = 0.0
 
+        main_start = self.simulation_start + self.warm_up_period
+        main_end = self.simulation_end - self.cool_down_period
+
         # Group original (mother) instructions by linkcode.
         original_pairs = {}
         for inst in self.instructions:
-            if inst.motherID == "mother":
+            if inst.motherID == "mother" and main_start <= inst.get_creation_time() <= main_end:
                 original_pairs.setdefault(inst.linkcode, []).append(inst)
 
         for linkcode, pair in original_pairs.items():
@@ -356,51 +395,52 @@ class SettlementModel(Model):
         df.to_csv(filename, index=False)
         print(f"Settlement efficiency metrics saved to {filename}")
 
-if __name__ == "__main__":
-    print("Starting simulation...")
-    log_path = input("Enter the path to save the log (press Enter for default): ")
-    if not log_path.strip():
-        log_path = "event_log.csv"
-    partial1 = (False,False,False,False,False)
-    partial2 =(True,False,False,False,False)
-    partial3= (True, True, False, False, False)
-    partial4= (True,True,True,False,False)
-    partial5=(True,True,True,True,False)
-    partial6=(True, True, True, True, True)
-    partials = list()
-    #partials.append(partial1)
+
+#if __name__ == "__main__":
+#    print("Starting simulation...")
+#    log_path = input("Enter the path to save the log (press Enter for default): ")
+#    if not log_path.strip():
+#        log_path = "event_log.csv"
+#    partial1 = (False,False,False,False,False, False, False, False, False, False)
+#    partial2 =(True,False,False,False,False)
+#    partial3= (True, True, False, False, False)
+#    partial4= (True,True,True,False,False)
+#    partial5=(True,True,True,True,False)
+#    partial6=(True, True, True, True, True, True, True, True, True, True)
+#    partials = list()
+#    partials.append(partial1)
     #partials.append(partial2)
     #partials.append(partial3)
     #partials.append(partial4)
     #partials.append(partial5)
-    partials.append(partial6)
-    efficiencies = []
-    for p in partials:
+  #  partials.append(partial6)
+  #  efficiencies = []
+  #  for p in partials:
 
-        for i in range(1):
-            model = SettlementModel(partialsallowed=p)
-            try:
-                while model.simulated_time < model.simulation_end:
-                    model.step()
-            except RecursionError:
-                print("RecursionError encountered: maximum recursion depth exceeded. Terminating simulation gracefully.")
+     #   for i in range(5):
+     #       model = SettlementModel(partialsallowed=p)
+     #       try:
+      #          while model.simulated_time < model.simulation_end:
+       #             model.step()
+       #     except RecursionError:
+       #         print("RecursionError encountered: maximum recursion depth exceeded. Terminating simulation gracefully.")
 
-            print("Final Event Log:")
-            for event in model.event_log:
-                print(event)
-            print("Saving final event log...")
-            model.save_log(log_path)
-            model.save_ocel_log(filename="simulation_log2.jsonocel")
-            print("---------------------------------------------------------------")
-            model.print_settlement_efficiency()
-            model.save_settlement_efficiency_to_csv()
-            new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
-            new_eff = {'Partial': str(p), 'instruction efficiency': new_ins_eff, 'value efficiency': new_val_eff}
-            efficiencies.append(new_eff)
+        #    print("Final Event Log:")
+        #    for event in model.event_log:
+        #        print(event)
+        #    print("Saving final event log...")
+         #   model.save_log(log_path)
+         #   model.save_ocel_log(filename="simulation_more_securities.jsonocel")
+         #   print("---------------------------------------------------------------")
+         #   model.print_settlement_efficiency()
+         #   model.save_settlement_efficiency_to_csv()
+         #   new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
+         #   new_eff = {'Partial': str(p), 'instruction efficiency': new_ins_eff, 'value efficiency': new_val_eff}
+         #   efficiencies.append(new_eff)
 
-        print(efficiencies)
+        #print(efficiencies)
 
-    df = pd.DataFrame(efficiencies)
-    df.to_csv("15 days all partials, 10 runs, new params")
+    #df = pd.DataFrame(efficiencies)
+    #df.to_csv("15 days all partials, 10 runs, new params")
 
 
