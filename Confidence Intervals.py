@@ -37,3 +37,6 @@ for config, values in grouped_value:
 print("\nBetrouwbaarheidsintervallen voor value efficiency per configuratie:")
 for config, stats_dict in results_value.items():
     print(f"{config}: Mean = {stats_dict['mean']:.2f}, CI = [{stats_dict['CI lower']:.2f}, {stats_dict['CI upper']:.2f}]")
+
+
+#dd

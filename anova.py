@@ -23,3 +23,4 @@ f_val_val, p_val_val = stats.f_oneway(*groups_value_efficiency)
 print("ANOVA voor value efficiency: F =", f_val_val, "p =", p_val_val)
 
 
+#dd
