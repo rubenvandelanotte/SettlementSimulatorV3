@@ -1,5 +1,12 @@
 import pandas as pd
 import scipy.stats as stats
+import logging
+
+logging.basicConfig(
+    filename="confidence_intervals.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 def compute_confidence_interval(data, confidence=0.95):
     """
@@ -18,9 +25,13 @@ df = pd.read_csv("New_measurement.csv")
 grouped_instruction = df.groupby("Partial")["instruction efficiency"]
 
 results_instruction = {}
+
+logging.info("Betrouwbaarheidsintervallen voor instruction efficiency per configuratie:")
 for config, values in grouped_instruction:
     mean, lower, upper = compute_confidence_interval(values)
     results_instruction[config] = {"mean": mean, "CI lower": lower, "CI upper": upper}
+    logging.info(f"Partial={config}: Mean = {mean:.2f}, CI = [{lower:.2f}, {upper:.2f}]")
+
 
 print("Betrouwbaarheidsintervallen voor instruction efficiency per configuratie:")
 for config, stats_dict in results_instruction.items():
@@ -30,9 +41,14 @@ for config, stats_dict in results_instruction.items():
 grouped_value = df.groupby("Partial")["value efficiency"]
 
 results_value = {}
+
+logging.info("Betrouwbaarheidsintervallen voor value efficiency per configuratie:")
 for config, values in grouped_value:
     mean, lower, upper = compute_confidence_interval(values)
     results_value[config] = {"mean": mean, "CI lower": lower, "CI upper": upper}
+    logging.info(f"Partial={config}: Mean = {mean:.2f}, CI = [{lower:.2f}, {upper:.2f}]")
+
+
 
 print("\nBetrouwbaarheidsintervallen voor value efficiency per configuratie:")
 for config, stats_dict in results_value.items():
