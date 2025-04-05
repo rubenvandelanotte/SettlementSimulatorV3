@@ -322,10 +322,10 @@ class SettlementModel(Model):
         Returns:
             A tuple (instruction_efficiency_percentage, value_efficiency_percentage)
         """
-        total_original_pairs = 0
         fully_settled_pairs = 0
         total_intended_value = 0.0
         total_settled_value = 0.0
+        eligible_instruction_pairs = 0
 
         main_start = self.simulation_start + self.warm_up_period
         main_end = self.simulation_end - self.cool_down_period
@@ -343,7 +343,6 @@ class SettlementModel(Model):
 
             # We assume both instructions have the same intended settlement amount.
             intended_amount = pair[0].get_amount()
-            total_original_pairs += 1
             total_intended_value += intended_amount
 
             # Case 1: Fully settled directly (both instructions settled on time or late).
@@ -351,6 +350,7 @@ class SettlementModel(Model):
                     pair[1].get_status() in ["Settled on time"]):
                 fully_settled_pairs += 1
                 total_settled_value += intended_amount
+                eligible_instruction_pairs += 1
 
             # Case 2: Partial settlement – both instructions were cancelled due to partial settlement.
             elif (pair[0].get_status() == "Cancelled due to partial settlement" and
@@ -364,10 +364,11 @@ class SettlementModel(Model):
                 # Count the pair as fully settled if the effective settled value equals the intended value.
                 if effective_settled == intended_amount:
                     fully_settled_pairs += 1
+                    eligible_instruction_pairs +=1
             # Other statuses are considered as not settled.
 
-        instruction_efficiency = (fully_settled_pairs / total_original_pairs * 100) if total_original_pairs > 0 else 0
-        value_efficiency = (total_settled_value / total_intended_value * 100) if total_intended_value > 0 else 0
+        instruction_efficiency = (fully_settled_pairs / eligible_instruction_pairs) * 100 if eligible_instruction_pairs > 0 else 0
+        value_efficiency = (total_settled_value / total_intended_value) * 100 if total_intended_value > 0 else 0
 
         return instruction_efficiency, value_efficiency
 
