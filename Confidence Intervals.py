@@ -4,6 +4,7 @@ import logging
 
 logging.basicConfig(
     filename="confidence_intervals.log",
+    filemode="w",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -30,8 +31,7 @@ logging.info("Betrouwbaarheidsintervallen voor instruction efficiency per config
 for config, values in grouped_instruction:
     mean, lower, upper = compute_confidence_interval(values)
     results_instruction[config] = {"mean": mean, "CI lower": lower, "CI upper": upper}
-    logging.info(f"Partial={config}: Mean = {mean:.2f}, CI = [{lower:.2f}, {upper:.2f}]")
-
+    logging.info(f"INSTRUCTION_CI,Partial={config},Mean={mean:.4f},Lower={lower:.4f},Upper={upper:.4f}")
 
 print("Betrouwbaarheidsintervallen voor instruction efficiency per configuratie:")
 for config, stats_dict in results_instruction.items():
@@ -46,9 +46,7 @@ logging.info("Betrouwbaarheidsintervallen voor value efficiency per configuratie
 for config, values in grouped_value:
     mean, lower, upper = compute_confidence_interval(values)
     results_value[config] = {"mean": mean, "CI lower": lower, "CI upper": upper}
-    logging.info(f"Partial={config}: Mean = {mean:.2f}, CI = [{lower:.2f}, {upper:.2f}]")
-
-
+    logging.info(f"VALUE_CI,Partial={config},Mean={mean:.4f},Lower={lower:.4f},Upper={upper:.4f}")
 
 print("\nBetrouwbaarheidsintervallen voor value efficiency per configuratie:")
 for config, stats_dict in results_value.items():
