@@ -133,10 +133,8 @@ class Account:
                 #self.model.log_event(f"Account {self.accountID} deducted {amount} securities of type {self.accountType}. New amount: {self.balance}", self.accountID, is_transaction=False)
                 return amount
             else:
-                #@ruben i think this should not be possible. if there is not enough to deduct, nothing should be deducted and partial settlement should be triggered
-                deducted = self.balance
-                self.balance = 0
-                return deducted
+
+                return 0
 
         else:
             print("Error: account doesn't allow to deduct this type of assets")

@@ -24,6 +24,7 @@ class InstructionAgent (Agent):
         self.creation_time = creation_time# track creation time for timeout
         self.linkedTransaction = linkedTransaction
         self.last_matched = creation_time
+        self.intended_settlement_time = creation_time + timedelta(hours=48) if motherID == "mother" else None
 
 
 #getter methods
@@ -82,6 +83,12 @@ class InstructionAgent (Agent):
     def set_status(self, new_status: str):
         self.status = new_status
 
+    def get_intended_settlement_time(self):
+        return self.intended_settlement_time
+
+    def set_intended_settlement_time(self, ts):
+        self.intended_settlement_time = ts
+
     def insert(self):
         if self.creation_time < self.model.simulated_time:
             if self.status == 'Exists':
@@ -123,7 +130,7 @@ class InstructionAgent (Agent):
     def step(self):
 
        if self.is_instruction_time_out():
-           self.cancel_timout()
+           self.cancel_timout() #applies to mother and children
        else:
            if self.status == 'Exists':
                self.insert()

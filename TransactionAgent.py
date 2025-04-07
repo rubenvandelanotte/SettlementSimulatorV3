@@ -103,7 +103,7 @@ class TransactionAgent(Agent):
                         )
                     if self.status != "Cancelled due to error":
                         #checks if settled on time (T+2)
-                        if self.deliverer.get_creation_time() + timedelta(hours = 48) < self.model.simulated_time or self.receiver.get_creation_time() + timedelta(hours = 48) < self.model.simulated_time:
+                        if (self.deliverer.get_intended_settlement_time() < self.model.simulated_time or self.receiver.get_intended_settlement_time() < self.model.simulated_time):
                             self.deliverer.set_status("Settled late")
                             self.receiver.set_status("Settled late")
                             self.status = "Settled late"

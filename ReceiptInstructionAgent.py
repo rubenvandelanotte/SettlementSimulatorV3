@@ -31,6 +31,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             status=status,
             linkcode=linkcode,
             creation_time=creation_time
+
         )
 
         self.model.log_object(
@@ -122,6 +123,10 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                 creation_time=self.model.simulated_time,
                 linkedTransaction=None
             )
+            #ensures that the intended_settlement_time of children = mother
+            receipt_child_1.set_intended_settlement_time(self.get_intended_settlement_time())
+            receipt_child_2.set_intended_settlement_time(self.get_intended_settlement_time())
+
             # Add the new child instructions to the agents scheduler.
             self.model.agents.add(receipt_child_1)
             self.model.agents.add(receipt_child_2)
