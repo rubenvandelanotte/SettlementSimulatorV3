@@ -10,7 +10,7 @@ def batch_runner():
         os.makedirs(log_folder)
 
     num_institutions = 10  # Aantal instituten in de simulatie
-    runs_per_config = 1  # Aantal simulaties per configuratie
+    runs_per_config = 2  # Aantal simulaties per configuratie
 
     efficiencies = []
 
@@ -43,7 +43,15 @@ def batch_runner():
             print(f"Logs opgeslagen voor configuratie {true_count} run {run}")
             print(f"Bereken settlement efficiency")
             new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
-            new_eff = {'Partial': str(partialsallowed), 'instruction efficiency': new_ins_eff, 'value efficiency': new_val_eff}
+
+            settled_count = model.count_settled_instructions()
+
+            new_eff = {
+                'Partial': str(partialsallowed),
+                'instruction efficiency': new_ins_eff,
+                'value efficiency': new_val_eff,
+                'settled_count': settled_count  # Add settled count to the results
+            }
             efficiencies.append(new_eff)
 
     return efficiencies
