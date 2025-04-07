@@ -46,11 +46,14 @@ def batch_runner():
 
             settled_count = model.count_settled_instructions()
 
+            total_settled_amount = model.get_total_settled_amount()
+
             new_eff = {
                 'Partial': str(partialsallowed),
                 'instruction efficiency': new_ins_eff,
                 'value efficiency': new_val_eff,
-                'settled_count': settled_count  # Add settled count to the results
+                'settled_count': settled_count,  # Instructions count
+                'settled_amount': total_settled_amount  # Total amount
             }
             efficiencies.append(new_eff)
 

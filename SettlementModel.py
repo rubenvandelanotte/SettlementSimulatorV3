@@ -450,6 +450,28 @@ class SettlementModel(Model):
 
         return settled_count
 
+    def get_total_settled_amount(self):
+        """
+        Calculates the total amount that was settled during the main simulation period.
+        This includes both directly settled instructions and recursively settled amounts
+        through child instructions.
+
+        Returns:
+            float: The total settled amount
+        """
+        main_start = self.simulation_start + self.warm_up_period
+        main_end = self.simulation_end - self.cool_down_period
+
+        total_settled_amount = 0.0
+
+        # First, add amounts from directly settled instructions
+        for inst in self.instructions:
+            if (inst.get_status() == "Settled on time" and
+                    main_start <= inst.get_creation_time() <= main_end):
+                total_settled_amount += inst.get_amount()
+
+        return total_settled_amount
+
     def print_settlement_efficiency(self):
         """
         Quickly prints the settlement efficiency metrics.

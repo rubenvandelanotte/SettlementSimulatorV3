@@ -72,3 +72,20 @@ if 'settled_count' in df.columns:
     for config, stats_dict in results_settled.items():
         print(
             f"{config}: Mean = {stats_dict['mean']:.2f}, CI = [{stats_dict['CI lower']:.2f}, {stats_dict['CI upper']:.2f}]")
+
+# Add settled_amount statistics
+if 'settled_amount' in df.columns:
+    grouped_amount = df.groupby("Partial")["settled_amount"]
+
+    results_amount = {}
+
+    logging.info("Betrouwbaarheidsintervallen voor totaal settled bedrag per configuratie:")
+    for config, values in grouped_amount:
+        mean, lower, upper = compute_confidence_interval(values)
+        results_amount[config] = {"mean": mean, "CI lower": lower, "CI upper": upper}
+        logging.info(f"SETTLED_AMOUNT,Partial={config},Mean={mean:.4f},Lower={lower:.4f},Upper={upper:.4f}")
+
+    print("\nBetrouwbaarheidsintervallen voor totaal settled bedrag per configuratie:")
+    for config, stats_dict in results_amount.items():
+        print(
+            f"{config}: Mean = {stats_dict['mean']:.2f}, CI = [{stats_dict['CI lower']:.2f}, {stats_dict['CI upper']:.2f}]")
