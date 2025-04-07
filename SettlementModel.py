@@ -203,7 +203,7 @@ class SettlementModel(Model):
             print(new_cash_Account.__repr__())
             for _ in range(total_accounts - 1):
                 new_security_accountID = generate_iban()
-                new_security_accountType = random.choicenew_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
+                new_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
 
                 new_security_balance = round(random.uniform(600e7, 900e7), 2)
                 new_security_creditLimit = 0

@@ -89,6 +89,9 @@ class InstructionAgent (Agent):
     def set_intended_settlement_time(self, ts):
         self.intended_settlement_time = ts
 
+    def cancel_timeout(self):
+        return
+
     def insert(self):
         if self.creation_time < self.model.simulated_time:
             if self.status == 'Exists':

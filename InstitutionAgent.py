@@ -31,7 +31,7 @@ class InstitutionAgent(Agent):
         if not self.allowPartial:
             print("Institution Already opted out, cannot opt out again")
         else:
-            self.allowPartiala = False
+            self.allowPartial = False
             print("Institution opted out of partial settlement")
             self.model.log_event(
                 event_type="institution_opt_out_partial",
