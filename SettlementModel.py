@@ -310,22 +310,21 @@ class SettlementModel(Model):
         child instructions.
 
         Two metrics are computed:
-         - Instruction Efficiency: the percentage of original instruction pairs (mother instructions)
-           that ended up fully settled (either directly or via child instructions covering the full amount).
+         - Instruction Efficiency: the percentage of eligible original instruction pairs that
+           reached settled status, either directly or through their child instructions.
          - Value Efficiency: the ratio (in percent) of the total settled (effective) value to the total
            intended settlement value.
 
         Original instructions are those with motherID == "mother", and they are grouped by their linkcode.
-        In case of partial settlement (both instructions cancelled due to partial settlement), this method
-        recursively aggregates settled amounts from child instructions.
+        For partial settlements, we check if the child instructions ultimately reached settlement.
 
         Returns:
             A tuple (instruction_efficiency_percentage, value_efficiency_percentage)
         """
         fully_settled_pairs = 0
+        eligible_original_pairs = 0
         total_intended_value = 0.0
         total_settled_value = 0.0
-        eligible_instruction_pairs = 0
 
         main_start = self.simulation_start + self.warm_up_period
         main_end = self.simulation_end - self.cool_down_period
@@ -346,31 +345,91 @@ class SettlementModel(Model):
             total_intended_value += intended_amount
 
             # Case 1: Fully settled directly (both instructions settled on time or late).
-            if (pair[0].get_status() in ["Settled on time"] and
-                    pair[1].get_status() in ["Settled on time"]):
+            if (pair[0].get_status() in ["Settled on time", "Settled late"] and
+                    pair[1].get_status() in ["Settled on time", "Settled late"]):
+                eligible_original_pairs += 1
                 fully_settled_pairs += 1
                 total_settled_value += intended_amount
-                eligible_instruction_pairs += 1
 
-            # Case 2: Partial settlement – both instructions were cancelled due to partial settlement.
+            # Case 2: Partial settlement – check if child instructions reached settlement
             elif (pair[0].get_status() == "Cancelled due to partial settlement" and
                   pair[1].get_status() == "Cancelled due to partial settlement"):
-                # Recursively sum settled amounts from child instructions (and their descendants).
+                # Calculate settled value for value efficiency
                 settled_child_value = (self.get_recursive_settled_amount(pair[0]) +
                                        self.get_recursive_settled_amount(pair[1]))
-                # The effective settled amount is capped at the intended amount.
                 effective_settled = min(settled_child_value, intended_amount)
                 total_settled_value += effective_settled
-                # Count the pair as fully settled if the effective settled value equals the intended value.
-                if effective_settled == intended_amount:
-                    fully_settled_pairs += 1
-                    eligible_instruction_pairs +=1
-            # Other statuses are considered as not settled.
 
-        instruction_efficiency = (fully_settled_pairs / eligible_instruction_pairs) * 100 if eligible_instruction_pairs > 0 else 0
-        value_efficiency = (total_settled_value / total_intended_value) * 100 if total_intended_value > 0 else 0
+                # NEW: Check if all child instructions are settled
+                # Get all child instructions for this pair
+                child_instructions = self.get_all_child_instructions(pair[0].uniqueID, pair[1].uniqueID)
+
+                # Check if all child instructions are either settled or cancelled due to further partial settlement
+                all_children_settled = True
+                for child in child_instructions:
+                    if child.get_status() not in ["Settled on time", "Settled late",
+                                                  "Cancelled due to partial settlement"]:
+                        all_children_settled = False
+                        break
+
+                # If all children are settled or further partially settled, count this pair as successful
+                if all_children_settled and effective_settled >= intended_amount * 0.99:  # Allow for small rounding differences
+                    eligible_original_pairs += 1
+                    fully_settled_pairs += 1
+
+            # Case 3: Other statuses (failed, rejected, etc.)
+            else:
+                eligible_original_pairs += 1  # Count in denominator but not in numerator
+
+        instruction_efficiency = (
+                    fully_settled_pairs / eligible_original_pairs * 100) if eligible_original_pairs > 0 else 0
+        value_efficiency = (total_settled_value / total_intended_value * 100) if total_intended_value > 0 else 0
 
         return instruction_efficiency, value_efficiency
+
+    def get_all_child_instructions(self, instruction_id1, instruction_id2):
+        """
+        Recursively get all child instructions for a pair of mother instructions.
+
+        Args:
+            instruction_id1: ID of the first mother instruction
+            instruction_id2: ID of the second mother instruction
+
+        Returns:
+            List of all child instructions
+        """
+        children = []
+
+        # First level children
+        for inst in self.instructions:
+            if inst.motherID in [instruction_id1, instruction_id2]:
+                children.append(inst)
+                # Recursively add all descendants
+                further_children = self.get_all_descendants(inst.uniqueID)
+                children.extend(further_children)
+
+        return children
+
+    def get_all_descendants(self, instruction_id):
+        """
+        Recursively get all descendants of an instruction.
+
+        Args:
+            instruction_id: ID of the parent instruction
+
+        Returns:
+            List of all descendant instructions
+        """
+        descendants = []
+
+        for inst in self.instructions:
+            if inst.motherID == instruction_id:
+                descendants.append(inst)
+                # Recursively add further descendants
+                further_descendants = self.get_all_descendants(inst.uniqueID)
+                descendants.extend(further_descendants)
+
+        return descendants
 
 
 
