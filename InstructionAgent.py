@@ -133,7 +133,7 @@ class InstructionAgent (Agent):
     def step(self):
 
        if self.is_instruction_time_out():
-           self.cancel_timout() #applies to mother and children
+           self.cancel_timeout() #applies to mother and children
        else:
            if self.status == 'Exists':
                self.insert()

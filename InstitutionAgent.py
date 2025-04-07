@@ -89,7 +89,7 @@ class InstitutionAgent(Agent):
         if other_institution_security_account is None:
             # Create a new security account for the counterparty institution
             new_security_account_id = SettlementModel.generate_iban()  # Generates an IBAN-like string
-            new_security_balance = int(random.uniform(600e7, 900e7), 2)  # Mimic the balance generation logic
+            new_security_balance = int(random.uniform(600e7, 900e7))  # Mimic the balance generation logic
             new_security_account = Account.Account(
                 accountID=new_security_account_id,
                 accountType=securityType,
@@ -165,11 +165,11 @@ class InstitutionAgent(Agent):
         if random.random() <0.05:
             self.create_cancelation_instruction()
 
-        if random.random() < 0.01:
-            if self.allowPartial:
-                self.opt_out_partial()
-            else:
-                self.opt_in_partial()
+        # if random.random() < 0.01:
+        #     if self.allowPartial:
+        #         self.opt_out_partial()
+        #     else:
+        #         self.opt_in_partial()
         self.model.simulated_time = self.model.simulated_time + timedelta(seconds=1)
 
     def get_full_institution_info(self):

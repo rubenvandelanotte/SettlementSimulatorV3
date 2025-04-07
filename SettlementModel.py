@@ -26,7 +26,7 @@ class SettlementModel(Model):
         self.num_institutions = 10
         self.min_total_accounts = 4
         self.max_total_accounts = 10
-        self.simulation_duration_days = 4 #number of measured days (so simulation is longer)
+        self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
         self.min_settlement_amount = 100
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
@@ -186,8 +186,8 @@ class SettlementModel(Model):
             #generate cash account => there has to be at least 1 cash account
             new_cash_accountID = generate_iban()
             new_cash_accountType = "Cash"
-            new_cash_balance =  int(random.uniform(6e9, 9e9), 2)  # Increased balance range
-            new_cash_creditLimit = int(random.uniform(0.25, 1), 2)*new_cash_balance
+            new_cash_balance =  int(random.uniform(6e9, 9e9))  # Increased balance range
+            new_cash_creditLimit = int(random.uniform(0.25, 1))*new_cash_balance
             new_cash_Account = Account.Account(accountID=new_cash_accountID, accountType= new_cash_accountType, balance= new_cash_balance, creditLimit=new_cash_creditLimit)
             inst_accounts.append(new_cash_Account)
             self.accounts.append(new_cash_Account)
@@ -205,7 +205,7 @@ class SettlementModel(Model):
                 new_security_accountID = generate_iban()
                 new_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
 
-                new_security_balance = int(random.uniform(600e7, 900e7), 2)
+                new_security_balance = int(random.uniform(600e7, 900e7))
                 new_security_creditLimit = 0
                 new_security_Account = Account.Account(accountID=new_security_accountID, accountType= new_security_accountType, balance= new_security_balance, creditLimit= new_security_creditLimit)
                 inst_accounts.append(new_security_Account)
