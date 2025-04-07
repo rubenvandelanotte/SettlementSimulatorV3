@@ -1,0 +1,44 @@
+2025-04-07 15:29:09,604 - INFO - Betrouwbaarheidsintervallen voor instruction efficiency per configuratie:
+2025-04-07 15:29:09,605 - INFO - INSTRUCTION_CI,Partial=(True, False, False, False, False, False, False, False, False, False),Mean=96.5551,Lower=84.9780,Upper=108.1322
+2025-04-07 15:29:09,606 - INFO - INSTRUCTION_CI,Partial=(True, True, False, False, False, False, False, False, False, False),Mean=95.4392,Lower=94.4276,Upper=96.4509
+2025-04-07 15:29:09,606 - INFO - INSTRUCTION_CI,Partial=(True, True, True, False, False, False, False, False, False, False),Mean=94.5497,Lower=79.7529,Upper=109.3466
+2025-04-07 15:29:09,607 - INFO - INSTRUCTION_CI,Partial=(True, True, True, True, False, False, False, False, False, False),Mean=94.1732,Lower=78.8525,Upper=109.4938
+2025-04-07 15:29:09,607 - INFO - INSTRUCTION_CI,Partial=(True, True, True, True, True, False, False, False, False, False),Mean=93.4352,Lower=61.5326,Upper=125.3377
+2025-04-07 15:29:09,608 - INFO - INSTRUCTION_CI,Partial=(True, True, True, True, True, True, False, False, False, False),Mean=97.6592,Lower=93.8471,Upper=101.4712
+2025-04-07 15:29:09,609 - INFO - INSTRUCTION_CI,Partial=(True, True, True, True, True, True, True, False, False, False),Mean=92.6099,Lower=55.6683,Upper=129.5514
+2025-04-07 15:29:09,609 - INFO - INSTRUCTION_CI,Partial=(True, True, True, True, True, True, True, True, False, False),Mean=96.7475,Lower=77.1909,Upper=116.3040
+2025-04-07 15:29:09,609 - INFO - INSTRUCTION_CI,Partial=(True, True, True, True, True, True, True, True, True, False),Mean=97.2802,Lower=75.5052,Upper=119.0552
+2025-04-07 15:29:09,610 - INFO - INSTRUCTION_CI,Partial=(True, True, True, True, True, True, True, True, True, True),Mean=95.8128,Lower=71.3364,Upper=120.2892
+2025-04-07 15:29:09,610 - INFO - Betrouwbaarheidsintervallen voor value efficiency per configuratie:
+2025-04-07 15:29:09,611 - INFO - VALUE_CI,Partial=(True, False, False, False, False, False, False, False, False, False),Mean=89.1883,Lower=87.5061,Upper=90.8704
+2025-04-07 15:29:09,611 - INFO - VALUE_CI,Partial=(True, True, False, False, False, False, False, False, False, False),Mean=85.6720,Lower=60.2111,Upper=111.1330
+2025-04-07 15:29:09,612 - INFO - VALUE_CI,Partial=(True, True, True, False, False, False, False, False, False, False),Mean=81.3736,Lower=67.0441,Upper=95.7031
+2025-04-07 15:29:09,612 - INFO - VALUE_CI,Partial=(True, True, True, True, False, False, False, False, False, False),Mean=79.5984,Lower=12.1639,Upper=147.0329
+2025-04-07 15:29:09,613 - INFO - VALUE_CI,Partial=(True, True, True, True, True, False, False, False, False, False),Mean=79.5867,Lower=33.9248,Upper=125.2486
+2025-04-07 15:29:09,613 - INFO - VALUE_CI,Partial=(True, True, True, True, True, True, False, False, False, False),Mean=87.5024,Lower=17.0241,Upper=157.9808
+2025-04-07 15:29:09,613 - INFO - VALUE_CI,Partial=(True, True, True, True, True, True, True, False, False, False),Mean=84.1075,Lower=56.5268,Upper=111.6883
+2025-04-07 15:29:09,614 - INFO - VALUE_CI,Partial=(True, True, True, True, True, True, True, True, False, False),Mean=89.2092,Lower=67.0393,Upper=111.3791
+2025-04-07 15:29:09,614 - INFO - VALUE_CI,Partial=(True, True, True, True, True, True, True, True, True, False),Mean=87.9616,Lower=40.5501,Upper=135.3731
+2025-04-07 15:29:09,615 - INFO - VALUE_CI,Partial=(True, True, True, True, True, True, True, True, True, True),Mean=79.1221,Lower=-23.3829,Upper=181.6270
+2025-04-07 15:29:09,615 - INFO - Betrouwbaarheidsintervallen voor aantal settled instructions per configuratie:
+2025-04-07 15:29:09,617 - INFO - SETTLED_COUNT,Partial=(True, False, False, False, False, False, False, False, False, False),Mean=1137.5000,Lower=241.7126,Upper=2033.2874
+2025-04-07 15:29:09,617 - INFO - SETTLED_COUNT,Partial=(True, True, False, False, False, False, False, False, False, False),Mean=854.5000,Lower=822.7345,Upper=886.2655
+2025-04-07 15:29:09,618 - INFO - SETTLED_COUNT,Partial=(True, True, True, False, False, False, False, False, False, False),Mean=1072.0000,Lower=436.6898,Upper=1707.3102
+2025-04-07 15:29:09,618 - INFO - SETTLED_COUNT,Partial=(True, True, True, True, False, False, False, False, False, False),Mean=1104.0000,Lower=862.5821,Upper=1345.4179
+2025-04-07 15:29:09,618 - INFO - SETTLED_COUNT,Partial=(True, True, True, True, True, False, False, False, False, False),Mean=1243.5000,Lower=995.7290,Upper=1491.2710
+2025-04-07 15:29:09,619 - INFO - SETTLED_COUNT,Partial=(True, True, True, True, True, True, False, False, False, False),Mean=1124.0000,Lower=780.9325,Upper=1467.0675
+2025-04-07 15:29:09,619 - INFO - SETTLED_COUNT,Partial=(True, True, True, True, True, True, True, False, False, False),Mean=1010.5000,Lower=-634.9535,Upper=2655.9535
+2025-04-07 15:29:09,620 - INFO - SETTLED_COUNT,Partial=(True, True, True, True, True, True, True, True, False, False),Mean=1141.5000,Lower=-923.2583,Upper=3206.2583
+2025-04-07 15:29:09,620 - INFO - SETTLED_COUNT,Partial=(True, True, True, True, True, True, True, True, True, False),Mean=1116.5000,Lower=309.6560,Upper=1923.3440
+2025-04-07 15:29:09,620 - INFO - SETTLED_COUNT,Partial=(True, True, True, True, True, True, True, True, True, True),Mean=1061.0000,Lower=-857.6369,Upper=2979.6369
+2025-04-07 15:29:09,621 - INFO - Betrouwbaarheidsintervallen voor totaal settled bedrag per configuratie:
+2025-04-07 15:29:09,621 - INFO - SETTLED_AMOUNT,Partial=(True, False, False, False, False, False, False, False, False, False),Mean=346394172709.4213,Lower=-332624063190.9437,Upper=1025412408609.7863
+2025-04-07 15:29:09,622 - INFO - SETTLED_AMOUNT,Partial=(True, True, False, False, False, False, False, False, False, False),Mean=250576879894.2569,Lower=827699696.0208,Upper=500326060092.4930
+2025-04-07 15:29:09,622 - INFO - SETTLED_AMOUNT,Partial=(True, True, True, False, False, False, False, False, False, False),Mean=273960277462.6545,Lower=171125081545.3016,Upper=376795473380.0075
+2025-04-07 15:29:09,623 - INFO - SETTLED_AMOUNT,Partial=(True, True, True, True, False, False, False, False, False, False),Mean=329508552408.3135,Lower=270575849777.6444,Upper=388441255038.9825
+2025-04-07 15:29:09,623 - INFO - SETTLED_AMOUNT,Partial=(True, True, True, True, True, False, False, False, False, False),Mean=286972178703.3196,Lower=230577734574.5067,Upper=343366622832.1326
+2025-04-07 15:29:09,623 - INFO - SETTLED_AMOUNT,Partial=(True, True, True, True, True, True, False, False, False, False),Mean=327422315343.6467,Lower=-4127108009.8170,Upper=658971738697.1104
+2025-04-07 15:29:09,624 - INFO - SETTLED_AMOUNT,Partial=(True, True, True, True, True, True, True, False, False, False),Mean=306293920543.7500,Lower=243343326905.9615,Upper=369244514181.5385
+2025-04-07 15:29:09,624 - INFO - SETTLED_AMOUNT,Partial=(True, True, True, True, True, True, True, True, False, False),Mean=298973099812.2070,Lower=169163003080.5046,Upper=428783196543.9094
+2025-04-07 15:29:09,625 - INFO - SETTLED_AMOUNT,Partial=(True, True, True, True, True, True, True, True, True, False),Mean=289599495175.2709,Lower=-272506783156.8206,Upper=851705773507.3625
+2025-04-07 15:29:09,625 - INFO - SETTLED_AMOUNT,Partial=(True, True, True, True, True, True, True, True, True, True),Mean=260997449910.0688,Lower=51103738145.4569,Upper=470891161674.6807
