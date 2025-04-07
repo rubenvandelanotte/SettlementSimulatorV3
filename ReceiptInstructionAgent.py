@@ -123,6 +123,11 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                 creation_time=self.model.simulated_time,
                 linkedTransaction=None
             )
+
+            # add to instructions list of model
+            self.model.instructions.append(receipt_child_1)
+            self.model.instructions.append(receipt_child_2)
+
             #ensures that the intended_settlement_time of children = mother
             receipt_child_1.set_intended_settlement_time(self.get_intended_settlement_time())
             receipt_child_2.set_intended_settlement_time(self.get_intended_settlement_time())
