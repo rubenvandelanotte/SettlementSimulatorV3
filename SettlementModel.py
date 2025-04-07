@@ -345,8 +345,8 @@ class SettlementModel(Model):
             total_intended_value += intended_amount
 
             # Case 1: Fully settled directly (both instructions settled on time or late).
-            if (pair[0].get_status() in ["Settled on time", "Settled late"] and
-                    pair[1].get_status() in ["Settled on time", "Settled late"]):
+            if (pair[0].get_status() in ["Settled on time"] and
+                    pair[1].get_status() in ["Settled on time"]):
                 eligible_original_pairs += 1
                 fully_settled_pairs += 1
                 total_settled_value += intended_amount
@@ -367,7 +367,7 @@ class SettlementModel(Model):
                 # Check if all child instructions are either settled or cancelled due to further partial settlement
                 all_children_settled = True
                 for child in child_instructions:
-                    if child.get_status() not in ["Settled on time", "Settled late",
+                    if child.get_status() not in ["Settled on time",
                                                   "Cancelled due to partial settlement"]:
                         all_children_settled = False
                         break
