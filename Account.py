@@ -133,7 +133,7 @@ class Account:
                 #self.model.log_event(f"Account {self.accountID} deducted {amount} securities of type {self.accountType}. New amount: {self.balance}", self.accountID, is_transaction=False)
                 return amount
             else:
-
+                #should never happen
                 return 0
 
         else:

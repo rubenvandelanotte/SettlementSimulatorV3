@@ -80,7 +80,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         if self.cashAccount.getAccountType() != "Cash":
             available_cash = 0
         else:
-            available_cash = self.cashAccount.getBalance()
+            available_cash = self.cashAccount.getBalance() + self.cashAccount.getCreditLimit() - self.cashAccount.getUsedCredit()
 
         deliverer = self.linkedTransaction.deliverer
         if deliverer.securitiesAccount.getAccountType() != self.securityType:
@@ -270,7 +270,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         )
         return transaction
 
-    def cancel_timout(self):
+    def cancel_timeout(self):
         if self.status == "Exists" or self.status == "Pending" or self.status == "Validated":
             self.status = "Cancelled due to timeout"
             self.model.agents.remove(self)

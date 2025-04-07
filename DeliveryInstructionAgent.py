@@ -79,7 +79,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         if receiver.cashAccount.getAccountType() != "Cash":
             available_cash = 0
         else:
-            available_cash = receiver.cashAccount.getBalance()
+            available_cash = receiver.cashAccount.getBalance() + receiver.cashAccount.getCreditLimit() - receiver.cashAccount.getUsedCredit()
 
         #takes the minimum of available securities of deliverer and available cash of seller and not more than the amount
         available_to_settle = min(self.amount, available_cash, available_securities)
@@ -251,7 +251,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         )
         return transaction
 
-    def cancel_timout(self):
+    def cancel_timeout(self):
         if self.status == "Exists" or self.status == "Pending" or self.status == "Validated":
             self.status = "Cancelled due to timeout"
             self.model.agents.remove(self)

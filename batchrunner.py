@@ -10,7 +10,7 @@ def batch_runner():
         os.makedirs(log_folder)
 
     num_institutions = 10  # Aantal instituten in de simulatie
-    runs_per_config = 2  # Aantal simulaties per configuratie
+    runs_per_config = 5  # Aantal simulaties per configuratie
 
     efficiencies = []
 

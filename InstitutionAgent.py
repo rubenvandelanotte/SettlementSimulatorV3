@@ -43,7 +43,7 @@ class InstitutionAgent(Agent):
         if self.allowPartial:
             print("Institution Already opted in, cannot opt in again")
         else:
-            self.allow_partial = True
+            self.allowPartial = True
             print("Institution opted in of partial settlements")
             self.model.log_event(
                 event_type="institution_opt_in_partial",

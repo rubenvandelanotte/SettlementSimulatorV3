@@ -236,9 +236,9 @@ class TransactionAgent(Agent):
             return
 
         if self.deliverer.is_instruction_time_out():
-            self.deliverer.cancel_timout()
+            self.deliverer.cancel_timeout()
         elif self.receiver.is_instruction_time_out():
-            self.receiver.cancel_timout()
+            self.receiver.cancel_timeout()
         elif self.status not in ["Cancelled due to timeout","Cancelled due to partial settlement", "Settled late", "Settled on time", "Cancelled due to error"]:
             if self.model.trading_start <= timedelta(hours=time_of_day.hour, minutes=time_of_day.minute) <= self.model.trading_end:
                 self.settle()

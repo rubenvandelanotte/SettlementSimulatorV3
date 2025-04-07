@@ -185,7 +185,7 @@ def plot_value_efficiency(value_data, settled_amounts, title, color, filename):
     # Primary axis: Efficiency percentage
     ax1.set_xlabel("Configuratie (aantal True waarden in Partial)", fontsize=12)
     ax1.set_ylabel("Value Efficiëntie (%)", fontsize=12, color=color)
-    ax1.set_ylim(60, 80)  # Adjusted to focus on the relevant range
+    ax1.set_ylim(60, 100)  # Adjusted to focus on the relevant range
 
     # Plot means with error bars
     ax1.errorbar(configs, means, yerr=[lower_errors, upper_errors], fmt='o', color=color,
@@ -350,7 +350,7 @@ def plot_combined_with_settled_count(instruction_data, value_data, settled_count
     ax2.errorbar(configs, means_value, yerr=[lower_errors_value, upper_errors_value],
                  fmt='o', color='salmon', capsize=5, label='Value Efficiency', markersize=8)
     ax2.plot(configs, means_value, 'o', color='salmon', markersize=8)
-    ax2.set_ylim(60, 80)  # Adjusted to focus on the relevant range
+    ax2.set_ylim(60, 100)  # Adjusted to focus on the relevant range
     ax2.tick_params(axis='y', labelcolor='salmon')
 
     ax2b = ax2.twinx()
