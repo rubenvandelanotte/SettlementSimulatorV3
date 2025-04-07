@@ -26,7 +26,7 @@ class SettlementModel(Model):
         self.num_institutions = 10
         self.min_total_accounts = 4
         self.max_total_accounts = 10
-        self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
+        self.simulation_duration_days = 4 #number of measured days (so simulation is longer)
         self.min_settlement_amount = 100
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
@@ -170,9 +170,9 @@ class SettlementModel(Model):
         so that overall: mean ≈ €324M, std ≈ €829M, and median ≈ €20M.
         """
         if random.random() < 0.881:
-            return random.uniform(18e6, 22e6)
+            return int(random.uniform(18e6, 22e6))
         else:
-            return random.uniform(2.45e9, 2.70e9)
+            return int(random.uniform(2.45e9, 2.70e9))
 
     def generate_data(self):
         print("Generate Accounts & Institutions:")
@@ -186,8 +186,8 @@ class SettlementModel(Model):
             #generate cash account => there has to be at least 1 cash account
             new_cash_accountID = generate_iban()
             new_cash_accountType = "Cash"
-            new_cash_balance =  round(random.uniform(6e9, 9e9), 2)  # Increased balance range
-            new_cash_creditLimit = round(random.uniform(0.25, 1), 2)*new_cash_balance
+            new_cash_balance =  int(random.uniform(6e9, 9e9), 2)  # Increased balance range
+            new_cash_creditLimit = int(random.uniform(0.25, 1), 2)*new_cash_balance
             new_cash_Account = Account.Account(accountID=new_cash_accountID, accountType= new_cash_accountType, balance= new_cash_balance, creditLimit=new_cash_creditLimit)
             inst_accounts.append(new_cash_Account)
             self.accounts.append(new_cash_Account)
@@ -205,7 +205,7 @@ class SettlementModel(Model):
                 new_security_accountID = generate_iban()
                 new_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
 
-                new_security_balance = round(random.uniform(600e7, 900e7), 2)
+                new_security_balance = int(random.uniform(600e7, 900e7), 2)
                 new_security_creditLimit = 0
                 new_security_Account = Account.Account(accountID=new_security_accountID, accountType= new_security_accountType, balance= new_security_balance, creditLimit= new_security_creditLimit)
                 inst_accounts.append(new_security_Account)
@@ -310,19 +310,20 @@ class SettlementModel(Model):
         child instructions.
 
         Two metrics are computed:
-         - Instruction Efficiency: the percentage of eligible original instruction pairs that
-           reached settled status, either directly or through their child instructions.
+         - Instruction Efficiency: the percentage of original instruction pairs (mother instructions)
+           that ended up fully settled (either directly or via child instructions covering the full amount).
          - Value Efficiency: the ratio (in percent) of the total settled (effective) value to the total
            intended settlement value.
 
         Original instructions are those with motherID == "mother", and they are grouped by their linkcode.
-        For partial settlements, we check if the child instructions ultimately reached settlement.
+        In case of partial settlement (both instructions cancelled due to partial settlement), this method
+        recursively aggregates settled amounts from child instructions.
 
         Returns:
             A tuple (instruction_efficiency_percentage, value_efficiency_percentage)
         """
+        total_original_pairs = 0
         fully_settled_pairs = 0
-        eligible_original_pairs = 0
         total_intended_value = 0.0
         total_settled_value = 0.0
 
@@ -342,94 +343,33 @@ class SettlementModel(Model):
 
             # We assume both instructions have the same intended settlement amount.
             intended_amount = pair[0].get_amount()
+            total_original_pairs += 1
             total_intended_value += intended_amount
 
             # Case 1: Fully settled directly (both instructions settled on time or late).
             if (pair[0].get_status() in ["Settled on time"] and
                     pair[1].get_status() in ["Settled on time"]):
-                eligible_original_pairs += 1
                 fully_settled_pairs += 1
                 total_settled_value += intended_amount
 
-            # Case 2: Partial settlement – check if child instructions reached settlement
+            # Case 2: Partial settlement – both instructions were cancelled due to partial settlement.
             elif (pair[0].get_status() == "Cancelled due to partial settlement" and
                   pair[1].get_status() == "Cancelled due to partial settlement"):
-                # Calculate settled value for value efficiency
+                # Recursively sum settled amounts from child instructions (and their descendants).
                 settled_child_value = (self.get_recursive_settled_amount(pair[0]) +
                                        self.get_recursive_settled_amount(pair[1]))
+                # The effective settled amount is capped at the intended amount.
                 effective_settled = min(settled_child_value, intended_amount)
                 total_settled_value += effective_settled
-
-                # NEW: Check if all child instructions are settled
-                # Get all child instructions for this pair
-                child_instructions = self.get_all_child_instructions(pair[0].uniqueID, pair[1].uniqueID)
-
-                # Check if all child instructions are either settled or cancelled due to further partial settlement
-                all_children_settled = True
-                for child in child_instructions:
-                    if child.get_status() not in ["Settled on time",
-                                                  "Cancelled due to partial settlement"]:
-                        all_children_settled = False
-                        break
-
-                # If all children are settled or further partially settled, count this pair as successful
-                if all_children_settled and effective_settled >= intended_amount * 0.99:  # Allow for small rounding differences
-                    eligible_original_pairs += 1
+                # Count the pair as fully settled if the effective settled value equals the intended value.
+                if effective_settled == intended_amount:
                     fully_settled_pairs += 1
+            # Other statuses are considered as not settled.
 
-            # Case 3: Other statuses (failed, rejected, etc.)
-            else:
-                eligible_original_pairs += 1  # Count in denominator but not in numerator
-
-        instruction_efficiency = (
-                    fully_settled_pairs / eligible_original_pairs * 100) if eligible_original_pairs > 0 else 0
+        instruction_efficiency = (fully_settled_pairs / total_original_pairs * 100) if total_original_pairs > 0 else 0
         value_efficiency = (total_settled_value / total_intended_value * 100) if total_intended_value > 0 else 0
 
         return instruction_efficiency, value_efficiency
-
-    def get_all_child_instructions(self, instruction_id1, instruction_id2):
-        """
-        Recursively get all child instructions for a pair of mother instructions.
-
-        Args:
-            instruction_id1: ID of the first mother instruction
-            instruction_id2: ID of the second mother instruction
-
-        Returns:
-            List of all child instructions
-        """
-        children = []
-
-        # First level children
-        for inst in self.instructions:
-            if inst.motherID in [instruction_id1, instruction_id2]:
-                children.append(inst)
-                # Recursively add all descendants
-                further_children = self.get_all_descendants(inst.uniqueID)
-                children.extend(further_children)
-
-        return children
-
-    def get_all_descendants(self, instruction_id):
-        """
-        Recursively get all descendants of an instruction.
-
-        Args:
-            instruction_id: ID of the parent instruction
-
-        Returns:
-            List of all descendant instructions
-        """
-        descendants = []
-
-        for inst in self.instructions:
-            if inst.motherID == instruction_id:
-                descendants.append(inst)
-                # Recursively add further descendants
-                further_descendants = self.get_all_descendants(inst.uniqueID)
-                descendants.extend(further_descendants)
-
-        return descendants
 
     def count_settled_instructions(self):
         """
