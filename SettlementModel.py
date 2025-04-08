@@ -27,7 +27,7 @@ class SettlementModel(Model):
         self.min_total_accounts = 4
         self.max_total_accounts = 10
         self.simulation_duration_days = 5 #number of measured days (so simulation is longer)
-        self.min_settlement_amount = 10000
+        self.min_settlement_amount = 100
         self.MAX_CHILD_DEPTH = 15
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
@@ -276,13 +276,26 @@ class SettlementModel(Model):
         self.transactions.remove(t)
 
     def batch_processing(self):
+        # --- Phase 1: Insert all ---
         for instruction in self.instructions:
             if instruction.get_status() == "Exists":
                 instruction.insert()
+
+        # --- Phase 2: Validate all ---
+        for instruction in self.instructions:
             if instruction.get_status() == "Pending":
                 instruction.validate()
-            if instruction.get_status() == "Validated":
-                instruction.match()
+
+        # --- Phase 3: Match with retries ---
+        matching_changed = True
+        while matching_changed:
+            matching_changed = False
+            for instruction in self.instructions:
+                if instruction.get_status() == "Validated":
+                    result = instruction.match()
+                    if result is not None:
+                        matching_changed = True
+
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
                 transaction.settle()
