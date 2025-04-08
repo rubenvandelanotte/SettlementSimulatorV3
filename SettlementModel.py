@@ -68,6 +68,7 @@ class SettlementModel(Model):
         self.event_log = []  # List to store OCEL events
         self.objects_catalog = {}  # Dictionary for static object info
 
+        self.partial_cancelled_count = 0
 
         self.generate_data()
 
@@ -471,7 +472,7 @@ class SettlementModel(Model):
         return len(mothers) // 2  # 2 instructions per pair
 
     def get_partial_settlement_count(self):
-        return sum(1 for t in self.transactions if t.get_status() == "Cancelled due to partial settlement")
+        return self.partial_cancelled_count
 
     def get_error_cancellation_count(self):
         return sum(1 for inst in self.instructions if inst.get_status() == "Cancelled due to error")

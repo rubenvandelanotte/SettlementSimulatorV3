@@ -268,6 +268,7 @@ class TransactionAgent(Agent):
         #logging
         #self.model.log_event(f"Transaction {self.transactionID} cancelled due to partial settlement.", self.transactionID, is_transaction = True)
         #remove transition and instructions from the model when cancelled
+        self.model.partial_cancelled_count += 1
         self.model.remove_transaction(self)
         self.model.agents.remove(self.deliverer)
         self.model.agents.remove(self.receiver)
