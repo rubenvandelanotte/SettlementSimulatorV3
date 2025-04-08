@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from Account import Account
 
 class InstructionAgent (Agent):
-    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: int, isChild: bool, status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None):
+    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: int, isChild: bool, status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0):
         super().__init__(model)
         self.uniqueID = uniqueID
         self.motherID = motherID
@@ -25,7 +25,7 @@ class InstructionAgent (Agent):
         self.linkedTransaction = linkedTransaction
         self.last_matched = creation_time
         self.intended_settlement_time = creation_time + timedelta(hours=48) if motherID == "mother" else None
-
+        self.depth = depth
 
 #getter methods
     def get_model(self):

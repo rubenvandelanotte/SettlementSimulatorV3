@@ -28,6 +28,7 @@ class SettlementModel(Model):
         self.max_total_accounts = 10
         self.simulation_duration_days = 5 #number of measured days (so simulation is longer)
         self.min_settlement_amount = 10000
+        self.MAX_CHILD_DEPTH = 15
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
         self.log_only_main_events= True
@@ -297,11 +298,6 @@ class SettlementModel(Model):
         Returns:
             The total settled amount from all descendant instructions.
         """
-
-        if depth > 100:  # Maximum recursion depth of 100
-            print(f"WARNING: Max recursion depth reached for instruction {parent_instruction.get_uniqueID()}")
-            return 0.0
-
         total = 0.0
         for inst in self.instructions:
             # Check if this instruction is a child of the parent_instruction.

@@ -12,7 +12,7 @@ import ReceiptInstructionAgent
 import TransactionAgent
 
 class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
-    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool, status: str, linkcode: str, creation_time: datetime ,linkedTransaction: Optional["TransactionAgent"] = None):
+    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool, status: str, linkcode: str, creation_time: datetime ,linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0):
         super().__init__(
             model=model,
             linkedTransaction=linkedTransaction,
@@ -26,7 +26,8 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             isChild=isChild,
             status=status,
             linkcode=linkcode,
-            creation_time=creation_time
+            creation_time=creation_time,
+            depth=depth
         )
 
         self.model.log_object(
@@ -37,7 +38,9 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                 "amount": self.amount,
                 "status": self.status,
                 "linkcode": self.linkcode,
-                "institutionID": self.institution.institutionID
+                "institutionID": self.institution.institutionID,
+                "depth": self.depth,
+                "motherID": self.motherID
             }
         )
 
@@ -48,7 +51,9 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                 "securityType": self.securityType,
                 "amount": self.amount,
                 "status": self.status,
-                "linkcode": self.linkcode
+                "linkcode": self.linkcode,
+                "depth": self.depth,
+                "motherID": self.motherID
             }
         )
         #old logger
@@ -68,6 +73,10 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         return self.creation_time
 
     def createDeliveryChildren(self):
+
+
+        if self.depth >= self.model.MAX_CHILD_DEPTH:
+            return(None, None)
 
         MIN_SETTLEMENT_AMOUNT = self.model.min_settlement_amount  # Define a minimum settlement threshold (@ruben dont think this is necessary)
         if self.securitiesAccount.getAccountType() != self.securityType:
@@ -90,11 +99,11 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             #instant matching and settlement of first child not yet possible, because receipt_child_1 does not yet exist
             delivery_child_1 = DeliveryInstructionAgent(self.model, f"{self.uniqueID}_1", self.uniqueID,
                                                 self.institution, self.securitiesAccount, self.cashAccount,
-                                                self.securityType, available_to_settle, True, "Validated", f"{self.linkcode}_1", self.model.simulated_time, None
+                                                self.securityType, available_to_settle, True, "Validated", f"{self.linkcode}_1", self.model.simulated_time, None, depth = self.depth +1
                                                 )
             delivery_child_2 = DeliveryInstructionAgent(self.model, f"{self.uniqueID}_2", self.uniqueID,
                                                 self.institution, self.securitiesAccount, self.cashAccount,
-                                                self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.model.simulated_time, None
+                                                self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.model.simulated_time, None, depth = self.depth +1
                                                 )
 
             #add to instructions list of model
@@ -113,7 +122,11 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             self.model.log_event(
                 event_type="Delivery Children Created",
                 object_ids=[delivery_child_1.uniqueID, delivery_child_2.uniqueID, self.uniqueID],
-                attributes={"parentInstructionID": self.uniqueID}
+                attributes={"parentInstructionID": self.uniqueID,
+                            "parent_depth": self.depth,
+                            "child1_depth": self.depth +1,
+                            "child2_depth": self.depth +1
+                            }
             )
             return delivery_child_1, delivery_child_2
         else:

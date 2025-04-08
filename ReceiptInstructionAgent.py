@@ -16,7 +16,7 @@ import DeliveryInstructionAgent
 class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
     def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent",
                  securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool,
-                 status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None):
+                 status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0):
         super().__init__(
             model=model,
             linkedTransaction=linkedTransaction,
@@ -30,8 +30,8 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             isChild=isChild,
             status=status,
             linkcode=linkcode,
-            creation_time=creation_time
-
+            creation_time=creation_time,
+            depth=depth
         )
 
         self.model.log_object(
@@ -42,7 +42,9 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                 "amount": self.amount,
                 "status": self.status,
                 "linkcode": self.linkcode,
-                "institutionID": self.institution.institutionID
+                "institutionID": self.institution.institutionID,
+                "depth": self.depth,
+                "motherID": self.motherID
             }
         )
         self.model.log_event(
@@ -52,7 +54,9 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                 "securityType": self.securityType,
                 "amount": self.amount,
                 "status": self.status,
-                "linkcode": self.linkcode
+                "linkcode": self.linkcode,
+                "depth": self.depth,
+                "motherID": self.motherID
             }
         )
 
@@ -75,6 +79,9 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
 
     def createReceiptChildren(self):
 
+        if self.depth >= self.model.MAX_CHILD_DEPTH:
+            return (None, None)
+
         MIN_SETTLEMENT_AMOUNT = self.model.min_settlement_amount
         # Calculate the actual available amounts using getBalance(), ensuring correct account types.
         if self.cashAccount.getAccountType() != "Cash":
@@ -94,35 +101,15 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         if available_to_settle > MIN_SETTLEMENT_AMOUNT:
             #  Create receipt child instructions with the computed amounts.
             receipt_child_1 = ReceiptInstructionAgent(
-                self.model,
-                f"{self.uniqueID}_1",
-                self.uniqueID,
-                self.institution,
-                self.securitiesAccount,
-                self.cashAccount,
-                self.securityType,
-                available_to_settle,
-                True,
-                "Validated",
-                f"{self.linkcode}_1",
-                creation_time=self.model.simulated_time,
-                linkedTransaction=None
-            )
+                                      self.model,f"{self.uniqueID}_1", self.uniqueID, self.institution, self.securitiesAccount, self.cashAccount, self.securityType, available_to_settle,True,"Validated",f"{self.linkcode}_1", creation_time=self.model.simulated_time, linkedTransaction=None, depth = self.depth + 1
+                                        )
+
             receipt_child_2 = ReceiptInstructionAgent(
-                self.model,
-                f"{self.uniqueID}_2",
-                self.uniqueID,
-                self.institution,
-                self.securitiesAccount,
-                self.cashAccount,
-                self.securityType,
-                self.amount - available_to_settle,
-                True,
-                "Validated",
-                f"{self.linkcode}_2",
-                creation_time=self.model.simulated_time,
-                linkedTransaction=None
-            )
+                            self.model,f"{self.uniqueID}_2", self.uniqueID, self.institution,
+                             self.securitiesAccount, self.cashAccount, self.securityType, self.amount - available_to_settle,
+                                 True,"Validated",f"{self.linkcode}_2", creation_time=self.model.simulated_time,
+                               linkedTransaction=None, depth = self.depth + 1
+                                )
 
             # add to instructions list of model
             self.model.instructions.append(receipt_child_1)
@@ -138,7 +125,11 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             self.model.log_event(
                 event_type="Receipt Children Created",
                 object_ids=[receipt_child_1.uniqueID, receipt_child_2.uniqueID, self.uniqueID],
-                attributes={"parentInstructionID": self.uniqueID}
+                attributes={"parentInstructionID": self.uniqueID,
+                            "parent_depth": self.depth,
+                            "child1_depth": self.depth + 1,
+                            "child2_depth": self.depth + 1
+                            }
             )
             return receipt_child_1, receipt_child_2
         else:
