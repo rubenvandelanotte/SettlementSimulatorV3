@@ -361,8 +361,7 @@ class SettlementModel(Model):
             elif (pair[0].get_status() == "Cancelled due to partial settlement" and
                   pair[1].get_status() == "Cancelled due to partial settlement"):
                 # Recursively sum settled amounts from child instructions (and their descendants).
-                settled_child_value = (self.get_recursive_settled_amount(pair[0]) +
-                                       self.get_recursive_settled_amount(pair[1]))
+                settled_child_value = (self.get_recursive_settled_amount(pair[0]))
                 # The effective settled amount is capped at the intended amount.
                 effective_settled = min(settled_child_value, intended_amount)
                 total_settled_value += effective_settled
