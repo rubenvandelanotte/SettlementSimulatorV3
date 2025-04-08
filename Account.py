@@ -96,34 +96,25 @@ class Account:
         #deduct cash
         if self.accountType == securityType and self.accountType == "Cash":
             total_available = self.balance + (self.creditLimit - self.usedCredit)
-            if total_available <= amount:
-                deducted = total_available
-                self.usedCredit = self.creditLimit
-                self.balance = 0
+            if total_available < amount:
+                #print(f"[DEDUCT FAILED] Account {self.accountID} | Requested: {amount}, Available: {total_available} (Balance: {self.balance}, UsedCredit: {self.usedCredit}, CreditLimit: {self.creditLimit})")
+                return 0
                 # logging
                 #self.model.log_event(f"Account {self.accountID} deducted {amount} cash. Total cash amount: {self.balance}, total credit amount: {self.usedCredit}",self.accountID, is_transaction=False)
-                return deducted
 
-            elif total_available > amount and self.balance == 0:
-                #adjust the creditLimit accordingly
-                self.usedCredit = self.usedCredit + amount
-                # logging
-                #self.model.log_event(f"Account {self.accountID} deducted {amount} cash. Total cash amount: {self.balance}, total credit amount: {self.usedCredit}", self.accountID, is_transaction=False)
+            if self.balance >= amount:
+                self.balance= self.balance - amount
+                #print(f"[DEDUCT CASH] Account {self.accountID} | Deducted {amount} from balance. New Balance: {self.balance}, UsedCredit: {self.usedCredit}")
                 return amount
 
-            elif self.balance > 0:
-                if self.balance >= amount:
-                    self.balance = self.balance - amount
-                    # logging
-                    #self.model.log_event(f"Account {self.accountID} deducted {amount} cash. Total cash amount: {self.balance}, total credit amount: {self.usedCredit}", self.accountID, is_transaction=False)
-                    return amount
-                else:
-                    deductedFromBalance = self.balance
-                    self.balance = 0
-                    self.usedCredit = self.usedCredit + deductedFromBalance
-                    # logging
-                    #self.model.log_event(f"Account {self.accountID} deducted {amount} cash. Total cash amount: {self.balance}, total credit amount: {self.usedCredit}",self.accountID, is_transaction=False)
-                    return amount
+            else:
+                needed_from_credit = amount - self.balance
+                print(f"[PARTIAL CASH] Account {self.accountID} | Deducted {self.balance} from balance and {needed_from_credit} from credit.")
+                self.balance = 0
+                self.usedCredit += needed_from_credit
+                print(f"[UPDATED] Account {self.accountID} | New Balance: {self.balance}, UsedCredit: {self.usedCredit}")
+                return amount
+
 
         #deduct securities
         elif self.accountType == securityType:
@@ -131,13 +122,16 @@ class Account:
                 self.balance = self.balance -amount
                 # logging
                 #self.model.log_event(f"Account {self.accountID} deducted {amount} securities of type {self.accountType}. New amount: {self.balance}", self.accountID, is_transaction=False)
+                print(f"[DEDUCT SECURITIES] Account {self.accountID} | Deducted {amount} of {securityType}. New Balance: {self.balance}")
+
                 return amount
             else:
                 #should never happen
+                print(f"[DEDUCT FAILED] Account {self.accountID} | Insufficient {securityType}. Balance: {self.balance}, Requested: {amount}")
                 return 0
 
         else:
-            print("Error: account doesn't allow to deduct this type of assets")
+            print(f"[ERROR] Account {self.accountID} | Cannot deduct {securityType} from account type {self.accountType}")
             # logging
             #self.model.log_event(f"ERROR: account {self.accountID} doesn't allow to deduct this type of assets", self.accountID, is_transaction=False)
             return 0
