@@ -389,12 +389,11 @@ class SettlementModel(Model):
             int: The total count of settled instructions
         """
         main_start = self.simulation_start + self.warm_up_period
-        main_end = self.simulation_end - self.cool_down_period
 
         settled_count = 0
 
         for inst in self.instructions:
-            if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= main_end:
+            if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= self.simulation_end:
                 settled_count += 1
 
         return settled_count

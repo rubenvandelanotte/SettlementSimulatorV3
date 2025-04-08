@@ -145,11 +145,11 @@ class InstitutionAgent(Agent):
 
 
 
-
-    def create_cancelation_instruction(self):
-
-        #to implement later on
-        return
+    #
+    # def create_cancelation_instruction(self):
+    #
+    #     #to implement later on
+    #     return
 
 
     def create_account(self):
@@ -162,8 +162,8 @@ class InstitutionAgent(Agent):
 
         if random.random() <0.1:
             self.create_instruction()
-        if random.random() <0.05:
-            self.create_cancelation_instruction()
+        # if random.random() <0.05:
+        #     self.create_cancelation_instruction()
 
         # if random.random() < 0.01:
         #     if self.allowPartial:
