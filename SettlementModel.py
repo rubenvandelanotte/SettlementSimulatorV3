@@ -497,16 +497,10 @@ class SettlementModel(Model):
                 depth_status_counts[depth] = {}
             depth_status_counts[depth][status] = depth_status_counts[depth].get(status, 0) + 1
 
-            # Build parent-child relationship
-            if inst.isChild and inst.motherID != "mother":
-                if inst.motherID not in parent_child_map:
-                    parent_child_map[inst.motherID] = []
-                parent_child_map[inst.motherID].append(inst.uniqueID)
 
         return {
             "depth_counts": depth_counts,
             "depth_status_counts": depth_status_counts,
-            "parent_child_map": parent_child_map,
             "original_pairs":   self.get_original_pair_count(),
             "partial_settlements": self.get_partial_settlement_count(),
             "avg_tree_depth": self.get_average_tree_depth(),
