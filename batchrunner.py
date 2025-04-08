@@ -6,11 +6,17 @@ import pandas as pd
 def batch_runner():
     # Maak een folder voor de logs als deze nog niet bestaat
     log_folder = "simulatie_logs"
+
+
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
 
     num_institutions = 10  # Aantal instituten in de simulatie
     runs_per_config = 5  # Aantal simulaties per configuratie
+    # use seeds to compare
+    base_seed = 42
+    seed_list = [base_seed + i for i in range(runs_per_config)]
+
 
     efficiencies = []
 
@@ -22,9 +28,13 @@ def batch_runner():
         partialsallowed = tuple([True] * true_count + [False] * (num_institutions - true_count))
         print(f"Simulatie configuratie: {partialsallowed}")
 
+        seed_index = 0
+
         for run in range(1, runs_per_config + 1):
             print(f"Start simulatie: Configuratie met {true_count} True, run {run}")
-            model = SettlementModel(partialsallowed=partialsallowed)
+            seed = seed_list[seed_index]
+            seed_index += 1
+            model = SettlementModel(partialsallowed=partialsallowed, seed=seed)
 
             try:
                 # Simuleer totdat de simulatie voorbij de ingestelde eindtijd is
@@ -53,7 +63,8 @@ def batch_runner():
                 'instruction efficiency': new_ins_eff,
                 'value efficiency': new_val_eff,
                 'settled_count': settled_count,  # Instructions count
-                'settled_amount': total_settled_amount  # Total amount
+                'settled_amount': total_settled_amount,  # Total amount
+                'seed': seed  # log seed for traceability
             }
             efficiencies.append(new_eff)
 

@@ -19,7 +19,7 @@ def generate_iban():
 
 
 class SettlementModel(Model):
-    def __init__(self, partialsallowed:tuple):
+    def __init__(self, partialsallowed:tuple, seed: int = None):
         super().__init__()
         self.partialsallowed= partialsallowed
         #parameters of the model
@@ -31,6 +31,10 @@ class SettlementModel(Model):
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
         self.log_only_main_events= True
+        self.seed = seed
+        if seed is not None:
+            random.seed(seed)  # Set the random seed
+            print(f"[INFO] Random seed set to: {seed}")
 
 
 
