@@ -499,7 +499,7 @@ class SettlementModel(Model):
         parent_child_map = {}
 
         for inst in self.instructions:
-            depth = getattr(inst, 'depth', 0)  # Default to 0 if depth not found
+            depth = inst.get_depth()
             status = inst.get_status()
 
             # Count by depth

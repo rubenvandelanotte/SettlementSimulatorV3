@@ -80,6 +80,9 @@ class InstructionAgent (Agent):
         """Returns the creation time of the instruction."""
         return self.creation_time
 
+    def get_depth(self):
+        return self.depth
+
     def set_status(self, new_status: str):
         self.status = new_status
 
