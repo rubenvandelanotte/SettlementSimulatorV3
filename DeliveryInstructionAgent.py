@@ -88,7 +88,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         if receiver.cashAccount.getAccountType() != "Cash":
             available_cash = 0
         else:
-            available_cash = receiver.cashAccount.getBalance() + receiver.cashAccount.getCreditLimit() - receiver.cashAccount.getUsedCredit()
+            available_cash = receiver.cashAccount.getEffectiveAvailableCash()
 
         #takes the minimum of available securities of deliverer and available cash of seller and not more than the amount
         available_to_settle = min(self.amount, available_cash, available_securities)

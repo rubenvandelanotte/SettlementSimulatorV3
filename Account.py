@@ -42,6 +42,12 @@ class Account:
         else:
             return False
 
+    def getEffectiveAvailableCash(self):
+        if self.accountType == "Cash":
+            return self.balance + self.creditLimit - self.usedCredit
+        return 0
+
+
 
     def addBalance(self, amount:float, securityType:str):
 
