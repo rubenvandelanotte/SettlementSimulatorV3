@@ -338,7 +338,7 @@ class SettlementModel(Model):
         # Group original (mother) instructions by linkcode.
         original_pairs = {}
         for inst in self.instructions:
-            if inst.motherID == "mother" and main_start <= inst.get_creation_time() <= main_end:
+            if inst.get_motherID() == "mother" and main_start <= inst.get_creation_time() <= main_end:
                 original_pairs.setdefault(inst.linkcode, []).append(inst)
 
         for linkcode, pair in original_pairs.items():
@@ -389,8 +389,12 @@ class SettlementModel(Model):
         settled_count = 0
 
         for inst in self.instructions:
-            if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= self.simulation_end:
-                settled_count += 1
+            if inst.get_motherID() == "mother":
+                if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= self.simulation_end:
+                    settled_count += 1
+            else:
+                if inst.get_status() == "Settled on time":
+                    settled_count += 1
 
         return settled_count
 
@@ -410,9 +414,13 @@ class SettlementModel(Model):
 
         # First, add amounts from directly settled instructions
         for inst in self.instructions:
-            if (inst.get_status() == "Settled on time" and
-                    main_start <= inst.get_creation_time() <= main_end):
-                total_settled_amount += inst.get_amount()
+            if inst.get_motherID() == "mother":
+                if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= self.simulation_end:
+                    total_settled_amount += inst.get_amount()
+            else:
+                if inst.get_status() == "Settled on time":
+                    total_settled_amount += inst.get_amount()
+
 
         return total_settled_amount
 
