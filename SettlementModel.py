@@ -393,7 +393,7 @@ class SettlementModel(Model):
                 if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= self.simulation_end:
                     settled_count += 1
             else:
-                if inst.get_status() == "Settled on time":
+                if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time():
                     settled_count += 1
 
         return settled_count
@@ -418,7 +418,7 @@ class SettlementModel(Model):
                 if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= self.simulation_end:
                     total_settled_amount += inst.get_amount()
             else:
-                if inst.get_status() == "Settled on time":
+                if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time():
                     total_settled_amount += inst.get_amount()
 
 
@@ -445,6 +445,53 @@ class SettlementModel(Model):
         df = pd.DataFrame(data)
         df.to_csv(filename, index=False)
         print(f"Settlement efficiency metrics saved to {filename}")
+
+    def generate_depth_statistics(self):
+        """
+        Generate statistics about instruction depth distribution for process mining visualization.
+        """
+        # Dictionary to store counts by depth
+        depth_counts = {}
+        # Dictionary to store counts by depth and status
+        depth_status_counts = {}
+        # Dictionary to store parent-child relationships for tree building
+        parent_child_map = {}
+
+        for inst in self.instructions:
+            depth = getattr(inst, 'depth', 0)  # Default to 0 if depth not found
+            status = inst.get_status()
+
+            # Count by depth
+            depth_counts[depth] = depth_counts.get(depth, 0) + 1
+
+            # Count by depth and status
+            if depth not in depth_status_counts:
+                depth_status_counts[depth] = {}
+            depth_status_counts[depth][status] = depth_status_counts[depth].get(status, 0) + 1
+
+            # Build parent-child relationship
+            if inst.isChild and inst.motherID != "mother":
+                if inst.motherID not in parent_child_map:
+                    parent_child_map[inst.motherID] = []
+                parent_child_map[inst.motherID].append(inst.uniqueID)
+
+        return {
+            "depth_counts": depth_counts,
+            "depth_status_counts": depth_status_counts,
+            "parent_child_map": parent_child_map
+        }
+
+    def save_depth_statistics(self, filename="depth_statistics.json"):
+        """Save depth statistics to a JSON file for external visualization"""
+        import json
+
+        stats = self.generate_depth_statistics()
+        with open(filename, 'w') as f:
+            json.dump(stats, f, indent=2)
+
+        print(f"Depth statistics saved to {filename}")
+
+
 
 
 #if __name__ == "__main__":
