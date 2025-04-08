@@ -6,10 +6,13 @@ import pandas as pd
 def batch_runner():
     # Maak een folder voor de logs als deze nog niet bestaat
     log_folder = "simulatie_logs"
+    depth_folder = "depth_statistics"
 
 
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
+    if not os.path.exists(depth_folder):
+        os.makedirs(depth_folder)
 
     num_institutions = 10  # Aantal instituten in de simulatie
     runs_per_config = 5  # Aantal simulaties per configuratie
@@ -46,10 +49,20 @@ def batch_runner():
             # Stel bestandsnamen in met de configuratie en run-nummer
             log_filename = os.path.join(log_folder, f"log_config{true_count}_run{run}.csv")
             ocel_filename = os.path.join(log_folder, f"simulation_config{true_count}_run{run}.jsonocel")
+            depth_filename = os.path.join(depth_folder, f"depth_statistics_config{true_count}_run{run}.jsonocel")
+
 
             # Sla de logs op
             model.save_log(filename = log_filename)
             model.save_ocel_log(filename=ocel_filename)
+
+            # Save depth statistics
+            stats = model.generate_depth_statistics()
+            import json
+            with open(depth_filename, 'w') as f:
+                json.dump(stats, f, indent=2)
+            print(f"Depth statistics saved to {depth_filename}")
+
             print(f"Logs opgeslagen voor configuratie {true_count} run {run}")
             print(f"Bereken settlement efficiency")
             new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
@@ -78,4 +91,4 @@ if __name__ == "__main__":
     df = pd.DataFrame(new_measured_efficiency)
     df.to_csv("New_measurement.csv", index=False)
 
-#dd
+#
