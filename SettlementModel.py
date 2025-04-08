@@ -26,8 +26,8 @@ class SettlementModel(Model):
         self.num_institutions = 10
         self.min_total_accounts = 4
         self.max_total_accounts = 10
-        self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
-        self.min_settlement_amount = 100
+        self.simulation_duration_days = 5 #number of measured days (so simulation is longer)
+        self.min_settlement_amount = 10000
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
         self.log_only_main_events= True
@@ -282,7 +282,7 @@ class SettlementModel(Model):
             if transaction.get_status() == "Matched":
                 transaction.settle()
 
-    def get_recursive_settled_amount(self, parent_instruction):
+    def get_recursive_settled_amount(self, parent_instruction, depth=0):
         """
         Recursively sum the settled amounts of all descendant (child) instructions
         for a given parent instruction.
@@ -293,6 +293,11 @@ class SettlementModel(Model):
         Returns:
             The total settled amount from all descendant instructions.
         """
+
+        if depth > 100:  # Maximum recursion depth of 100
+            print(f"WARNING: Max recursion depth reached for instruction {parent_instruction.get_uniqueID()}")
+            return 0.0
+
         total = 0.0
         for inst in self.instructions:
             # Check if this instruction is a child of the parent_instruction.
@@ -301,7 +306,7 @@ class SettlementModel(Model):
                 if inst.get_status() in ["Settled on time"]:
                     total += inst.get_amount()
                 # Recursively include settled amounts from further descendant instructions.
-                total += self.get_recursive_settled_amount(inst)
+                total += self.get_recursive_settled_amount(inst, depth + 1)
         return total
 
     def calculate_settlement_efficiency(self):
