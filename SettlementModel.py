@@ -445,6 +445,35 @@ class SettlementModel(Model):
         df.to_csv(filename, index=False)
         print(f"Settlement efficiency metrics saved to {filename}")
 
+    def get_avg_instruction_age_before_settlement(self):
+        settled = [inst for inst in self.instructions if inst.get_status() in ["Settled on time", "Settled late"]]
+        ages = [(self.simulated_time - inst.get_creation_time()).total_seconds() / 3600 for inst in settled]
+        return round(sum(ages) / len(ages), 2) if ages else 0
+
+    def get_original_pair_count(self):
+        main_start = self.simulation_start + self.warm_up_period
+        main_end = self.simulation_end - self.cool_down_period
+        mothers = [inst for inst in self.instructions if
+                   inst.motherID == "mother" and main_start <= inst.get_creation_time() <= main_end]
+        return len(mothers) // 2  # 2 instructions per pair
+
+    def get_partial_settlement_count(self):
+        return sum(1 for t in self.transactions if t.get_status() == "Cancelled due to partial settlement")
+
+    def get_error_cancellation_count(self):
+        return sum(1 for inst in self.instructions if inst.get_status() == "Cancelled due to error")
+
+    def get_average_tree_depth(self):
+        def get_depth(inst):
+            children = [child for child in self.instructions if child.isChild and child.motherID == inst.get_uniqueID()]
+            if not children:
+                return 1
+            return 1 + max(get_depth(child) for child in children)
+
+        mothers = [inst for inst in self.instructions if inst.motherID == "mother"]
+        depths = [get_depth(mother) for mother in mothers]
+        return round(sum(depths) / len(depths), 2) if depths else 0
+
     def generate_depth_statistics(self):
         """
         Generate statistics about instruction depth distribution for process mining visualization.
@@ -477,7 +506,12 @@ class SettlementModel(Model):
         return {
             "depth_counts": depth_counts,
             "depth_status_counts": depth_status_counts,
-            "parent_child_map": parent_child_map
+            "parent_child_map": parent_child_map,
+            "original_pairs":   self.get_original_pair_count(),
+            "partial_settlements": self.get_partial_settlement_count(),
+            "avg_tree_depth": self.get_average_tree_depth(),
+            "cancellations_due_to_error": self.get_error_cancellation_count(),
+
         }
 
     def save_depth_statistics(self, filename="depth_statistics.json"):
