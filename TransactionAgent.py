@@ -192,19 +192,6 @@ class TransactionAgent(Agent):
                             child_transaction_2.receiver.get_cashAccount().set_newSecurities(False)
 
                         if child_transaction_1 or child_transaction_2:
-                            self.model.log_event(
-                                event_type="Partially Settled",
-                                object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
-                                attributes={"status": self.status}
-                            )
-                            self.model.log_ocel_event(
-                                activity="Partially Settled",
-                                object_refs=[
-                                    {"object_id": self.transactionID, "object_type": "Transaction"},
-                                    {"object_id": self.deliverer.uniqueID, "object_type": "DeliveryInstruction"},
-                                    {"object_id": self.receiver.uniqueID, "object_type": "ReceiptInstruction"}
-                                ]
-                            )
                             self.cancel_partial()
                         else:
                             print("[WARNING] Partial settlement failed: no children succeeded.")
