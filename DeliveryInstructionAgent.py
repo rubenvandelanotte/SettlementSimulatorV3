@@ -106,9 +106,8 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                                                 self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.model.simulated_time, None, depth = self.depth +1
                                                 )
 
-            #add to instructions list of model
-            self.model.instructions.append(delivery_child_1)
-            self.model.instructions.append(delivery_child_2)
+
+
 
             #pass intended settlement time of mother to the children
             delivery_child_1.set_intended_settlement_time(self.get_intended_settlement_time())

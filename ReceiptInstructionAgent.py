@@ -111,9 +111,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                                linkedTransaction=None, depth = self.depth + 1
                                 )
 
-            # add to instructions list of model
-            self.model.instructions.append(receipt_child_1)
-            self.model.instructions.append(receipt_child_2)
+
 
             #ensures that the intended_settlement_time of children = mother
             receipt_child_1.set_intended_settlement_time(self.get_intended_settlement_time())
@@ -122,6 +120,10 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             # Add the new child instructions to the agents scheduler.
             self.model.agents.add(receipt_child_1)
             self.model.agents.add(receipt_child_2)
+
+            #add agents to the instruction list
+            self.model.instructions.append(receipt_child_1)
+            self.model.instructions.append(receipt_child_2)
             self.model.log_event(
                 event_type="Receipt Children Created",
                 object_ids=[receipt_child_1.uniqueID, receipt_child_2.uniqueID, self.uniqueID],
