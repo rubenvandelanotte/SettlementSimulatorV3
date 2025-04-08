@@ -87,7 +87,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         if self.cashAccount.getAccountType() != "Cash":
             available_cash = 0
         else:
-            available_cash = self.getEffectiveAvailableCash()
+            available_cash = self.cashAccount.getEffectiveAvailableCash()
 
         deliverer = self.linkedTransaction.deliverer
         if deliverer.securitiesAccount.getAccountType() != self.securityType:
