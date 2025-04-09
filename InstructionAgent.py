@@ -147,8 +147,9 @@ class InstructionAgent (Agent):
                self.validate()
            elif self.status == "Validated":
                if self.last_matched+ timedelta(seconds=3) <= self.model.simulated_time:
-                    self.match()
-                    self.last_matched = self.model.simulated_time
+                   if random.random() < 0.1:
+                        self.match()
+                        self.last_matched = self.model.simulated_time
                else:
                    return
 
