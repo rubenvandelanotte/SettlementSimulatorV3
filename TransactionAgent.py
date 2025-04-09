@@ -122,7 +122,7 @@ class TransactionAgent(Agent):
 
                             # calculate lateness
                             lateness_seconds = (
-                                        self.model.simulated_time - self.deliverer.get_intended_settlement_time()).total_seconds()
+                                        self.model.simulated_time - self.deliverer.get_intended_settlement_date()).total_seconds()
                             lateness_hours = math.ceil(lateness_seconds / 3600)  # Convert to hours
 
                         else:
