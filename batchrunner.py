@@ -84,7 +84,7 @@ def batch_runner():
     return efficiencies
 
 
-# Om de batch_runner te starten:
+#Starting the batchrunner
 if __name__ == "__main__":
     new_measured_efficiency = batch_runner()
     print(new_measured_efficiency)

@@ -56,18 +56,6 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                 "motherID": self.motherID
             }
         )
-        #old logger
-
-        self.model.log_ocel_event(
-            activity="Created",
-            object_refs=[
-                {"object_id": self.uniqueID, "object_type": "DeliveryInstruction"},
-                {"object_id": self.institution.institutionID, "object_type": "Institution"},
-                {"object_id": self.securitiesAccount.getAccountID(), "object_type": "Account"}
-            ]
-        )
-        # logging
-       # self.model.log_event(f"Delivery instruction with ID {uniqueID} created by institution {institution.institutionID} for {securityType} for amount {amount}", self.uniqueID, is_transaction = True)
 
     def get_creation_time(self):
         return self.creation_time
@@ -129,12 +117,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             )
             return delivery_child_1, delivery_child_2
         else:
-            # Log insufficient funds and return a tuple of Nones.
-            #self.model.log_event(
-            #    f"DeliveryInstruction {self.uniqueID}: insufficient funds for partial settlement.",
-            #    self.uniqueID,
-            #    is_transaction=True
-            #)
+
 
             #new logging
             self.model.log_event(
@@ -143,12 +126,6 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                 attributes={"status": self.status}
             )
 
-
-            #old logging
-            self.model.log_ocel_event(
-                activity="Partial Settlement Failed: Insufficient Funds",
-                object_refs=[{"object_id": self.uniqueID, "object_type": "DeliveryInstruction"}]
-            )
 
             return (None, None)
 
@@ -163,35 +140,13 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         )
 
 
-        #old logging
-        self.model.log_ocel_event(
-            activity="Attempting to Match",
-            object_refs=[{"object_id": self.uniqueID, "object_type": "DeliveryInstruction"}]
-        )
-        #self.model.log_event(
-        #    f"Instruction {self.uniqueID} attempting to match",
-        #    self.uniqueID,
-        #    is_transaction=True
-        #)
-
         if self.status != "Validated":
-            #self.model.log_event(
-            #    f"Error: Instruction {self.uniqueID} in wrong state, cannot match",
-            #    self.uniqueID,
-            #    is_transaction=True,
-            #)
-            #new logging
             self.model.log_event(
                 event_type="Matching Failed: Incorrect State",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
 
-            #old logging
-            self.model.log_ocel_event(
-                activity="Matching Failed: Incorrect State",
-                object_refs=[{"object_id": self.uniqueID, "object_type": "DeliveryInstruction"}]
-            )
             return None
 
         # Find a matching ReceiptInstructionAgent
@@ -205,11 +160,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                 other_instruction = agent
                 break
         else:
-            #self.model.log_event(
-            #    f"ERROR: DeliveryInstruction {self.uniqueID} failed to match, ReceiptInstruction not yet validated",
-            #    self.uniqueID,
-            #    is_transaction=True,
-            #)
+
 
 
             #new logging
@@ -219,12 +170,6 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                 attributes={"status": self.status}
             )
 
-
-            #old logging
-            self.model.log_ocel_event(
-                activity="Matching Failed: No Counter Instruction Found",
-                object_refs=[{"object_id": self.uniqueID, "object_type": "DeliveryInstruction"}]
-            )
             return None
 
         # Create a transaction
@@ -245,26 +190,12 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         self.set_status("Matched")
         other_instruction.set_status("Matched")
 
-        #self.model.log_event(
-        #    f"DeliveryInstruction {self.uniqueID} matched with ReceiptInstruction {other_instruction.uniqueID}",
-        #    self.uniqueID,
-        #    is_transaction=True,
-        #)
         self.model.log_event(
             event_type="Matched",
             object_ids=[self.uniqueID, other_instruction.uniqueID, transaction.transactionID],
             attributes={"status": "Matched"}
         )
 
-        #old logging
-        self.model.log_ocel_event(
-            activity="Matched",
-            object_refs=[
-                {"object_id": self.uniqueID, "object_type": "DeliveryInstruction"},
-                {"object_id": other_instruction.uniqueID, "object_type": "ReceiptInstruction"},
-                {"object_id": transaction.transactionID, "object_type": "Transaction"}
-            ]
-        )
         return transaction
 
     def cancel_timeout(self):
@@ -278,11 +209,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                 object_ids=[self.uniqueID],
                 attributes={"status": "Cancelled due to timeout"}
             )
-            # old logging
-            self.model.log_ocel_event(
-                activity="Cancelled due to Timeout",
-                object_refs=[{"object_id": self.uniqueID, "object_type": "DeliveryInstruction"}]
-            )
+
 
             #self.model.log_event(f"DeliveryInstruction {self.uniqueID} cancelled due to timeout.", self.uniqueID, is_transaction=True)
         if self.status == "Matched":
@@ -298,22 +225,9 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             )
 
 
-            #old logging:
-            self.model.log_ocel_event(
-                activity="Cancelled due to Timeout",
-                object_refs=[
-                    {"object_id": self.uniqueID, "object_type": "DeliveryInstruction"},
-                    {"object_id": self.linkedTransaction.transactionID, "object_type": "Transaction"}
-                ]
-            )
 
             self.model.remove_transaction(self.linkedTransaction)
             self.model.agents.remove(self.linkedTransaction.receiver)
             self.model.agents.remove(self.linkedTransaction)
             self.model.agents.remove(self)
 
-            # logging
-            #self.model.log_event(f"DeliveryInstruction {self.uniqueID} cancelled due to timeout.", self.uniqueID, is_transaction=True)
-            #self.model.log_event(f"ReceiptInstruction {self.linkedTransaction.receiver.get_uniqueID()} cancelled due to timeout.", self.linkedTransaction.receiver.get_uniqueID(), is_transaction=True)
-            #self.model.log_event(f"Transaction {self.linkedTransaction.get_transactionID()} cancelled due to timeout.", self.linkedTransaction.get_transactionID(), is_transaction = True)
-#
