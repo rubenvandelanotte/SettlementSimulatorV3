@@ -356,14 +356,19 @@ class SettlementModel(Model):
                 original_pairs.setdefault(inst.linkcode, []).append(inst)
 
         for linkcode, pair in original_pairs.items():
-            if len(pair) < 2:
-                # We expect a pair (delivery and receipt); if not, skip this group.
+
+            if not pair:
+                #should never be empty, just in case
                 continue
 
             # We assume both instructions have the same intended settlement amount.
             intended_amount = pair[0].get_amount()
             total_original_pairs += 1
             total_intended_value += intended_amount
+
+            if len(pair) <2:
+                #end here for instruction without a counter instruction, won't be settled anyway
+                continue
 
             # Case 1: Fully settled directly (both instructions settled on time or late).
             if (pair[0].get_status() in ["Settled on time"] and
