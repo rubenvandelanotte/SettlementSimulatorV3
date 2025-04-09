@@ -418,10 +418,10 @@ class SettlementAnalyzer:
             output_dir=os.path.join(output_base, "lateness")
         )
 
-        self.analyze_lateness_hours(
-            log_folder="simulatie_logs",
-            output_dir=os.path.join(output_base, "lateness_hours")
-        )
+        # self.analyze_lateness_hours(
+        #     log_folder="simulatie_logs",
+        #     output_dir=os.path.join(output_base, "lateness_hours")
+        # )
 
         print(f"Analysis complete. Results in {output_base}")
 
