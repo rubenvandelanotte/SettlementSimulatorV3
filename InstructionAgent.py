@@ -111,28 +111,18 @@ class InstructionAgent (Agent):
                     attributes={"status": self.status}
                 )
 
-                #old logging
-                self.model.log_ocel_event(
-                    activity="Instruction Inserted",
-                    object_refs=[{"object_id": self.uniqueID, "object_type": "Instruction"}]
-                )
+
     def validate(self):
         if self.status == 'Pending':
             self.set_status('Validated')
-            #logging
-            #self.model.log_event(f"Instruction {self.uniqueID} validated.", self.uniqueID, is_transaction = True)
+
             #new logging
             self.model.log_event(
                 event_type="Instruction Validated",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
-            #old logging
 
-            self.model.log_ocel_event(
-                activity="Instruction Validated",
-                object_refs=[{"object_id": self.uniqueID, "object_type": "Instruction"}]
-            )
     def is_instruction_time_out(self):
         return self.creation_time + timedelta(days = 14) <= self.model.simulated_time
 
@@ -153,8 +143,3 @@ class InstructionAgent (Agent):
                else:
                    return
 
-
-       #self.model.simulated_time = self.model.simulated_time +timedelta(seconds=1)
-
-
-#
