@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+import random
+
 from mesa import Agent
 from typing import TYPE_CHECKING, Optional
 
@@ -178,7 +180,7 @@ class InstructionAgent (Agent):
                    return
 
 
-       self.model.simulated_time = self.model.simulated_time +timedelta(seconds=1)
+       #self.model.simulated_time = self.model.simulated_time +timedelta(seconds=1)
 
 
 #

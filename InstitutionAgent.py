@@ -170,7 +170,7 @@ class InstitutionAgent(Agent):
         #         self.opt_out_partial()
         #     else:
         #         self.opt_in_partial()
-        self.model.simulated_time = self.model.simulated_time + timedelta(seconds=1)
+        #self.model.simulated_time = self.model.simulated_time + timedelta(seconds=1)
 
     def get_full_institution_info(self):
         """

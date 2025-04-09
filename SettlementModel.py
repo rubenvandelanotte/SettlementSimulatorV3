@@ -265,7 +265,7 @@ class SettlementModel(Model):
                     self.batch_processing()
                     self.batch_processed = True
 
-            self.simulated_time += timedelta(seconds=1)
+            self.simulated_time += timedelta(seconds=300)
 
             if self.simulated_time >= datetime.combine(self.simulated_time.date(), datetime.min.time()) + self.day_end:
                 self.simulated_time = datetime.combine(self.simulated_time.date() + timedelta(days=1), datetime.min.time()) + self.trading_start
