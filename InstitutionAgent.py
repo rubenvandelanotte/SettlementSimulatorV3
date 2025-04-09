@@ -204,23 +204,5 @@ class InstitutionAgent(Agent):
         if random.random() <0.1:
             self.create_instruction()
 
-        #self.model.simulated_time = self.model.simulated_time + timedelta(seconds=1)
 
-    def get_full_institution_info(self):
-        """
-        Return a dictionary with all institution attributes,
-        including a detailed list of its accounts.
-        """
-        return {
-            "institutionID": self.institutionID,
-            "allowPartial": self.allowPartial,
-            "accounts": [account.get_full_account_info() for account in self.accounts]
-        }
 
-    def __repr__(self):
-        return (
-            f"InstitutionAgent(institutionID={self.institutionID}, "
-            f"allowPartial={self.allowPartial}, "
-            f"accounts={self.accounts})"
-        )
-#
