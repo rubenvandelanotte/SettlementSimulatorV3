@@ -190,23 +190,7 @@ class InstitutionAgent(Agent):
                 "linkcode": linkcode
             }
         )
-        #old logging
-        self.model.log_ocel_event(
-            activity="Instruction Pair Created",
-            object_refs=[
-                {"object_id": new_instructionAgent.uniqueID, "object_type": "Instruction"},
-                {"object_id": counter_instructionAgent.uniqueID, "object_type": "Instruction"},
-                {"object_id": self.institutionID, "object_type": "Institution"}
-            ]
-        )
 
-
-
-    #
-    # def create_cancelation_instruction(self):
-    #
-    #     #to implement later on
-    #     return
 
 
     def create_account(self):
@@ -219,14 +203,7 @@ class InstitutionAgent(Agent):
 
         if random.random() <0.1:
             self.create_instruction()
-        # if random.random() <0.05:
-        #     self.create_cancelation_instruction()
 
-        # if random.random() < 0.01:
-        #     if self.allowPartial:
-        #         self.opt_out_partial()
-        #     else:
-        #         self.opt_in_partial()
         #self.model.simulated_time = self.model.simulated_time + timedelta(seconds=1)
 
     def get_full_institution_info(self):
