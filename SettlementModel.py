@@ -2,6 +2,8 @@ import pandas
 from mesa import Model
 from datetime import datetime, timedelta
 import pandas as pd
+from sympy.physics.units import seconds
+
 import InstitutionAgent
 import Account
 import random
@@ -59,6 +61,10 @@ class SettlementModel(Model):
         self.accounts = []
         self.instructions = []
         self.transactions = []
+
+        #mini batching
+        self.mini_batch_times = [timedelta(hours=h, minutes=0) for h in range(2, 20)]  # 02:00 to 19:00 hourly
+        self.mini_batches_processed = set()
 
 
 
@@ -200,6 +206,10 @@ class SettlementModel(Model):
                 current_period = "main"
             print("Current simulation period:", current_period)
 
+            # Reset mini-batch tracker
+            if self.simulated_time.time() == self.trading_start:
+                self.mini_batches_processed = set()
+
             time_of_day = self.simulated_time.time()
 
             if self.trading_start <= timedelta(hours=time_of_day.hour, minutes=time_of_day.minute) <= self.trading_end:
@@ -210,8 +220,15 @@ class SettlementModel(Model):
                 self.agents.shuffle_do("step")
                 print(f"{len(self.agents)} Agents executed their step module")
 
-            elif timedelta(hours=time_of_day.hour, minutes=time_of_day.minute) >= self.batch_start:
-                if not self.batch_processed: #batch processing at 22:00 only one loop of batch_processing
+                for batch_time in self.mini_batch_times:
+                    key = (self.simulated_time.date(), batch_time)
+                    if batch_time <= timedelta(hours=time_of_day.hour, minutes = time_of_day.minute, seconds= time_of_day.second) and key not in self.mini_batches_processed:
+                        self.mini_batch_settlement()
+                        self.mini_batches_processed.add(key)
+
+
+            elif timedelta(hours=self.simulated_time.hour, minutes= self.simulated_time.minute, seconds=self.simulated_time.second) >= self.batch_start and not self.batch_processed:
+                #batch processing at 22:00 only one loop of batch_processing
                     self.batch_processing()
                     self.batch_processed = True
 
@@ -247,6 +264,12 @@ class SettlementModel(Model):
                     if result is not None:
                         matching_changed = True
 
+        for transaction in self.transactions:
+            if transaction.get_status() == "Matched":
+                transaction.settle()
+
+    def mini_batch_settlement(self):
+        print(f"[INFO] Running mini-batch settlement at {self.simulated_time}")
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
                 transaction.settle()

@@ -182,19 +182,21 @@ class TransactionAgent(Agent):
         self.receiver.get_cashAccount().set_newSecurities(False)
 
     def step(self):
-        time_of_day = self.model.simulated_time.time()
-        if not (self.deliverer.get_securitiesAccount().get_newSecurities() == True or
-            self.receiver.get_cashAccount().get_newSecurities() == True ):
+        #time_of_day = self.model.simulated_time.time()
+        #if not (self.deliverer.get_securitiesAccount().get_newSecurities() == True or
+        #    self.receiver.get_cashAccount().get_newSecurities() == True ):
             #if no new securities or cash where added to an account, no settlement gets tried
-            return
+        #    return
 
         if self.deliverer.is_instruction_time_out():
             self.deliverer.cancel_timeout()
         elif self.receiver.is_instruction_time_out():
             self.receiver.cancel_timeout()
-        elif self.status not in ["Cancelled due to timeout","Cancelled due to partial settlement", "Settled late", "Settled on time", "Cancelled due to error"]:
-            if self.model.trading_start <= timedelta(hours=time_of_day.hour, minutes=time_of_day.minute) <= self.model.trading_end:
-                self.settle()
+
+            #No longer settled only during mini batches
+        #elif self.status not in ["Cancelled due to timeout","Cancelled due to partial settlement", "Settled late", "Settled on time", "Cancelled due to error"]:
+         #   if self.model.trading_start <= timedelta(hours=time_of_day.hour, minutes=time_of_day.minute) <= self.model.trading_end:
+         #       self.settle()
         #self.model.simulated_time = self.model.simulated_time + timedelta(seconds=1)
 
     def cancel_partial(self):

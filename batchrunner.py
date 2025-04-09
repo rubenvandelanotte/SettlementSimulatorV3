@@ -15,7 +15,7 @@ def batch_runner():
         os.makedirs(depth_folder)
 
     num_institutions = 10  # Aantal instituten in de simulatie
-    runs_per_config = 5  # Aantal simulaties per configuratie
+    runs_per_config = 10  # Aantal simulaties per configuratie
     # use seeds to compare
     base_seed = 42
     seed_list = [base_seed + i for i in range(runs_per_config)]
@@ -53,7 +53,7 @@ def batch_runner():
 
 
             # Sla de logs op
-            model.save_log(filename = log_filename)
+
             model.save_ocel_log(filename=ocel_filename)
 
             # Save depth statistics
