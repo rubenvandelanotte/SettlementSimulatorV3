@@ -130,6 +130,7 @@ class TransactionAgent(Agent):
                             self.receiver.set_status("Settled on time")
                             self.status = "Settled on time"
                             label = "Settled On Time"
+                            lateness_hours = 0
 
 
                         self.model.log_event(
