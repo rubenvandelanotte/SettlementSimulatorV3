@@ -40,8 +40,8 @@ class SettlementModel(Model):
 
 
         self.simulation_start = datetime(2025, 4, 1, 1, 30)
-        self.warm_up_period = timedelta(days=2)
-        self.cool_down_period = timedelta(days=2)
+        self.warm_up_period = timedelta(days=5)
+        self.cool_down_period = timedelta(days=5)
 
         self.simulation_main_duration = timedelta(days=self.simulation_duration_days)
         self.simulation_total_duration = self.warm_up_period + self.simulation_main_duration + self.cool_down_period
@@ -60,13 +60,13 @@ class SettlementModel(Model):
         self.instructions = []
         self.transactions = []
 
-        self.activity_log = []
+
 
         #OCEL logging reqs:
 
         self.event_counter = 1
-        self.event_log = []  # List to store OCEL events
-        self.objects_catalog = {}  # Dictionary for static object info
+        self.event_log = []  # List to store OCEL events => probably redudant
+
 
         self.partial_cancelled_count = 0
 
@@ -109,62 +109,12 @@ class SettlementModel(Model):
     def save_ocel_log(self, filename: str = "simulation_log.jsonocel"):
         self.logger.export_log(filename)
 
-    #old logger
-    def log_ocel_event(self, activity: str, object_refs: list):
-        """
-        Log an event in OCEL format.
-        :param activity: The activity name (e.g., 'DeliveryInstruction Created').
-        :param object_refs: List of dictionaries with keys 'object_id' and 'object_type'.
-        """
-        event_entry = {
-            "event_id": self.next_event_id(),
-            "timestamp": self.simulated_time.strftime('%Y-%m-%dT%H:%M:%S'),
-            "activity": activity,
-            "object_refs": object_refs
-        }
-        self.event_log.append(event_entry)
-        print(f"Logged event: {event_entry}")
-
-    #old logger
-    def register_object(self, object_id: str, object_type: str, attributes: dict):
-        self.objects_catalog[object_id] = {
-            "object_id": object_id,
-            "object_type": object_type,
-            "attributes": attributes
-        }
-    #old logger
-    def save_log(self, filename=None, activity_filename=None):
-        if filename is None:
-            filename = "ocel_event_log.csv"
-        df = pd.DataFrame(self.event_log)
-        df.to_csv(filename, index=False)
-        if activity_filename is None:
-            activity_filename = "objects_catalog.csv"
-        df_activity = pd.DataFrame(list(self.objects_catalog.values()))
-        df_activity.to_csv(activity_filename, index=False)
-        print(f"Object catalog saved to {activity_filename}")
-        print(f"Event Log saved to {filename}")
 
     def random_timestamp(self):
         delta = self.simulation_end - self.simulated_time
         random_seconds = random.uniform(0, delta.total_seconds())
         random_time = self.simulation_start + timedelta(seconds=random_seconds)
         return random_time  # Now returns a datetime object
-
-   # def log_event(self, message, agent_id, is_transaction=True):
-   #     timestamp = self.simulated_time.strftime('%Y-%m-%d %H:%M:%S')
-   #     log_entry = {'Timestamp': timestamp, 'Agent ID': agent_id, 'Event': message}
-    #
-    #    if is_transaction:
-    #        if log_entry not in self.event_log:
-    #            print(f"{timestamp} | Agent ID: {log_entry['Agent ID']} | {message}")
-    #            self.event_log.append(log_entry)  # Ensures no duplicates
-     #   else:
-     #       if log_entry not in self.activity_log:
-     #           print(f"{timestamp} | Agent ID: {log_entry['Agent ID']} | {message}")
-                  # Ensures no duplicates
-
-      #  self.activity_log.append(log_entry)
 
 
 
@@ -232,7 +182,7 @@ class SettlementModel(Model):
             print(new_institution.__repr__())
         print("-------------------------------------------------------")
         print("Accounts & Institutions generated")
-        #input("enter")
+
 
 
 
@@ -537,55 +487,3 @@ class SettlementModel(Model):
 
         print(f"Depth statistics saved to {filename}")
 
-
-
-
-#if __name__ == "__main__":
-#    print("Starting simulation...")
-#    log_path = input("Enter the path to save the log (press Enter for default): ")
-#    if not log_path.strip():
-#        log_path = "event_log.csv"
-#    partial1 = (False,False,False,False,False, False, False, False, False, False)
-#    partial2 =(True,False,False,False,False)
-#    partial3= (True, True, False, False, False)
-#    partial4= (True,True,True,False,False)
-#    partial5=(True,True,True,True,False)
-#    partial6=(True, True, True, True, True, True, True, True, True, True)
-#    partials = list()
-#    partials.append(partial1)
-    #partials.append(partial2)
-    #partials.append(partial3)
-    #partials.append(partial4)
-    #partials.append(partial5)
-  #  partials.append(partial6)
-  #  efficiencies = []
-  #  for p in partials:
-
-     #   for i in range(5):
-     #       model = SettlementModel(partialsallowed=p)
-     #       try:
-      #          while model.simulated_time < model.simulation_end:
-       #             model.step()
-       #     except RecursionError:
-       #         print("RecursionError encountered: maximum recursion depth exceeded. Terminating simulation gracefully.")
-
-        #    print("Final Event Log:")
-        #    for event in model.event_log:
-        #        print(event)
-        #    print("Saving final event log...")
-         #   model.save_log(log_path)
-         #   model.save_ocel_log(filename="simulation_more_securities.jsonocel")
-         #   print("---------------------------------------------------------------")
-         #   model.print_settlement_efficiency()
-         #   model.save_settlement_efficiency_to_csv()
-         #   new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
-         #   new_eff = {'Partial': str(p), 'instruction efficiency': new_ins_eff, 'value efficiency': new_val_eff}
-         #   efficiencies.append(new_eff)
-
-        #print(efficiencies)
-
-    #df = pd.DataFrame(efficiencies)
-    #df.to_csv("15 days all partials, 10 runs, new params")
-
-
-#dd
