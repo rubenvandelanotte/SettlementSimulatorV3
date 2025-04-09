@@ -361,7 +361,7 @@ class SettlementModel(Model):
                 #should never be empty, just in case
                 continue
 
-            # We assume both instructions have the same intended settlement amount.
+            # We include both single leg pairs as double leg pairs in the denominator of calculation.
             intended_amount = pair[0].get_amount()
             total_original_pairs += 1
             total_intended_value += intended_amount
