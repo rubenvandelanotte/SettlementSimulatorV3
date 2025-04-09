@@ -118,6 +118,12 @@ class TransactionAgent(Agent):
                             self.receiver.set_status("Settled late")
                             self.status = "Settled late"
                             label = "Settled Late"
+
+                            #calculate lateness
+                            lateness_seconds = (self.model.simulated_time - self.deliverer.get_intended_settlement_time()).total_seconds()
+                            lateness_hours = lateness_seconds / 3600  # Convert to hours
+
+
                         else:
                             self.deliverer.set_status("Settled on time")
                             self.receiver.set_status("Settled on time")
@@ -127,7 +133,10 @@ class TransactionAgent(Agent):
                         self.model.log_event(
                             event_type=label,
                             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
-                            attributes={"status": self.status}
+                            attributes={
+                                "status": self.status,
+                                "lateness_hours": lateness_hours
+                            }
                         )
                         self.model.log_ocel_event(
                             activity=label,
