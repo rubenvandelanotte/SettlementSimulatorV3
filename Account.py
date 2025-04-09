@@ -10,8 +10,6 @@ class Account:
         self.usedCredit = 0
 
 
-        #logging
-        #self.model.log_event(f"Account {accountID} of type {accountType} created with balance {balance} and credit limit {creditLimit}", accountID, is_transaction = False)
 
     def getAccountID(self):
         return self.accountID
@@ -59,8 +57,7 @@ class Account:
 
                 self.balance = self.balance + amount
                 self.set_newSecurities(True)
-                #logging
-                #self.model.log_event(f"Account {self.accountID} added {amount} cash. Total cash amount: {self.balance}, total credit amount: {self.usedCredit}", self.accountID, is_transaction = False)
+
                 return amount
 
             elif self.creditLimit != self.creditLimit - self.usedCredit:
@@ -69,8 +66,6 @@ class Account:
                     #reset the used credit with the amount
                     self.usedCredit = self.usedCredit - amount
                     self.set_newSecurities(True)
-                    # logging
-                    #self.model.log_event(f"Account {self.accountID} added {amount} cash. Total cash amount: {self.balance}, total credit amount: {self.usedCredit}", self.accountID, is_transaction=False)
                     return amount
                 else:
                     #set used credit to 0 and add remaining to balance
@@ -78,22 +73,17 @@ class Account:
                     self.usedCredit = 0
                     self.balance = self.balance + remaining
                     self.set_newSecurities(True)
-                    # logging
-                    #self.model.log_event(f"Account {self.accountID} added {amount} cash. Total cash amount: {self.balance}, total credit amount: {self.usedCredit}",self.accountID, is_transaction=False)
+
                     return amount
 
         #if security account:
         elif self.accountType == securityType:
             self.balance = self.balance + amount
             self.set_newSecurities(True)
-            #logging
-            #self.model.log_event(f"Account {self.accountID} added {amount} securities of type {self.accountType}. New amount: {self.balance}", self.accountID, is_transaction = False)
             return amount
 
         else:
             print("Error: account doesn't allow to add this type of assets")
-            #logging
-            #self.model.log_event(f"ERROR: account {self.accountID} doesn't allow to add this type of assets", self.accountID, is_transaction = False)
             return 0
 
 
@@ -103,14 +93,11 @@ class Account:
         if self.accountType == securityType and self.accountType == "Cash":
             total_available = self.balance + (self.creditLimit - self.usedCredit)
             if total_available < amount:
-                #print(f"[DEDUCT FAILED] Account {self.accountID} | Requested: {amount}, Available: {total_available} (Balance: {self.balance}, UsedCredit: {self.usedCredit}, CreditLimit: {self.creditLimit})")
                 return 0
-                # logging
-                #self.model.log_event(f"Account {self.accountID} deducted {amount} cash. Total cash amount: {self.balance}, total credit amount: {self.usedCredit}",self.accountID, is_transaction=False)
+
 
             if self.balance >= amount:
                 self.balance= self.balance - amount
-                #print(f"[DEDUCT CASH] Account {self.accountID} | Deducted {amount} from balance. New Balance: {self.balance}, UsedCredit: {self.usedCredit}")
                 return amount
 
             else:
@@ -126,8 +113,6 @@ class Account:
         elif self.accountType == securityType:
             if self.balance >= amount:
                 self.balance = self.balance -amount
-                # logging
-                #self.model.log_event(f"Account {self.accountID} deducted {amount} securities of type {self.accountType}. New amount: {self.balance}", self.accountID, is_transaction=False)
                 print(f"[DEDUCT SECURITIES] Account {self.accountID} | Deducted {amount} of {securityType}. New Balance: {self.balance}")
 
                 return amount
@@ -138,28 +123,7 @@ class Account:
 
         else:
             print(f"[ERROR] Account {self.accountID} | Cannot deduct {securityType} from account type {self.accountType}")
-            # logging
-            #self.model.log_event(f"ERROR: account {self.accountID} doesn't allow to deduct this type of assets", self.accountID, is_transaction=False)
             return 0
 
 
 
-    def get_full_account_info(self):
-            """Return a dictionary of all account attributes."""
-            return {
-                "accountID": self.accountID,
-                "accountType": self.accountType,
-                "balance": self.balance,
-                "creditLimit": self.creditLimit,
-                "usedCredit": self.usedCredit}
-
-    def __repr__(self):
-            """String representation useful for debugging."""
-            return (
-                f"Account(accountID={self.accountID}, "
-                f"accountType={self.accountType}, "
-                f"balance={self.balance}, "
-                f"creditLimit={self.creditLimit}, "
-                f"usedCredit={self.usedCredit})"
-            )
-#
