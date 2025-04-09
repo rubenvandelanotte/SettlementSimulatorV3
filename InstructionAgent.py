@@ -10,33 +10,6 @@ if TYPE_CHECKING:
     from InstitutionAgent import InstitutionAgent
     from Account import Account
 
-def sample_ISD(creation_time: datetime):
-    """
-    Generates random ISD based on a distribution
-    """
-
-    # Possible choices
-    choices =["<0", "0", "1", "2", "3", "4", ">4"]
-    weights = [1, 29, 22, 20, 7, 16, 5]
-
-    #choose an option
-    label = random.choices(choices, weights=weights, k=1)[0]
-
-    if label == "<0":
-        # should settle immediately => always late
-        return creation_time
-
-    elif label == ">4":
-        #can be settled within 8 days max
-        days_delay = random.randint(5, 8)
-
-    else:
-        days_delay = int(label)
-
-    #create isd & ensure that it is always only labeled after batch run in evening => settled date always on 22:30 of business day
-    isd = (creation_time + timedelta(days=days_delay)).replace(hour=22, minute=30, second=0, microsecond=0)
-
-    return isd
 
 class InstructionAgent (Agent):
     def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: int, isChild: bool, status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0):
@@ -54,7 +27,7 @@ class InstructionAgent (Agent):
         self.creation_time = creation_time# track creation time for timeout
         self.linkedTransaction = linkedTransaction
         self.last_matched = creation_time
-        self.intended_settlement_time = sample_ISD(self.creation_time) if motherID == "mother" else None
+        self.intended_settlement_date = None
         self.depth = depth
 
 #getter methods
@@ -116,11 +89,11 @@ class InstructionAgent (Agent):
     def set_status(self, new_status: str):
         self.status = new_status
 
-    def get_intended_settlement_time(self):
-        return self.intended_settlement_time
+    def get_intended_settlement_date(self):
+        return self.intended_settlement_date
 
-    def set_intended_settlement_time(self, ts):
-        self.intended_settlement_time = ts
+    def set_intended_settlement_date(self, ts):
+        self.intended_settlement_date = ts
 
     def cancel_timeout(self):
         return

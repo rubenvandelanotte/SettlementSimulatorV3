@@ -110,8 +110,8 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
 
 
             #pass intended settlement time of mother to the children
-            delivery_child_1.set_intended_settlement_time(self.get_intended_settlement_time())
-            delivery_child_2.set_intended_settlement_time(self.get_intended_settlement_time())
+            delivery_child_1.set_intended_settlement_date(self.get_intended_settlement_date())
+            delivery_child_2.set_intended_settlement_date(self.get_intended_settlement_date())
 
             #add child instructions to the model
             self.model.agents.add(delivery_child_1)

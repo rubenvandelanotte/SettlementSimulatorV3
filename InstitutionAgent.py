@@ -10,6 +10,55 @@ import DeliveryInstructionAgent
 import Account
 
 
+def get_creation_time(isd: datetime, delay: int, simulated_time:datetime) -> datetime:
+    creation_date = isd - timedelta(days=delay)
+
+    #pick random time on that day
+    start = timedelta(hours=1, minutes=30)
+    end = timedelta(hours=19, minutes=30)
+    delta_seconds = int((end - start).total_seconds())
+    random_offset = timedelta(seconds=random.randint(0, delta_seconds))
+
+    #merge with the day chosen
+    creation_time = creation_date.replace(hour=0, minute=0, second=0, microsecond=0) + start + random_offset
+    #ensures no creations in the past
+    return max(creation_time, simulated_time)
+
+
+
+
+
+def sample_instruction_creation_times_and_isd(simulated_time: datetime):
+    """
+    Samples two distinct creation times and a shared ISD (intended settlement date),
+    ensuring:
+    - ISD is 2–5 days in the future
+    - ISD always falls at 22:30
+    - Creation times are generated using empirical delay distribution
+    - No creation occurs before simulated_time
+    """
+
+    # Step 1: Choose ISD 2–5 days from now and set it on 22:30
+    raw_isd_day = simulated_time + timedelta(days=random.randint(2, 5))
+    isd = raw_isd_day.replace(hour=22, minute=30, second=0, microsecond=0)
+
+    # Step 2: Define delay distribution
+    delays = [-1, 0, 1, 2, 3, 4, 5]  # Delay in days from ISD
+    weights = [0.01, 0.29, 0.22, 0.20, 0.07, 0.16, 0.05]  # Empirical weights
+
+    # Step 3: Sample delays for both instruction legs
+    delay_a = random.choices(delays, weights=weights, k=1)[0]
+    delay_b = random.choices(delays, weights=weights, k=1)[0]
+
+
+    # Step 4: Generate creation times
+    creation_time_a = get_creation_time(isd, delay_a, simulated_time)
+    creation_time_b = get_creation_time(isd, delay_b, simulated_time)
+
+    return creation_time_a, creation_time_b, isd
+
+
+
 class InstitutionAgent(Agent):
 
     def __init__(self, model:SettlementModel, institutionID:str, accounts:list[Account] = [],allowPartial:bool = True):
@@ -103,18 +152,26 @@ class InstitutionAgent(Agent):
         isChild = False
         status = "Exists"
         linkcode = f"LINK-{uniqueID}L{otherID}"
-        instruction_creation_time = self.model.simulated_time
-        delay_seconds = random.uniform(0.5, 5)  # random delay between 0.5 and 5 seconds
-        counter_instruction_creation_time = instruction_creation_time + timedelta(seconds=delay_seconds)
+        instruction_creation_time, counter_instruction_creation_time, isd = sample_instruction_creation_times_and_isd(self.model.simulated_time)
 
         if instruction_type == 'delivery':
             new_instructionAgent = DeliveryInstructionAgent.DeliveryInstructionAgent(uniqueID=uniqueID, model = model, linkedTransaction = linkedTransaction, motherID=motherID, institution= institution, securitiesAccount = security_account, cashAccount = cash_account, securityType=securityType, amount= amount, isChild=isChild, status=status, linkcode=linkcode, creation_time = instruction_creation_time)
             counter_instructionAgent = ReceiptInstructionAgent.ReceiptInstructionAgent(uniqueID=otherID, model = model, linkedTransaction = linkedTransaction, motherID=motherID, institution= other_institution, securitiesAccount = other_institution_security_account, cashAccount = other_institution_cash_account, securityType=securityType, amount= amount, isChild=isChild, status=status, linkcode=linkcode, creation_time = counter_instruction_creation_time)
+
+            #set isds
+            new_instructionAgent.set_intended_settlement_date(isd)
+            counter_instructionAgent.set_intended_settlement_date(isd)
+
             self.model.instructions.append(new_instructionAgent)
             self.model.instructions.append(counter_instructionAgent)
         else:
             new_instructionAgent = ReceiptInstructionAgent.ReceiptInstructionAgent(uniqueID=uniqueID, model = model, linkedTransaction = linkedTransaction, motherID=motherID, institution= institution, securitiesAccount = security_account, cashAccount = cash_account, securityType=securityType, amount= amount, isChild=isChild, status=status, linkcode=linkcode, creation_time = instruction_creation_time)
             counter_instructionAgent = DeliveryInstructionAgent.DeliveryInstructionAgent(uniqueID=otherID, model = model, linkedTransaction = linkedTransaction, motherID=motherID, institution= other_institution, securitiesAccount = other_institution_security_account, cashAccount = other_institution_cash_account, securityType=securityType, amount= amount, isChild=isChild, status=status, linkcode=linkcode, creation_time = counter_instruction_creation_time)
+
+            #set isds
+            new_instructionAgent.set_intended_settlement_date(isd)
+            counter_instructionAgent.set_intended_settlement_date(isd)
+
             self.model.instructions.append(new_instructionAgent)
             self.model.instructions.append(counter_instructionAgent)
 

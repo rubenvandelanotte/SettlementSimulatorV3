@@ -114,8 +114,8 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
 
 
             #ensures that the intended_settlement_time of children = mother
-            receipt_child_1.set_intended_settlement_time(self.get_intended_settlement_time())
-            receipt_child_2.set_intended_settlement_time(self.get_intended_settlement_time())
+            receipt_child_1.set_intended_settlement_date(self.get_intended_settlement_date())
+            receipt_child_2.set_intended_settlement_date(self.get_intended_settlement_date())
 
             # Add the new child instructions to the agents scheduler.
             self.model.agents.add(receipt_child_1)
