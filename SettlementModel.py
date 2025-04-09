@@ -28,7 +28,7 @@ class SettlementModel(Model):
         self.num_institutions = 10
         self.min_total_accounts = 4
         self.max_total_accounts = 10
-        self.simulation_duration_days = 5 #number of measured days (so simulation is longer)
+        self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
         self.min_settlement_amount = 100
         self.MAX_CHILD_DEPTH = 15
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
