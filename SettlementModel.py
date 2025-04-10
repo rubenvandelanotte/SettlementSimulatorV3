@@ -274,7 +274,30 @@ class SettlementModel(Model):
             if transaction.get_status() == "Matched":
                 transaction.settle()
 
-    def get_recursive_settled_amount(self, parent_instruction, depth=0):
+    def get_main_period_mothers_and_descendants(self):
+        main_start = self.simulation_start + self.warm_up_period
+        main_end = self.simulation_end - self.cool_down_period
+
+        mother_instructions = [
+            inst for inst in self.instructions
+            if inst.get_motherID() == "mother" and main_start <= inst.get_creation_time() <= main_end
+        ]
+
+        descendants = set(mother_instructions)
+        queue = list(mother_instructions)
+
+        while queue:
+            current = queue.pop()
+            children = [
+                inst for inst in self.instructions
+                if inst.isChild and inst.get_motherID() == current.get_uniqueID()
+            ]
+            descendants.update(children)
+            queue.extend(children)
+
+        return list(descendants)
+
+    def get_recursive_settled_amount(self, parent_instruction, instruction_pool = None, depth=0):
         """
         Recursively sum the settled amounts of all descendant (child) instructions
         for a given parent instruction.
@@ -285,15 +308,17 @@ class SettlementModel(Model):
         Returns:
             The total settled amount from all descendant instructions.
         """
+
+        instruction_pool = instruction_pool if instruction_pool is not None else self.instructions
         total = 0.0
-        for inst in self.instructions:
+        for inst in instruction_pool:
             # Check if this instruction is a child of the parent_instruction.
             if inst.isChild and inst.motherID == parent_instruction.get_uniqueID():
                 # If the child instruction is settled, add its amount.
                 if inst.get_status() in ["Settled on time"]:
                     total += inst.get_amount()
                 # Recursively include settled amounts from further descendant instructions.
-                total += self.get_recursive_settled_amount(inst, depth + 1)
+                total += self.get_recursive_settled_amount(inst, instruction_pool ,depth + 1)
         return total
 
     def calculate_settlement_efficiency(self):
@@ -314,19 +339,18 @@ class SettlementModel(Model):
         Returns:
             A tuple (instruction_efficiency_percentage, value_efficiency_percentage)
         """
+
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        original_pairs = {}
+        for inst in relevant_instructions:
+            if inst.get_motherID() == "mother":
+                original_pairs.setdefault(inst.get_linkcode(), []).append(inst)
+
         total_original_pairs = 0
         fully_settled_pairs = 0
         total_intended_value = 0.0
         total_settled_value = 0.0
 
-        main_start = self.simulation_start + self.warm_up_period
-        main_end = self.simulation_end - self.cool_down_period
-
-        # Group original (mother) instructions by linkcode.
-        original_pairs = {}
-        for inst in self.instructions:
-            if inst.get_motherID() == "mother" and main_start <= inst.get_creation_time() <= main_end:
-                original_pairs.setdefault(inst.linkcode, []).append(inst)
 
         for linkcode, pair in original_pairs.items():
 
@@ -353,7 +377,7 @@ class SettlementModel(Model):
             elif (pair[0].get_status() == "Cancelled due to partial settlement" and
                   pair[1].get_status() == "Cancelled due to partial settlement"):
                 # Recursively sum settled amounts from child instructions (and their descendants).
-                settled_child_value = (self.get_recursive_settled_amount(pair[0]))
+                settled_child_value = (self.get_recursive_settled_amount(parent_instruction=pair[0],instruction_pool=relevant_instructions,depth=0))
                 # The effective settled amount is capped at the intended amount.
                 effective_settled = min(settled_child_value, intended_amount)
                 total_settled_value += effective_settled
@@ -373,21 +397,10 @@ class SettlementModel(Model):
         during the main simulation period.
 
         Returns:
-            int: The total count of settled instructions
+            int: The total count of settled instructions, includes mothers & children
         """
-        main_start = self.simulation_start + self.warm_up_period
-
-        settled_count = 0
-
-        for inst in self.instructions:
-            if inst.get_motherID() == "mother":
-                if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= self.simulation_end:
-                    settled_count += 1
-            else:
-                if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time():
-                    settled_count += 1
-
-        return settled_count
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        return sum(1 for inst in relevant_instructions if inst.get_status() in ["Settled on time", "Settled late"])
 
     def get_total_settled_amount(self):
         """
@@ -398,22 +411,17 @@ class SettlementModel(Model):
         Returns:
             float: The total settled amount
         """
-        main_start = self.simulation_start + self.warm_up_period
-        main_end = self.simulation_end - self.cool_down_period
-
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
         total_settled_amount = 0.0
 
         # First, add amounts from directly settled instructions
-        for inst in self.instructions:
-            if inst.get_motherID() == "mother":
-                if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time() <= self.simulation_end:
-                    total_settled_amount += inst.get_amount()
-            else:
-                if inst.get_status() == "Settled on time" and main_start <= inst.get_creation_time():
-                    total_settled_amount += inst.get_amount()
-
+        for inst in relevant_instructions:
+            if inst.get_status() in ["Settled on time", "Settled late"]:
+                total_settled_amount += inst.get_amount()
 
         return total_settled_amount
+
+
 
     def print_settlement_efficiency(self):
         """
@@ -437,32 +445,39 @@ class SettlementModel(Model):
         df.to_csv(filename, index=False)
         print(f"Settlement efficiency metrics saved to {filename}")
 
+
+
     def get_avg_instruction_age_before_settlement(self):
-        settled = [inst for inst in self.instructions if inst.get_status() in ["Settled on time", "Settled late"]]
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        settled = [inst for inst in relevant_instructions if inst.get_status() in ["Settled on time", "Settled late"]]
         ages = [(self.simulated_time - inst.get_creation_time()).total_seconds() / 3600 for inst in settled]
         return round(sum(ages) / len(ages), 2) if ages else 0
 
     def get_original_pair_count(self):
-        main_start = self.simulation_start + self.warm_up_period
-        main_end = self.simulation_end - self.cool_down_period
-        mothers = [inst for inst in self.instructions if
-                   inst.motherID == "mother" and main_start <= inst.get_creation_time() <= main_end]
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
         return len(mothers) // 2  # 2 instructions per pair
 
     def get_partial_settlement_count(self):
-        return self.partial_cancelled_count
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        return sum(1 for inst in relevant_instructions if inst.get_status() == "Cancelled due to partial settlement")
 
     def get_error_cancellation_count(self):
-        return sum(1 for inst in self.instructions if inst.get_status() == "Cancelled due to error")
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        return sum(1 for inst in relevant_instructions if inst.get_status() == "Cancelled due to error")
+
 
     def get_average_tree_depth(self):
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
+
         def get_depth(inst):
-            children = [child for child in self.instructions if child.isChild and child.motherID == inst.get_uniqueID()]
+            children = [child for child in relevant_instructions if child.isChild and child.motherID == inst.get_uniqueID()]
             if not children:
                 return 1
             return 1 + max(get_depth(child) for child in children)
 
-        mothers = [inst for inst in self.instructions if inst.motherID == "mother"]
+
         depths = [get_depth(mother) for mother in mothers]
         return round(sum(depths) / len(depths), 2) if depths else 0
 
@@ -471,13 +486,14 @@ class SettlementModel(Model):
         Generate statistics about instruction depth distribution for process mining visualization.
         """
         # Dictionary to store counts by depth
+        relevant_instructions = self.get_main_period_mothers_and_descendants()
         depth_counts = {}
         # Dictionary to store counts by depth and status
         depth_status_counts = {}
         # Dictionary to store parent-child relationships for tree building
         parent_child_map = {}
 
-        for inst in self.instructions:
+        for inst in relevant_instructions:
             depth = inst.get_depth()
             status = inst.get_status()
 
@@ -499,6 +515,7 @@ class SettlementModel(Model):
             "cancellations_due_to_error": self.get_error_cancellation_count(),
 
         }
+
 
     def save_depth_statistics(self, filename="depth_statistics.json"):
         """Save depth statistics to a JSON file for external visualization"""
