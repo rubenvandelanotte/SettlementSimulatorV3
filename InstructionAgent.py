@@ -87,7 +87,23 @@ class InstructionAgent (Agent):
         return self.depth
 
     def set_status(self, new_status: str):
+        old_status = self.status
         self.status = new_status
+
+        # Clean up from indices when status changes from "Validated"
+        if old_status == "Validated" and new_status != "Validated":
+            import DeliveryInstructionAgent
+            import ReceiptInstructionAgent
+
+            if isinstance(self, DeliveryInstructionAgent.DeliveryInstructionAgent):
+                if self.linkcode in self.model.validated_delivery_instructions:
+                    if self in self.model.validated_delivery_instructions[self.linkcode]:
+                        self.model.validated_delivery_instructions[self.linkcode].remove(self)
+            elif isinstance(self, ReceiptInstructionAgent.ReceiptInstructionAgent):
+                if self.linkcode in self.model.validated_receipt_instructions:
+                    if self in self.model.validated_receipt_instructions[self.linkcode]:
+                        self.model.validated_receipt_instructions[self.linkcode].remove(self)
+
 
     def get_intended_settlement_date(self):
         return self.intended_settlement_date
@@ -115,6 +131,19 @@ class InstructionAgent (Agent):
     def validate(self):
         if self.status == 'Pending':
             self.set_status('Validated')
+
+            # Add code to allow for faster matching lookup
+            import DeliveryInstructionAgent
+            import ReceiptInstructionAgent
+
+            if isinstance(self, DeliveryInstructionAgent.DeliveryInstructionAgent):
+                if self.linkcode not in self.model.validated_delivery_instructions:
+                    self.model.validated_delivery_instructions[self.linkcode] = []
+                self.model.validated_delivery_instructions[self.linkcode].append(self)
+            elif isinstance(self, ReceiptInstructionAgent.ReceiptInstructionAgent):
+                if self.linkcode not in self.model.validated_receipt_instructions:
+                    self.model.validated_receipt_instructions[self.linkcode] = []
+                self.model.validated_receipt_instructions[self.linkcode].append(self)
 
             #new logging
             self.model.log_event(

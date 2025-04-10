@@ -139,7 +139,6 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         """Matches this ReceiptInstructionAgent with a DeliveryInstructionAgent
         that has the same link code and creates a TransactionAgent."""
 
-
         #new logging
         self.model.log_event(
             event_type="Attempting to Match",
@@ -147,39 +146,31 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             attributes={"status": self.status}
         )
 
-
-
         if self.status != "Validated":
-
             #new logging
             self.model.log_event(
                 event_type="Matching Failed: Incorrect State",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
-
             return None
 
         # Find a matching DeliveryInstructionAgent
         other_instruction = None
-        for agent in self.model.agents:
-            if (
-                    isinstance(agent, DeliveryInstructionAgent.DeliveryInstructionAgent)  # Ensure it's a DeliveryInstructionAgent
-                    and agent.linkcode == self.linkcode  # Check if linkcodes match
-                    and agent.status == "Validated"  # Ensure the status is correct
-            ):
-                other_instruction = agent
-                break
-        else:
+        if self.linkcode in self.model.validated_delivery_instructions:
+            delivery_candidates = self.model.validated_delivery_instructions[self.linkcode]
+            for candidate in delivery_candidates:
+                if candidate.status == "Validated":
+                    other_instruction = candidate
+                    break
 
-            #new logging
+        if not other_instruction:
+            # Logging for failed match
             self.model.log_event(
                 event_type="Matching Failed: No Counter Instruction Found",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
-
-
             return None
 
         # Create a transaction

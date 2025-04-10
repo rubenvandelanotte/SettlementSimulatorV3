@@ -29,7 +29,7 @@ class SettlementModel(Model):
         self.min_total_accounts = 4
         self.max_total_accounts = 10
         self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
-        self.min_settlement_amount = 100
+        self.min_settlement_amount = 10000
         self.MAX_CHILD_DEPTH = 15
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
@@ -63,10 +63,13 @@ class SettlementModel(Model):
         self.transactions = []
 
         #mini batching
-        self.mini_batch_times = [timedelta(hours=h, minutes=0) for h in range(2, 20)]  # 02:00 to 19:00 hourly
+        self.mini_batch_times = [timedelta(hours=h, minutes=m) for h in range(2, 19) for m in [0, 30]] + [
+            timedelta(hours=19, minutes=0)]
         self.mini_batches_processed = set()
 
-
+        # Instruction indices for fast lookup
+        self.validated_delivery_instructions = {}  # linkcode -> list of delivery instructions
+        self.validated_receipt_instructions = {}  # linkcode -> list of receipt instructions
 
         #OCEL logging reqs:
 
@@ -258,12 +261,21 @@ class SettlementModel(Model):
         matching_changed = True
         while matching_changed:
             matching_changed = False
-            for instruction in self.instructions:
-                if instruction.get_status() == "Validated":
-                    result = instruction.match()
-                    if result is not None:
-                        matching_changed = True
 
+            # Process one linkcode at a time where both delivery and receipt instructions exist
+            common_linkcodes = set(self.validated_delivery_instructions.keys()) & set(
+                self.validated_receipt_instructions.keys())
+
+            for linkcode in common_linkcodes:
+                delivery_list = self.validated_delivery_instructions.get(linkcode, [])
+                if delivery_list:  # If there are delivery instructions with this linkcode
+                    delivery = delivery_list[0]  # Take the first one
+                    if delivery.get_status() == "Validated":
+                        result = delivery.match()
+                        if result is not None:
+                            matching_changed = True
+
+        # Continue with settlement phase
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
                 transaction.settle()
