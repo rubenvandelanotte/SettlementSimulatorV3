@@ -71,12 +71,6 @@ class TransactionAgent(Agent):
                     received_cash = self.deliverer.cashAccount.addBalance(
                         self.deliverer.get_amount(), "Cash")
 
-                    # Debug logs
-                    print(f"[DEBUG] Securities: delivered={delivered_securities}, received={received_securities}")
-                    print(f"[DEBUG] Cash: delivered={delivered_cash}, received={received_cash}")
-                    print(
-                        f"[DEBUG] Instruction Amounts: deliverer={self.deliverer.get_amount()}, receiver={self.receiver.get_amount()}")
-
                     if not (
                             delivered_securities == received_securities ==
                             delivered_cash == received_cash ==
@@ -95,8 +89,6 @@ class TransactionAgent(Agent):
 
                     if self.status != "Cancelled due to error":
                         # Late settlement check
-                        print(
-                            f"[DEBUG] Intended: deliverer={self.deliverer.get_intended_settlement_date()}, receiver={self.receiver.get_intended_settlement_date()}, Actual={self.model.simulated_time}")
                         if (self.deliverer.get_intended_settlement_date() < self.model.simulated_time or
                                 self.receiver.get_intended_settlement_date() < self.model.simulated_time):
                             self.deliverer.set_status("Settled late")
