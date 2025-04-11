@@ -198,6 +198,9 @@ class SettlementModel(Model):
 
     def step(self):
             # Determine which period we are in:
+            #regular flush to disk to stop overhead in memory
+            if len(self.logger.events) > 10000:  # or any threshold
+                self.logger.flush_to_disk(f"flush_events_{self.seed}.jsonl")
 
             if len(self.logger.events) > 10000:  # or any threshold
                 self.logger.flush_to_disk(f"flush_events_{self.seed}.jsonl")

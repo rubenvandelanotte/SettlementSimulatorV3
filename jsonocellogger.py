@@ -125,3 +125,4 @@ class JSONOCELLogger:
                 f.write("\n")
         print(f"Flushed {len(self.events)} events to disk.")
         self.events.clear()
+        #flush
