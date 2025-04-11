@@ -309,6 +309,48 @@ class SettlementModel(Model):
 
         return list(descendants)
 
+    def get_main_period_mothers_and_descendants_optimized(self):
+        """
+        Optimized version that uses a more efficient breadth-first traversal
+        to collect all relevant instructions.
+        """
+        main_start = self.simulation_start + self.warm_up_period
+        main_end = self.simulation_end - self.cool_down_period
+
+        # Get mother instructions from main period
+        mother_instructions = [
+            inst for inst in self.instructions
+            if inst.get_motherID() == "mother" and main_start <= inst.get_creation_time() <= main_end
+        ]
+
+        # Use a set for faster membership testing
+        descendants = set(mother_instructions)
+
+        # Create a mapping from parent ID to children for faster lookup
+        parent_to_children = {}
+        for inst in self.instructions:
+            if inst.isChild:
+                parent_id = inst.get_motherID()
+                if parent_id not in parent_to_children:
+                    parent_to_children[parent_id] = []
+                parent_to_children[parent_id].append(inst)
+
+        # Use queue for breadth-first traversal
+        queue = [inst for inst in mother_instructions]
+        while queue:
+            current = queue.pop(0)
+            current_id = current.get_uniqueID()
+
+            # Get children from pre-computed mapping
+            children = parent_to_children.get(current_id, [])
+
+            for child in children:
+                if child not in descendants:
+                    descendants.add(child)
+                    queue.append(child)
+
+        return list(descendants)
+
     def get_recursive_settled_amount(self, parent_instruction, instruction_pool=None):
         instruction_pool = instruction_pool if instruction_pool is not None else self.instructions
         total = 0.0
@@ -363,6 +405,7 @@ class SettlementModel(Model):
 
         relevant_instructions = self.get_main_period_mothers_and_descendants()
         original_pairs = {}
+
         for inst in relevant_instructions:
             if inst.get_motherID() == "mother":
                 original_pairs.setdefault(inst.get_linkcode(), []).append(inst)
@@ -407,6 +450,122 @@ class SettlementModel(Model):
                     fully_settled_pairs += 1
             # Other statuses are considered as not settled.
 
+        instruction_efficiency = (fully_settled_pairs / total_original_pairs * 100) if total_original_pairs > 0 else 0
+        value_efficiency = (total_settled_value / total_intended_value * 100) if total_intended_value > 0 else 0
+
+        return instruction_efficiency, value_efficiency
+
+    def calculate_settlement_efficiency_optimized(self):
+        """
+        Optimized version of settlement efficiency calculation that:
+        1. Pre-computes child relationships
+        2. Uses efficient data structures
+        3. Eliminates redundant calculations
+        4. Uses iteration instead of recursion
+
+        Returns:
+            tuple: (instruction_efficiency_percentage, value_efficiency_percentage)
+        """
+        # Get all relevant instructions only once
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+
+        # Pre-build parent-child mapping
+        child_map = {}
+        status_cache = {}
+        amount_cache = {}
+
+        for inst in relevant_instructions:
+            # Cache instruction properties
+            inst_id = inst.get_uniqueID()
+            status_cache[inst_id] = inst.get_status()
+            amount_cache[inst_id] = inst.get_amount()
+
+            # Build child relationships
+            if inst.isChild:
+                parent_id = inst.get_motherID()
+                if parent_id not in child_map:
+                    child_map[parent_id] = []
+                child_map[parent_id].append(inst_id)
+
+        # Group mothers by linkcode
+        original_pairs = {}
+        mother_instructions = []
+
+        for inst in relevant_instructions:
+            if inst.get_motherID() == "mother":
+                mother_instructions.append(inst)
+                linkcode = inst.get_linkcode()
+                if linkcode not in original_pairs:
+                    original_pairs[linkcode] = []
+                original_pairs[linkcode].append(inst)
+
+        # Initialize counters
+        total_original_pairs = 0
+        fully_settled_pairs = 0
+        total_intended_value = 0.0
+        total_settled_value = 0.0
+
+        # Pre-compute settled amounts for all parent instructions that will need it
+        # (specifically, those with "Cancelled due to partial settlement" status)
+        cached_settled_amounts = {}
+        for inst in mother_instructions:
+            parent_id = inst.get_uniqueID()
+            if status_cache.get(parent_id) == "Cancelled due to partial settlement":
+                if parent_id not in cached_settled_amounts:
+                    settled_amount = self._get_settled_amount_iterative(
+                        parent_id, child_map, status_cache, amount_cache
+                    )
+                    cached_settled_amounts[parent_id] = settled_amount
+
+        # Process all pairs
+        for linkcode, pair in original_pairs.items():
+            if not pair:
+                continue
+
+            # Process each pair only once
+            intended_amount = pair[0].get_amount()
+            total_original_pairs += 1
+            total_intended_value += intended_amount
+
+            if len(pair) < 2:
+                # Skip instructions without a counter instruction
+                continue
+
+            # Get cached statuses
+            pair_0_id = pair[0].get_uniqueID()
+            pair_1_id = pair[1].get_uniqueID()
+            pair_0_status = status_cache[pair_0_id]
+            pair_1_status = status_cache[pair_1_id]
+
+            # Case 1: Fully settled directly
+            if (pair_0_status in ["Settled on time"] and
+                    pair_1_status in ["Settled on time"]):
+                fully_settled_pairs += 1
+                total_settled_value += intended_amount
+
+            # Case 2: Partial settlement
+            elif (pair_0_status == "Cancelled due to partial settlement" and
+                  pair_1_status == "Cancelled due to partial settlement"):
+
+                # Use pre-computed settled amount or compute it if not in cache
+                if pair_0_id in cached_settled_amounts:
+                    settled_child_value = cached_settled_amounts[pair_0_id]
+                else:
+                    # Compute on-demand if somehow not in cache
+                    settled_child_value = self._get_settled_amount_iterative(
+                        pair_0_id, child_map, status_cache, amount_cache
+                    )
+                    cached_settled_amounts[pair_0_id] = settled_child_value
+
+                # The effective settled amount is capped at the intended amount
+                effective_settled = min(settled_child_value, intended_amount)
+                total_settled_value += effective_settled
+
+                # Count as fully settled if effective settled equals intended amount
+                if effective_settled == intended_amount:
+                    fully_settled_pairs += 1
+
+        # Calculate final metrics
         instruction_efficiency = (fully_settled_pairs / total_original_pairs * 100) if total_original_pairs > 0 else 0
         value_efficiency = (total_settled_value / total_intended_value * 100) if total_intended_value > 0 else 0
 
