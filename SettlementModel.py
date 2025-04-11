@@ -309,28 +309,37 @@ class SettlementModel(Model):
 
         return list(descendants)
 
-    def get_recursive_settled_amount(self, parent_instruction, instruction_pool = None, depth=0):
-        """
-        Recursively sum the settled amounts of all descendant (child) instructions
-        for a given parent instruction.
-
-        Parameters:
-            parent_instruction: The instruction whose children (and their descendants)
-                                are to be summed.
-        Returns:
-            The total settled amount from all descendant instructions.
-        """
-
+    def get_recursive_settled_amount(self, parent_instruction, instruction_pool=None):
         instruction_pool = instruction_pool if instruction_pool is not None else self.instructions
         total = 0.0
+        processed = set()
+
+        # Pre-compute child relationships for faster lookup
+        child_map = {}
         for inst in instruction_pool:
-            # Check if this instruction is a child of the parent_instruction.
-            if inst.isChild and inst.motherID == parent_instruction.get_uniqueID():
-                # If the child instruction is settled, add its amount.
-                if inst.get_status() in ["Settled on time"]:
-                    total += inst.get_amount()
-                # Recursively include settled amounts from further descendant instructions.
-                total += self.get_recursive_settled_amount(inst, instruction_pool ,depth + 1)
+            if inst.isChild:
+                if inst.motherID not in child_map:
+                    child_map[inst.motherID] = []
+                child_map[inst.motherID].append(inst)
+
+        # Start with direct children of parent
+        queue = child_map.get(parent_instruction.get_uniqueID(), [])
+
+        # Process all descendants
+        while queue:
+            current = queue.pop(0)
+            current_id = current.get_uniqueID()
+
+            if current_id in processed:
+                continue
+            processed.add(current_id)
+
+            if current.get_status() in ["Settled on time"]:
+                total += current.get_amount()
+
+            # Add all children to the queue
+            queue.extend(child_map.get(current_id, []))
+
         return total
 
     def calculate_settlement_efficiency(self):
