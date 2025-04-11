@@ -30,7 +30,7 @@ class SettlementModel(Model):
         self.max_total_accounts = 10
         self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
         self.min_settlement_amount = 10000
-        self.MAX_CHILD_DEPTH = 15
+        self.MAX_CHILD_DEPTH = 10
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
         self.log_only_main_events= True
@@ -198,6 +198,9 @@ class SettlementModel(Model):
 
     def step(self):
             # Determine which period we are in:
+
+            if len(self.logger.events) > 10000:  # or any threshold
+                self.logger.flush_to_disk(f"flush_events_{self.seed}.jsonl")
             print(f"Running simulation step {self.steps}...")
             main_start = self.simulation_start + self.warm_up_period
             main_end = self.simulation_end - self.cool_down_period
@@ -235,7 +238,7 @@ class SettlementModel(Model):
                     self.batch_processing()
                     self.batch_processed = True
 
-            self.simulated_time += timedelta(seconds=300)
+            self.simulated_time += timedelta(seconds=600)
 
             if self.simulated_time >= datetime.combine(self.simulated_time.date(), datetime.min.time()) + self.day_end:
                 self.simulated_time = datetime.combine(self.simulated_time.date() + timedelta(days=1), datetime.min.time()) + self.trading_start
@@ -259,8 +262,10 @@ class SettlementModel(Model):
 
         # --- Phase 3: Match with retries ---
         matching_changed = True
-        while matching_changed:
+        attempts = 0
+        while matching_changed and attempts <3 :
             matching_changed = False
+            attempts = attempts + 1
 
             # Process one linkcode at a time where both delivery and receipt instructions exist
             common_linkcodes = set(self.validated_delivery_instructions.keys()) & set(

@@ -85,7 +85,7 @@ class JSONOCELLogger:
             "type": otype,
             "attributes": attributes
         })
-        print(f"Logged object: {oid} of type {otype}")
+        #print(f"Logged object: {oid} of type {otype}")
 
     def log_event(self, event_type, object_ids, event_attributes=None, relationships=None, timestamp=None):
         event_attributes = event_attributes if event_attributes else {}
@@ -106,7 +106,7 @@ class JSONOCELLogger:
             "relationships": relationships
         }
         self.events.append(event)
-        print(f"Logged event: {event['id']} of type {event_type}")
+        #print(f"Logged event: {event['id']} of type {event_type}")
 
     def export_log(self, filename):
         with open(filename, "w") as f:
@@ -117,3 +117,11 @@ class JSONOCELLogger:
                 "objects": self.objects
             }, f, indent=4)
         print(f"Exported JSONOCEL log to {filename}")
+
+    def flush_to_disk(self, path="event_dump.jsonl"):
+        with open(path, "a") as f:
+            for event in self.events:
+                json.dump(event, f)
+                f.write("\n")
+        print(f"Flushed {len(self.events)} events to disk.")
+        self.events.clear()
