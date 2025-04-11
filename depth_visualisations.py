@@ -418,6 +418,13 @@ class SettlementAnalyzer:
             output_dir=os.path.join(output_base, "lateness")
         )
 
+        # Generate runtime visualizations
+        self.analyze_runtime(
+            runtime_file="runtime_results.json",
+            output_dir=os.path.join(output_base, "runtime"),
+            measurement_csv="New_measurement.csv"
+        )
+
         # self.analyze_lateness_hours(
         #     log_folder="simulatie_logs",
         #     output_dir=os.path.join(output_base, "lateness_hours")
@@ -1346,6 +1353,294 @@ class SettlementAnalyzer:
             plt.close()
 
         print(f"Settlement lateness visualizations created in {output_dir}")
+
+    def analyze_runtime(self, runtime_file="runtime_results.json", output_dir="settlement_analysis/runtime/",
+                        measurement_csv="New_measurement.csv"):
+        """
+        Analyze and visualize runtime data from the runtime_results.json file
+
+        Args:
+            runtime_file: Path to the runtime_results.json file
+            output_dir: Directory to save visualizations
+            measurement_csv: Path to New_measurement.csv for efficiency metrics
+        """
+        import os
+        import json
+        import pandas as pd
+        import numpy as np
+        from collections import defaultdict
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        print("Analyzing runtime data...")
+
+        # Check if runtime file exists
+        if not os.path.exists(runtime_file):
+            print(f"Runtime file '{runtime_file}' not found!")
+            return
+
+        try:
+            # Load runtime data
+            with open(runtime_file, 'r') as f:
+                runtime_data = json.load(f)
+
+            print(f"Loaded runtime data with {len(runtime_data)} records")
+
+            # Process runtime data
+            config_runtimes = defaultdict(list)
+            all_runtimes = []
+
+            for record in runtime_data:
+                run_label = record.get("run_label", "")
+
+                # Extract configuration number from run label (e.g., "Config5_Run3")
+                import re
+                config_match = re.search(r'Config(\d+)', run_label)
+                if config_match:
+                    config_num = int(config_match.group(1))
+
+                    # Extract runtime
+                    execution_time = record.get("execution_time_seconds", 0)
+
+                    # Store in appropriate data structures
+                    config_runtimes[config_num].append(execution_time)
+                    all_runtimes.append(execution_time)
+
+                    print(f"Processed runtime for Config {config_num}: {execution_time:.2f} seconds")
+
+            if not config_runtimes:
+                print("No valid configuration data found in runtime file")
+                return
+
+            # Calculate average runtime for each configuration
+            avg_runtimes = {}
+            std_runtimes = {}
+            for config_num, times in config_runtimes.items():
+                avg_runtimes[config_num] = np.mean(times)
+                std_runtimes[config_num] = np.std(times)
+
+            # Sort configurations by number
+            configs = sorted(avg_runtimes.keys())
+            avg_runtime_values = [avg_runtimes[c] for c in configs]
+            std_runtime_values = [std_runtimes[c] for c in configs]
+
+            # 1. Create basic line chart of runtime by configuration
+            plt.figure(figsize=(12, 8))
+            plt.plot(configs, avg_runtime_values, 'o-', linewidth=2, markersize=8, color='blue')
+
+            # Add error bars for standard deviation
+            plt.errorbar(configs, avg_runtime_values, yerr=std_runtime_values, fmt='none', ecolor='lightblue',
+                         capsize=5)
+
+            # Add data labels
+            for i, runtime in enumerate(avg_runtime_values):
+                plt.text(configs[i], runtime, f"{runtime:.2f}s", ha='center', va='bottom')
+
+            plt.xlabel('Configuration (Number of True Values)')
+            plt.ylabel('Average Runtime (seconds)')
+            plt.title('Average Simulation Runtime by Configuration')
+            plt.grid(True, linestyle='--', alpha=0.7)
+            plt.xticks(configs)
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, "runtime_by_config.png"), dpi=300)
+            plt.close()
+
+            # 2. Create a bar chart with standard deviation
+            plt.figure(figsize=(12, 8))
+            bars = plt.bar(configs, avg_runtime_values, yerr=std_runtime_values,
+                           capsize=5, color='skyblue', edgecolor='navy')
+
+            # Add runtime labels
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width() / 2., height + 0.1,
+                         f'{height:.2f}s', ha='center', va='bottom')
+
+            plt.xlabel('Configuration (Number of True Values)')
+            plt.ylabel('Average Runtime (seconds)')
+            plt.title('Simulation Runtime with Standard Deviation by Configuration')
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
+            plt.xticks(configs)
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, "runtime_bars.png"), dpi=300)
+            plt.close()
+
+            # 3. Create boxplot to show distribution of runtimes
+            plt.figure(figsize=(14, 8))
+
+            # Prepare data for boxplot
+            box_data = [config_runtimes[c] for c in configs]
+
+            # Create boxplot
+            bp = plt.boxplot(box_data, labels=configs, patch_artist=True)
+
+            # Customize box colors
+            for box in bp['boxes']:
+                box.set(facecolor='lightblue', alpha=0.8)
+
+            plt.xlabel('Configuration (Number of True Values)')
+            plt.ylabel('Runtime (seconds)')
+            plt.title('Runtime Distribution by Configuration')
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, "runtime_boxplot.png"), dpi=300)
+            plt.close()
+
+            # 4. Create histogram of all runtimes
+            plt.figure(figsize=(12, 8))
+            plt.hist(all_runtimes, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
+
+            # Add mean and median lines
+            mean_runtime = np.mean(all_runtimes)
+            median_runtime = np.median(all_runtimes)
+
+            plt.axvline(x=mean_runtime, color='red', linestyle='--',
+                        label=f'Mean: {mean_runtime:.2f}s')
+            plt.axvline(x=median_runtime, color='green', linestyle='--',
+                        label=f'Median: {median_runtime:.2f}s')
+
+            plt.xlabel('Runtime (seconds)')
+            plt.ylabel('Frequency')
+            plt.title('Distribution of All Simulation Runtimes')
+            plt.legend()
+            plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, "runtime_histogram.png"), dpi=300)
+            plt.close()
+
+            # Load efficiency metrics if available
+            if os.path.exists(measurement_csv):
+                try:
+                    df = pd.read_csv(measurement_csv)
+
+                    # Check if we have runtime_seconds in the CSV
+                    if 'runtime_seconds' in df.columns and 'Partial' in df.columns:
+                        # Extract config numbers from the 'Partial' column
+                        df['config_num'] = df['Partial'].apply(lambda x: x.count('True'))
+
+                        # Calculate average metrics for each configuration
+                        config_metrics = df.groupby('config_num').agg({
+                            'runtime_seconds': 'mean',
+                            'instruction efficiency': 'mean',
+                            'value efficiency': 'mean',
+                            'settled_count': 'mean',
+                            'settled_amount': 'mean'
+                        }).reset_index()
+
+                        # 5. Create scatter plot of runtime vs. efficiency metrics
+                        metrics_to_plot = [
+                            ('instruction efficiency', 'Instruction Efficiency (%)', 'blue'),
+                            ('value efficiency', 'Value Efficiency (%)', 'green'),
+                        ]
+
+                        for metric_col, metric_label, color in metrics_to_plot:
+                            plt.figure(figsize=(12, 8))
+
+                            # Create scatter plot
+                            plt.scatter(config_metrics['runtime_seconds'],
+                                        config_metrics[metric_col],
+                                        s=100, alpha=0.7, color=color)
+
+                            # Add config number labels to points
+                            for i, row in config_metrics.iterrows():
+                                plt.annotate(f"Config {int(row['config_num'])}",
+                                             (row['runtime_seconds'], row[metric_col]),
+                                             xytext=(5, 5), textcoords='offset points')
+
+                            # Add trend line
+                            z = np.polyfit(config_metrics['runtime_seconds'],
+                                           config_metrics[metric_col], 1)
+                            p = np.poly1d(z)
+                            x_trend = np.linspace(config_metrics['runtime_seconds'].min(),
+                                                  config_metrics['runtime_seconds'].max(), 100)
+                            plt.plot(x_trend, p(x_trend), "r--",
+                                     label=f"Trend: y = {z[0]:.4f}x + {z[1]:.4f}")
+
+                            plt.xlabel('Average Runtime (seconds)')
+                            plt.ylabel(metric_label)
+                            plt.title(f'Runtime vs. {metric_label}')
+                            plt.grid(True, linestyle='--', alpha=0.7)
+                            plt.legend()
+
+                            # Calculate correlation
+                            correlation = config_metrics['runtime_seconds'].corr(config_metrics[metric_col])
+                            plt.figtext(0.5, 0.01, f"Correlation: {correlation:.4f}",
+                                        ha='center', fontsize=12,
+                                        bbox={"facecolor": "white", "alpha": 0.5, "pad": 5})
+
+                            plt.tight_layout()
+                            plt.savefig(os.path.join(output_dir, f"runtime_vs_{metric_col.replace(' ', '_')}.png"),
+                                        dpi=300)
+                            plt.close()
+
+                        # 6. Create a heatmap of the correlations between runtime and other metrics
+                        plt.figure(figsize=(10, 8))
+
+                        # Calculate correlation matrix
+                        corr_matrix = config_metrics[['runtime_seconds', 'instruction efficiency',
+                                                      'value efficiency', 'settled_count',
+                                                      'settled_amount']].corr()
+
+                        # Create heatmap
+                        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1,
+                                    linewidths=0.5, fmt='.2f')
+
+                        plt.title('Correlation Matrix of Runtime and Efficiency Metrics')
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(output_dir, "runtime_correlation_heatmap.png"), dpi=300)
+                        plt.close()
+
+                        # 7. Create a multi-line chart showing runtime and efficiencies by config
+                        fig, ax1 = plt.subplots(figsize=(12, 8))
+
+                        # Runtime line (primary y-axis)
+                        color = 'tab:blue'
+                        ax1.set_xlabel('Configuration (Number of True Values)')
+                        ax1.set_ylabel('Runtime (seconds)', color=color)
+                        line1 = ax1.plot(config_metrics['config_num'], config_metrics['runtime_seconds'],
+                                         'o-', color=color, linewidth=2, label='Runtime')
+                        ax1.tick_params(axis='y', labelcolor=color)
+
+                        # Efficiency lines (secondary y-axis)
+                        ax2 = ax1.twinx()
+                        color2 = 'tab:green'
+                        color3 = 'tab:orange'
+                        ax2.set_ylabel('Efficiency (%)')
+                        line2 = ax2.plot(config_metrics['config_num'], config_metrics['instruction efficiency'],
+                                         's--', color=color2, linewidth=2, label='Instruction Efficiency')
+                        line3 = ax2.plot(config_metrics['config_num'], config_metrics['value efficiency'],
+                                         '^:', color=color3, linewidth=2, label='Value Efficiency')
+
+                        # Add data labels for runtime
+                        for i, runtime in enumerate(config_metrics['runtime_seconds']):
+                            config_num = config_metrics['config_num'].iloc[i]
+                            ax1.text(config_num, runtime, f"{runtime:.2f}s",
+                                     ha='center', va='bottom', color=color)
+
+                        # Combine legend from both axes
+                        lines = line1 + line2 + line3
+                        labels = [l.get_label() for l in lines]
+                        ax1.legend(lines, labels, loc='upper left')
+
+                        plt.title('Runtime and Efficiency Metrics by Configuration')
+                        plt.grid(True, linestyle='--', alpha=0.3)
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(output_dir, "runtime_and_efficiency.png"), dpi=300)
+                        plt.close()
+
+                except Exception as e:
+                    print(f"Error analyzing efficiency data: {e}")
+
+            print(f"Runtime analysis visualizations created in {output_dir}")
+
+        except Exception as e:
+            print(f"Error analyzing runtime data: {e}")
 
     # def analyze_lateness_hours(self, log_folder="simulation_logs/", output_dir="settlement_analysis/lateness_hours/"):
     #     """

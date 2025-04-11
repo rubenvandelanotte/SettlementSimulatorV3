@@ -1,13 +1,16 @@
 import os
 from SettlementModel import SettlementModel
 import pandas as pd
+from RuntimeTracker import RuntimeTracker
 
 
 def batch_runner():
+    # Create a runtime tracker
+    tracker = RuntimeTracker("runtime_results.json")
+
     # Maak een folder voor de logs als deze nog niet bestaat
     log_folder = "simulatie_logs"
     depth_folder = "depth_statistics"
-
 
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
@@ -19,7 +22,6 @@ def batch_runner():
     # use seeds to compare
     base_seed = 42
     seed_list = [base_seed + i for i in range(runs_per_config)]
-
 
     efficiencies = []
 
@@ -37,57 +39,87 @@ def batch_runner():
             print(f"Start simulatie: Configuratie met {true_count} True, run {run}")
             seed = seed_list[seed_index]
             seed_index += 1
-            model = SettlementModel(partialsallowed=partialsallowed, seed=seed)
 
-            try:
-                # Simuleer totdat de simulatie voorbij de ingestelde eindtijd is
-                while model.simulated_time < model.simulation_end:
-                    model.step()
-            except RecursionError:
-                print("RecursionError opgetreden: maximum recursiediepte overschreden. Simulatie wordt beëindigd.")
+            # Define a run_simulation function that will be timed
+            def run_simulation(config):
+                # Extract the configuration parameters
+                partialsallowed = config["partialsallowed"]
+                seed = config["seed"]
 
-            # Stel bestandsnamen in met de configuratie en run-nummer
-            log_filename = os.path.join(log_folder, f"log_config{true_count}_run{run}.csv")
-            ocel_filename = os.path.join(log_folder, f"simulation_config{true_count}_run{run}.jsonocel")
-            depth_filename = os.path.join(depth_folder, f"depth_statistics_config{true_count}_run{run}.jsonocel")
+                # Create and run the model
+                model = SettlementModel(partialsallowed=partialsallowed, seed=seed)
 
+                try:
+                    # Simuleer totdat de simulatie voorbij de ingestelde eindtijd is
+                    while model.simulated_time < model.simulation_end:
+                        model.step()
+                except RecursionError:
+                    print("RecursionError opgetreden: maximum recursiediepte overschreden. Simulatie wordt beëindigd.")
 
-            # Sla de logs op
+                # Stel bestandsnamen in met de configuratie en run-nummer
+                log_filename = os.path.join(log_folder, f"log_config{true_count}_run{run}.csv")
+                ocel_filename = os.path.join(log_folder, f"simulation_config{true_count}_run{run}.jsonocel")
+                depth_filename = os.path.join(depth_folder, f"depth_statistics_config{true_count}_run{run}.jsonocel")
 
-            model.save_ocel_log(filename=ocel_filename)
+                # Sla de logs op
+                model.save_ocel_log(filename=ocel_filename)
 
-            # Save depth statistics
-            stats = model.generate_depth_statistics()
-            import json
-            with open(depth_filename, 'w') as f:
-                json.dump(stats, f, indent=2)
-            print(f"Depth statistics saved to {depth_filename}")
+                # Save depth statistics
+                stats = model.generate_depth_statistics()
+                import json
+                with open(depth_filename, 'w') as f:
+                    json.dump(stats, f, indent=2)
+                print(f"Depth statistics saved to {depth_filename}")
 
-            print(f"Logs opgeslagen voor configuratie {true_count} run {run}")
-            print(f"Bereken settlement efficiency")
-            new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
+                print(f"Logs opgeslagen voor configuratie {true_count} run {run}")
+                print(f"Bereken settlement efficiency")
+                new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
 
-            settled_count = model.count_settled_instructions()
+                settled_count = model.count_settled_instructions()
+                total_settled_amount = model.get_total_settled_amount()
 
-            total_settled_amount = model.get_total_settled_amount()
+                # Return the results we need
+                return {
+                    "instruction_efficiency": new_ins_eff,
+                    "value_efficiency": new_val_eff,
+                    "settled_count": settled_count,
+                    "settled_amount": total_settled_amount
+                }
+
+            # Track the runtime for this configuration
+            config = {
+                "partialsallowed": partialsallowed,
+                "seed": seed
+            }
+            run_label = f"Config{true_count}_Run{run}"
+
+            # Run the simulation with timing
+            result = tracker.track_runtime(run_simulation, config, run_label)
+
+            # Extract the simulation results
+            sim_results = result["simulation_result"]
+            runtime = result["execution_info"]["execution_time_seconds"]
 
             new_eff = {
                 'Partial': str(partialsallowed),
-                'instruction efficiency': new_ins_eff,
-                'value efficiency': new_val_eff,
-                'settled_count': settled_count,  # Instructions count
-                'settled_amount': total_settled_amount,  # Total amount
-                'seed': seed  # log seed for traceability
+                'instruction efficiency': sim_results["instruction_efficiency"],
+                'value efficiency': sim_results["value_efficiency"],
+                'settled_count': sim_results["settled_count"],
+                'settled_amount': sim_results["settled_amount"],
+                'seed': seed,  # log seed for traceability
+                'runtime_seconds': runtime  # Add runtime to the results
             }
             efficiencies.append(new_eff)
+
+    # Save all runtime results
+    tracker.save_results()
 
     return efficiencies
 
 
-#Starting the batchrunner
+# Starting the batchrunner
 if __name__ == "__main__":
     new_measured_efficiency = batch_runner()
     print(new_measured_efficiency)
     df = pd.DataFrame(new_measured_efficiency)
     df.to_csv("New_measurement.csv", index=False)
-
