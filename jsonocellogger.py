@@ -118,11 +118,3 @@ class JSONOCELLogger:
             }, f, indent=4)
         print(f"Exported JSONOCEL log to {filename}")
 
-    def flush_to_disk(self, path="event_dump.jsonl"):
-        with open(path, "a") as f:
-            for event in self.events:
-                json.dump(event, f)
-                f.write("\n")
-        print(f"Flushed {len(self.events)} events to disk.")
-        self.events.clear()
-        #flush
