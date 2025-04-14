@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class InstructionAgent (Agent):
-    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: int, isChild: bool, status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0):
+    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: int, isChild: bool, status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0, original_mother_amount: int = None):
         super().__init__(model)
         self.uniqueID = uniqueID
         self.motherID = motherID
@@ -29,6 +29,14 @@ class InstructionAgent (Agent):
         self.last_matched = creation_time
         self.intended_settlement_date = None
         self.depth = depth
+
+        # Set original_mother_amount
+        if original_mother_amount is None and not isChild:
+            # If this is a mother instruction, set to its own amount
+            self.original_mother_amount = amount
+        else:
+            # If this is a child, use the provided value
+            self.original_mother_amount = original_mother_amount
 
 #getter methods
     def get_model(self):
@@ -85,6 +93,10 @@ class InstructionAgent (Agent):
 
     def get_depth(self):
         return self.depth
+
+    def get_original_mother_amount(self):
+        """Returns the original amount from the mother instruction."""
+        return self.original_mother_amount
 
     def set_status(self, new_status: str):
         old_status = self.status

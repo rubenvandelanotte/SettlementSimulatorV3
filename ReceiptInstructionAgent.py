@@ -16,7 +16,7 @@ import DeliveryInstructionAgent
 class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
     def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent",
                  securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool,
-                 status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0):
+                 status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0, original_mother_amount: int=None):
         super().__init__(
             model=model,
             linkedTransaction=linkedTransaction,
@@ -31,7 +31,8 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             status=status,
             linkcode=linkcode,
             creation_time=creation_time,
-            depth=depth
+            depth=depth,
+            original_mother_amount=original_mother_amount
         )
 
         self.model.log_object(
@@ -67,10 +68,10 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
 
     def createReceiptChildren(self):
 
-        if self.depth >= self.model.MAX_CHILD_DEPTH:
+        if self.depth >= self.model.max_child_depth:
             return (None, None)
 
-        MIN_SETTLEMENT_AMOUNT = self.model.min_settlement_amount
+        min_settlement_amount = self.original_mother_amount * self.model.min_settlement_percentage
         # Calculate the actual available amounts using getBalance(), ensuring correct account types.
         if self.cashAccount.getAccountType() != "Cash":
             available_cash = 0
@@ -86,17 +87,17 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         # Compute the amount that can actually be settled.
         available_to_settle = min(self.amount, available_cash, available_securities)
 
-        if available_to_settle > MIN_SETTLEMENT_AMOUNT:
+        if available_to_settle > min_settlement_amount:
             #  Create receipt child instructions with the computed amounts.
             receipt_child_1 = ReceiptInstructionAgent(
-                                      self.model,f"{self.uniqueID}_1", self.uniqueID, self.institution, self.securitiesAccount, self.cashAccount, self.securityType, available_to_settle,True,"Validated",f"{self.linkcode}_1", creation_time=self.model.simulated_time, linkedTransaction=None, depth = self.depth + 1
+                                      self.model,f"{self.uniqueID}_1", self.uniqueID, self.institution, self.securitiesAccount, self.cashAccount, self.securityType, available_to_settle,True,"Validated",f"{self.linkcode}_1", creation_time=self.model.simulated_time, linkedTransaction=None, depth = self.depth + 1, original_mother_amount=self.original_mother_amount
                                         )
 
             receipt_child_2 = ReceiptInstructionAgent(
                             self.model,f"{self.uniqueID}_2", self.uniqueID, self.institution,
                              self.securitiesAccount, self.cashAccount, self.securityType, self.amount - available_to_settle,
                                  True,"Validated",f"{self.linkcode}_2", creation_time=self.model.simulated_time,
-                               linkedTransaction=None, depth = self.depth + 1
+                               linkedTransaction=None, depth = self.depth + 1, original_mother_amount=self.original_mother_amount
                                 )
 
 

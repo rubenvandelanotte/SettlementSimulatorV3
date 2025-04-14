@@ -12,7 +12,7 @@ import ReceiptInstructionAgent
 import TransactionAgent
 
 class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
-    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool, status: str, linkcode: str, creation_time: datetime ,linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0):
+    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool, status: str, linkcode: str, creation_time: datetime ,linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0, original_mother_amount: int=None):
         super().__init__(
             model=model,
             linkedTransaction=linkedTransaction,
@@ -27,7 +27,8 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             status=status,
             linkcode=linkcode,
             creation_time=creation_time,
-            depth=depth
+            depth=depth,
+            original_mother_amount=original_mother_amount
         )
 
         self.model.log_object(
@@ -63,10 +64,11 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
     def createDeliveryChildren(self):
 
 
-        if self.depth >= self.model.MAX_CHILD_DEPTH:
+        if self.depth >= self.model.max_child_depth:
             return(None, None)
 
-        MIN_SETTLEMENT_AMOUNT = self.model.min_settlement_amount  # Define a minimum settlement threshold (@ruben dont think this is necessary)
+        min_settlement_amount = self.original_mother_amount * self.model.min_settlement_percentage
+
         if self.securitiesAccount.getAccountType() != self.securityType:
             available_securities = 0
         else:
@@ -81,20 +83,18 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         #takes the minimum of available securities of deliverer and available cash of seller and not more than the amount
         available_to_settle = min(self.amount, available_cash, available_securities)
 
-        if available_to_settle > MIN_SETTLEMENT_AMOUNT:
+        if available_to_settle > min_settlement_amount:
             #create delivery children instructions
 
             #instant matching and settlement of first child not yet possible, because receipt_child_1 does not yet exist
             delivery_child_1 = DeliveryInstructionAgent(self.model, f"{self.uniqueID}_1", self.uniqueID,
                                                 self.institution, self.securitiesAccount, self.cashAccount,
-                                                self.securityType, available_to_settle, True, "Validated", f"{self.linkcode}_1", self.model.simulated_time, None, depth = self.depth +1
+                                                self.securityType, available_to_settle, True, "Validated", f"{self.linkcode}_1", self.model.simulated_time, None, depth = self.depth +1, original_mother_amount=self.original_mother_amount
                                                 )
             delivery_child_2 = DeliveryInstructionAgent(self.model, f"{self.uniqueID}_2", self.uniqueID,
                                                 self.institution, self.securitiesAccount, self.cashAccount,
-                                                self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.model.simulated_time, None, depth = self.depth +1
+                                                self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.model.simulated_time, None, depth = self.depth +1, original_mother_amount=self.original_mother_amount
                                                 )
-
-
 
 
             #pass intended settlement time of mother to the children
