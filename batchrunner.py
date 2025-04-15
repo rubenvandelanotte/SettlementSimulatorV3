@@ -1,11 +1,12 @@
 import os
 import pandas as pd
-import gc  # For manual garbage collection
 import time
 import psutil  # For memory monitoring
 import json
 from SettlementModel import SettlementModel
 from RuntimeTracker import RuntimeTracker
+import gc
+import sys
 
 
 def get_memory_usage():
@@ -30,6 +31,27 @@ def log_memory_usage(label):
     mem_usage = get_memory_usage()
     print(f"Memory usage [{label}]: {mem_usage:.2f} MB")
     return mem_usage
+
+
+def deep_cleanup():
+    """Perform aggressive memory cleanup between simulation runs"""
+    # Run multiple garbage collection cycles with the highest generation
+    for i in range(3):
+        collected = gc.collect(2)
+        print(f"GC run {i + 1}: collected {collected} objects")
+
+    # On Windows, try to release memory back to the OS
+    if sys.platform.startswith('win'):
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetProcessWorkingSetSize(
+                ctypes.windll.kernel32.GetCurrentProcess(), -1, -1)
+            print("Released memory back to OS")
+        except Exception as e:
+            print(f"Error releasing memory: {e}")
+
+
+# Call this function after each simulation run completes
 
 
 def batch_runner():
@@ -176,6 +198,12 @@ def batch_runner():
                     print(f"Saving OCEL logs...")
                     model.save_ocel_log(filename=ocel_filename)
                     print(f"OCEL logs saved to {ocel_filename}")
+
+                    # Reset logger state
+                    if hasattr(model, 'logger') and hasattr(model.logger, 'reset'):
+                        print("Resetting logger state...")
+                        model.logger.reset()
+
                 except Exception as e:
                     print(f"Error saving full OCEL logs: {str(e)}")
                     print(f"Attempting to save simplified logs...")
@@ -217,6 +245,33 @@ def batch_runner():
                     except Exception as backup_error:
                         print(f"Error saving simplified logs: {str(backup_error)}")
                         print(f"Continuing without saving logs")
+
+                # Explicit cleanup of model structures - Approach 1
+                print("Explicitly cleaning model data structures")
+                if hasattr(model, 'instructions'):
+                    print(f"Clearing {len(model.instructions)} instructions")
+                    model.instructions.clear()
+                if hasattr(model, 'transactions'):
+                    print(f"Clearing {len(model.transactions)} transactions")
+                    model.transactions.clear()
+                if hasattr(model, 'institutions'):
+                    print(f"Clearing {len(model.institutions)} institutions")
+                    model.institutions.clear()
+                if hasattr(model, 'accounts'):
+                    print(f"Clearing {len(model.accounts)} accounts")
+                    model.accounts.clear()
+                if hasattr(model, 'validated_delivery_instructions'):
+                    print(f"Clearing validated delivery instructions")
+                    model.validated_delivery_instructions.clear()
+                if hasattr(model, 'validated_receipt_instructions'):
+                    print(f"Clearing validated receipt instructions")
+                    model.validated_receipt_instructions.clear()
+                if hasattr(model, 'agents'):
+                    print(f"Clearing agents")
+                    model.agents.clear()
+                if hasattr(model, 'event_log'):
+                    print(f"Clearing event log")
+                    model.event_log.clear()
 
                 # Final memory check
                 gc.collect()
@@ -276,11 +331,15 @@ def batch_runner():
             df_incremental = pd.DataFrame(efficiencies)
             df_incremental.to_csv("Incremental_measurement.csv", index=False)
 
-            # Force garbage collection between runs
-            gc.collect()
+            # Force deep cleanup between runs
+            print("Performing deep memory cleanup between runs...")
+            deep_cleanup()
 
             # Short pause to let the system stabilize
             time.sleep(2)
+
+            # Log memory after cleanup to check if it's being released
+            log_memory_usage(f"After complete cleanup (Config{true_count}_Run{run})")
 
     # Save all runtime results
     tracker.save_results()

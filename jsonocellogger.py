@@ -132,3 +132,21 @@ class JSONOCELLogger:
                 print(f"Error removing temp file {temp_file}: {str(e)}")
 
         self.temp_files = []
+
+    def reset(self):
+        """Reset the logger to its initial state"""
+        # Flush any events in memory
+        if self.events:
+            self._flush_events_to_disk()
+
+        # The temp_files list keeps track of files to be combined during export
+        # We don't clear this as it would cause data loss
+
+        # Clear objects list (these have already been written to files)
+        print(f"Clearing {len(self.objects)} objects from logger")
+        self.objects = []
+
+        # Reset counters
+        self.event_count = 0
+
+        print("Logger reset complete")
