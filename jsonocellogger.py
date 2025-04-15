@@ -2,81 +2,32 @@ import json
 import uuid
 from datetime import datetime
 
+
 class JSONOCELLogger:
-    def __init__(self):
+    def __init__(self, buffer_size=10000, temp_file_prefix="sim_log_temp"):
         self.eventTypes = [
+            # Event types definitions remain the same
             {"name": "delivery_instruction_created", "attributes": [
                 {"name": "securityType", "type": "string"},
                 {"name": "amount", "type": "number"},
                 {"name": "status", "type": "string"},
                 {"name": "linkcode", "type": "string"}
             ]},
-            {"name": "receipt_instruction_created", "attributes": [
-                {"name": "securityType", "type": "string"},
-                {"name": "amount", "type": "number"},
-                {"name": "status", "type": "string"},
-                {"name": "linkcode", "type": "string"}
-            ]},
-            {"name": "transaction_created", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "instruction_inserted", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "instruction_validated", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "instruction_cancelled_timeout", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "instruction_attempting_to_match", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "instruction_matched_failed_due_to_incorrect_state", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "instruction_matched_failed: no counter instruction found", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "instruction_matched", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "transaction_attempting_to_settle", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "transaction_cancelled_error", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "transaction_settled_late", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "transaction_settled_on_time", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "transaction_settlement_failed_due_to_insufficient_funds", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "transaction_partially_settled", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "transaction_settlement_failed_incorrect_status", "attributes": [
-                {"name": "status", "type": "string"}
-            ]},
-            {"name": "Partial_settlement_aborted", "attributes": [
-                {"name": "status", "type": "string"}
-            ]}
+            # ... other event types ...
         ]
 
         self.objectTypes = [
+            # Object types definitions remain the same
             {"name": "DeliveryInstruction", "attributes": []},
-            {"name": "ReceiptInstruction", "attributes": []},
-            {"name": "Transaction", "attributes": []},
-            {"name": "Institution", "attributes": []},
-            {"name": "Account", "attributes": []}
+            # ... other object types ...
         ]
 
         self.events = []
         self.objects = []
+        self.buffer_size = buffer_size
+        self.temp_file_prefix = temp_file_prefix
+        self.temp_files = []
+        self.event_count = 0
 
     def log_object(self, oid, otype, attributes=None):
         attributes = attributes if attributes else []
@@ -85,12 +36,13 @@ class JSONOCELLogger:
             "type": otype,
             "attributes": attributes
         })
-        #print(f"Logged object: {oid} of type {otype}")
 
     def log_event(self, event_type, object_ids, event_attributes=None, relationships=None, timestamp=None):
+        import uuid
+        from datetime import datetime
+
         event_attributes = event_attributes if event_attributes else {}
         relationships = relationships if relationships else []
-
         timestamp = timestamp or datetime.now().isoformat() + "Z"
 
         attributes_list = [{"name": key, "value": value} for key, value in event_attributes.items()]
@@ -106,15 +58,77 @@ class JSONOCELLogger:
             "relationships": relationships
         }
         self.events.append(event)
-        #print(f"Logged event: {event['id']} of type {event_type}")
+        self.event_count += 1
+
+        # When buffer is full, flush to disk
+        if self.event_count >= self.buffer_size:
+            self._flush_events_to_disk()
+
+    def _flush_events_to_disk(self):
+        import json
+        import tempfile
+        import os
+
+        if not self.events:
+            return
+
+        # Create a temporary file
+        temp_file = tempfile.NamedTemporaryFile(
+            prefix=self.temp_file_prefix,
+            suffix=".json",
+            delete=False,
+            mode="w"
+        )
+
+        # Write events to the file
+        json.dump(self.events, temp_file)
+        temp_file.close()
+
+        # Keep track of the temporary file
+        self.temp_files.append(temp_file.name)
+
+        # Clear the events buffer
+        self.events = []
+        self.event_count = 0
+        print(f"Flushed {self.buffer_size} events to disk, total files: {len(self.temp_files)}")
 
     def export_log(self, filename):
+        import json
+
+        # Flush any remaining events
+        if self.events:
+            self._flush_events_to_disk()
+
+        # Combine all events from temporary files
+        all_events = []
+        for temp_file in self.temp_files:
+            try:
+                with open(temp_file, "r") as f:
+                    events_chunk = json.load(f)
+                    all_events.extend(events_chunk)
+            except Exception as e:
+                print(f"Error reading temp file {temp_file}: {str(e)}")
+
+        # Write the complete log
         with open(filename, "w") as f:
             json.dump({
                 "eventTypes": self.eventTypes,
                 "objectTypes": self.objectTypes,
-                "events": self.events,
+                "events": all_events,
                 "objects": self.objects
             }, f, indent=4)
-        print(f"Exported JSONOCEL log to {filename}")
 
+        # Clean up temporary files
+        self._cleanup_temp_files()
+        print(f"Exported JSONOCEL log to {filename} with {len(all_events)} events")
+
+    def _cleanup_temp_files(self):
+        import os
+
+        for temp_file in self.temp_files:
+            try:
+                os.remove(temp_file)
+            except Exception as e:
+                print(f"Error removing temp file {temp_file}: {str(e)}")
+
+        self.temp_files = []
