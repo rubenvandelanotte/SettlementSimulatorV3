@@ -61,7 +61,7 @@ def sample_instruction_creation_times_and_isd(simulated_time: datetime):
 
 class InstitutionAgent(Agent):
 
-    def __init__(self, model:SettlementModel, institutionID:str, accounts:list[Account] = [],allowPartial:bool = True):
+    def __init__(self, model:SettlementModel, institutionID:str, accounts:list[Account] = [], allowPartial:bool = True):
         super().__init__(model)
 
         self.institutionID = institutionID
@@ -107,12 +107,9 @@ class InstitutionAgent(Agent):
             return False
 
     def getSecurityAccounts(self, securityType:str):
-
         for account in self.accounts:
             if account.accountType == securityType:
                 return account
-
-
 
     def create_instruction(self):
         instruction_type = random.choice(['delivery', 'receipt'])

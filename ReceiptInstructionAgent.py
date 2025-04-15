@@ -100,8 +100,6 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                                linkedTransaction=None, depth = self.depth + 1, original_mother_amount=self.original_mother_amount
                                 )
 
-
-
             #ensures that the intended_settlement_time of children = mother
             receipt_child_1.set_intended_settlement_date(self.get_intended_settlement_date())
             receipt_child_2.set_intended_settlement_date(self.get_intended_settlement_date())
@@ -122,18 +120,13 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                             "child2_depth": self.depth + 1
                             }
             )
-            return receipt_child_1, receipt_child_2
+            return (receipt_child_1, receipt_child_2)
         else:
-
-            #new logging
             self.model.log_event(
                 event_type="Partial Settlement Failed: Insufficient Funds",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
-
-
-
             return (None, None)
 
     def match(self):
@@ -192,14 +185,12 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         self.set_status("Matched")
         other_instruction.set_status("Matched")
 
-
         #new logging
         self.model.log_event(
             event_type="Matched",
             object_ids=[self.uniqueID, other_instruction.uniqueID, transaction.transactionID],
             attributes={"status": "Matched"}
         )
-
         return transaction
 
     def cancel_timeout(self):
@@ -224,7 +215,6 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                 object_ids=[self.uniqueID,self.linkedTransaction.deliverer.uniqueID, self.linkedTransaction.transactionID],
                 attributes={"status": "Cancelled due to timeout"}
             )
-
 
             self.model.remove_transaction(self.linkedTransaction)
             self.model.agents.remove(self.linkedTransaction.deliverer)

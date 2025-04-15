@@ -62,8 +62,6 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         return self.creation_time
 
     def createDeliveryChildren(self):
-
-
         if self.depth >= self.model.max_child_depth:
             return(None, None)
 
@@ -96,7 +94,6 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                                                 self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.model.simulated_time, None, depth = self.depth +1, original_mother_amount=self.original_mother_amount
                                                 )
 
-
             #pass intended settlement time of mother to the children
             delivery_child_1.set_intended_settlement_date(self.get_intended_settlement_date())
             delivery_child_2.set_intended_settlement_date(self.get_intended_settlement_date())
@@ -115,18 +112,13 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                             "child2_depth": self.depth +1
                             }
             )
-            return delivery_child_1, delivery_child_2
+            return (delivery_child_1, delivery_child_2)
         else:
-
-
-            #new logging
             self.model.log_event(
                 event_type="Partial Settlement Failed: Insufficient Funds",
                 object_ids=[self.uniqueID],
                 attributes={"status": self.status}
             )
-
-
             return (None, None)
 
     def match(self):
@@ -138,7 +130,6 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             object_ids=[self.uniqueID],
             attributes={"status": self.status}
         )
-
 
         if self.status != "Validated":
             self.model.log_event(
@@ -217,8 +208,6 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                 object_ids=[self.uniqueID, self.linkedTransaction.receiver.uniqueID, self.linkedTransaction.transactionID],
                 attributes={"status": "Cancelled due to timeout"}
             )
-
-
 
             self.model.remove_transaction(self.linkedTransaction)
             self.model.agents.remove(self.linkedTransaction.receiver)

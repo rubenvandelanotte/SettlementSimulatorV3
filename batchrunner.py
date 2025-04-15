@@ -18,7 +18,7 @@ def batch_runner():
         os.makedirs(depth_folder)
 
     num_institutions = 10  # Aantal instituten in de simulatie
-    runs_per_config = 10  # Aantal simulaties per configuratie
+    runs_per_config = 7  # Aantal simulaties per configuratie
     # use seeds to compare
     base_seed = 42
     seed_list = [base_seed + i for i in range(runs_per_config)]
@@ -73,7 +73,7 @@ def batch_runner():
 
                 print(f"Logs opgeslagen voor configuratie {true_count} run {run}")
                 print(f"Bereken settlement efficiency")
-                new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
+                new_ins_eff, new_val_eff = model.calculate_settlement_efficiency_optimized()
 
                 settled_count = model.count_settled_instructions()
                 total_settled_amount = model.get_total_settled_amount()

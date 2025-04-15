@@ -24,10 +24,10 @@ class InstructionAgent (Agent):
         self.isChild = isChild
         self.status = status
         self.linkcode = linkcode
-        self.creation_time = creation_time# track creation time for timeout
+        self.creation_time = creation_time # track creation time for timeout
         self.linkedTransaction = linkedTransaction
-        self.last_matched = creation_time
-        self.intended_settlement_date = None
+        self.last_matched = creation_time   #why not in declaration?
+        self.intended_settlement_date = None    #why not in declaration?
         self.depth = depth
 
         # Set original_mother_amount
@@ -168,7 +168,6 @@ class InstructionAgent (Agent):
         return self.creation_time + timedelta(days = 14) <= self.model.simulated_time
 
     def step(self):
-
        if self.is_instruction_time_out():
            self.cancel_timeout() #applies to mother and children
        else:

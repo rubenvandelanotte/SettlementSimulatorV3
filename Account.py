@@ -1,15 +1,13 @@
 class Account:
 
     #account object class
-    def __init__(self, accountID: str, accountType:str,balance:float, newSecurities: bool = True, creditLimit:float = 0):
+    def __init__(self, accountID: str, accountType:str, balance:int, newSecurities: bool = True, creditLimit: int = 0):
         self.accountID = accountID
         self.accountType = accountType
         self.balance = balance
         self.creditLimit = creditLimit
         self.newSecurities = newSecurities
-        self.usedCredit = 0
-
-
+        self.usedCredit = 0  #why not int declaration?
 
     def getAccountID(self):
         return self.accountID
@@ -32,7 +30,7 @@ class Account:
     def set_newSecurities(self, new:bool):
         self.newSecurities = new
 
-    def checkBalance(self, amount : float, securityType: str):
+    def checkBalance(self, amount : int, securityType: str):
         if self.accountType == "Cash" and securityType == "Cash":
            return  self.balance + self.creditLimit >= amount
         elif self.accountType == securityType:
@@ -45,19 +43,13 @@ class Account:
             return self.balance + self.creditLimit - self.usedCredit
         return 0
 
-
-
-    def addBalance(self, amount:float, securityType:str):
-
+    def addBalance(self, amount:int, securityType:str):
         #if cash account
         if self.accountType == securityType and self.accountType == "Cash":
-
             #check whether this account used credit already: condition only satisfies if usedCredit ==0
             if self.creditLimit == (self.creditLimit - self.usedCredit):
-
                 self.balance = self.balance + amount
                 self.set_newSecurities(True)
-
                 return amount
 
             elif self.creditLimit != self.creditLimit - self.usedCredit:
@@ -73,7 +65,6 @@ class Account:
                     self.usedCredit = 0
                     self.balance = self.balance + remaining
                     self.set_newSecurities(True)
-
                     return amount
 
         #if security account:
@@ -87,7 +78,7 @@ class Account:
             return 0
 
 
-    def deductBalance(self, amount: float, securityType:str):
+    def deductBalance(self, amount: int, securityType:str):
 
         #deduct cash
         if self.accountType == securityType and self.accountType == "Cash":

@@ -100,14 +100,13 @@ class SettlementModel(Model):
         self.logger.log_object(oid=object_id, otype=object_type, attributes=attributes_list)
 
     def log_event(self, event_type: str, object_ids: list, attributes: dict = None):
-
         #allow for logging only in the main period (no warm-up / cooldown
         if self.log_only_main_events and not self.in_main_period():
             return
 
-
         if attributes is None:
             attributes = {}
+
         self.logger.log_event(
             event_type=event_type,
             object_ids=object_ids,
@@ -192,17 +191,7 @@ class SettlementModel(Model):
         print("-------------------------------------------------------")
         print("Accounts & Institutions generated")
 
-
-
-
-
     def step(self):
-            # Determine which period we are in:
-
-
-            #
-            # if len(self.logger.events) > 10000:  # or any threshold
-            #     self.logger.flush_to_disk(f"flush_events_{self.seed}.jsonl")
             print(f"Running simulation step {self.steps}...")
             main_start = self.simulation_start + self.warm_up_period
             main_end = self.simulation_end - self.cool_down_period
@@ -596,10 +585,10 @@ class SettlementModel(Model):
         through child instructions.
 
         Returns:
-            float: The total settled amount
+            int: The total settled amount
         """
         relevant_instructions = self.get_main_period_mothers_and_descendants()
-        total_settled_amount = 0.0
+        total_settled_amount = 0
 
         # First, add amounts from directly settled instructions
         for inst in relevant_instructions:
@@ -653,7 +642,6 @@ class SettlementModel(Model):
         relevant_instructions = self.get_main_period_mothers_and_descendants()
         return sum(1 for inst in relevant_instructions if inst.get_status() == "Cancelled due to error")
 
-
     def get_average_tree_depth(self):
         relevant_instructions = self.get_main_period_mothers_and_descendants()
         mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
@@ -692,7 +680,6 @@ class SettlementModel(Model):
                 depth_status_counts[depth] = {}
             depth_status_counts[depth][status] = depth_status_counts[depth].get(status, 0) + 1
 
-
         return {
             "depth_counts": depth_counts,
             "depth_status_counts": depth_status_counts,
@@ -700,9 +687,7 @@ class SettlementModel(Model):
             "partial_settlements": self.get_partial_settlement_count(),
             "avg_tree_depth": self.get_average_tree_depth(),
             "cancellations_due_to_error": self.get_error_cancellation_count(),
-
         }
-
 
     def save_depth_statistics(self, filename="depth_statistics.json"):
         """Save depth statistics to a JSON file for external visualization"""
