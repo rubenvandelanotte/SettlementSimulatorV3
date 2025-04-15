@@ -24,10 +24,6 @@ def get_creation_time(isd: datetime, delay: int, simulated_time:datetime) -> dat
     #ensures no creations in the past
     return max(creation_time, simulated_time)
 
-
-
-
-
 def sample_instruction_creation_times_and_isd(simulated_time: datetime):
     """
     Samples two distinct creation times and a shared ISD (intended settlement date),
@@ -56,8 +52,6 @@ def sample_instruction_creation_times_and_isd(simulated_time: datetime):
     creation_time_b = get_creation_time(isd, delay_b, simulated_time)
 
     return creation_time_a, creation_time_b, isd
-
-
 
 class InstitutionAgent(Agent):
 
@@ -188,16 +182,11 @@ class InstitutionAgent(Agent):
             }
         )
 
-
-
     def create_account(self):
         #not really relevant so far
         return
 
     def step(self):
-
-        #if selected create an instruction and with low probability allow/ disallow partial settlements
-
         if random.random() <0.1:
             self.create_instruction()
 
