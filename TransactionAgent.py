@@ -144,11 +144,43 @@ class TransactionAgent(Agent):
                         )
 
                     else:
+                        #new implementation:
                         delivery_child_1, delivery_child_2 = delivery_children
                         receipt_child_1, receipt_child_2 = receipt_children
 
-                        child_transaction_1 = delivery_child_1.match()
-                        child_transaction_2 = delivery_child_2.match()
+                        child_transaction_1 = TransactionAgent(
+                            model=self.model,
+                            transactionID=f"trans{delivery_child_1.uniqueID}_{receipt_child_1.uniqueID}",
+                            deliverer=delivery_child_1,
+                            receiver=receipt_child_1,
+                            status="Matched"
+                        )
+                        self.model.register_transaction(child_transaction_1)
+
+                        # Link transaction to both instructions
+                        delivery_child_1.linkedTransaction = child_transaction_1
+                        receipt_child_1.linkedTransaction = child_transaction_1
+
+                        # Update statuses
+                        delivery_child_1.set_status("Matched")
+                        receipt_child_1.set_status("Matched")
+
+                        child_transaction_2 = TransactionAgent(
+                            model=self.model,
+                            transactionID=f"trans{delivery_child_2.uniqueID}_{receipt_child_2.uniqueID}",
+                            deliverer=delivery_child_2,
+                            receiver=receipt_child_2,
+                            status="Matched"
+                        )
+                        self.model.register_transaction(child_transaction_2)
+
+                        # Link transaction to both instructions
+                        delivery_child_2.linkedTransaction = child_transaction_2
+                        receipt_child_2.linkedTransaction = child_transaction_2
+
+                        # Update statuses
+                        delivery_child_2.set_status("Matched")
+                        receipt_child_2.set_status("Matched")
 
                         if child_transaction_1:
                             child_transaction_1.settle()
@@ -156,10 +188,26 @@ class TransactionAgent(Agent):
                             child_transaction_2.deliverer.get_securitiesAccount().set_newSecurities(False)
                             child_transaction_2.receiver.get_cashAccount().set_newSecurities(False)
 
-                        if child_transaction_1 or child_transaction_2:
-                            self.cancel_partial()
-                        else:
-                            print("[WARNING] Partial settlement failed: no children succeeded.")
+                        self.cancel_partial()
+
+
+                        #old implementation:
+                        # delivery_child_1, delivery_child_2 = delivery_children
+                        # receipt_child_1, receipt_child_2 = receipt_children
+                        #
+                        # child_transaction_1 = delivery_child_1.match()
+                        # child_transaction_2 = delivery_child_2.match()
+                        #
+                        # if child_transaction_1:
+                        #     child_transaction_1.settle()
+                        # if child_transaction_2:
+                        #     child_transaction_2.deliverer.get_securitiesAccount().set_newSecurities(False)
+                        #     child_transaction_2.receiver.get_cashAccount().set_newSecurities(False)
+                        #
+                        # if child_transaction_1 or child_transaction_2:
+                        #     self.cancel_partial()
+                        # else:
+                        #     print("[WARNING] Partial settlement failed: no children succeeded.")
 
         else:
             self.model.log_event(

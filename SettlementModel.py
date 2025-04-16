@@ -380,6 +380,42 @@ class SettlementModel(Model):
 
         return total
 
+    def get_settled_amount_iterative(self, parent_id, child_map, status_cache, amount_cache):
+        """
+        Iterative calculation of total settled amount for all descendants of an instruction.
+
+        Args:
+            parent_id (str): ID of the parent instruction
+            child_map (dict): Dictionary mapping parent IDs to lists of child IDs
+            status_cache (dict): Dictionary mapping instruction IDs to their status
+            amount_cache (dict): Dictionary mapping instruction IDs to their amounts
+
+        Returns:
+            float: Total settled amount from all descendants
+        """
+        total = 0.0
+        processed = set()
+
+        # Start with direct children of parent
+        queue = child_map.get(parent_id, [])
+
+        # Process all descendants
+        while queue:
+            current_id = queue.pop(0)
+
+            if current_id in processed:
+                continue
+            processed.add(current_id)
+
+            # Add settled amount if this instruction is settled on time
+            if status_cache.get(current_id) == "Settled on time":
+                total += amount_cache.get(current_id, 0)
+
+            # Add all children to the queue
+            queue.extend(child_map.get(current_id, []))
+
+        return total
+
     def calculate_settlement_efficiency(self):
         """
         Calculates settlement efficiency based on instruction pairs, including recursive
@@ -508,7 +544,7 @@ class SettlementModel(Model):
             parent_id = inst.get_uniqueID()
             if status_cache.get(parent_id) == "Cancelled due to partial settlement":
                 if parent_id not in cached_settled_amounts:
-                    settled_amount = self._get_settled_amount_iterative(
+                    settled_amount = self.get_settled_amount_iterative(
                         parent_id, child_map, status_cache, amount_cache
                     )
                     cached_settled_amounts[parent_id] = settled_amount
@@ -548,7 +584,7 @@ class SettlementModel(Model):
                     settled_child_value = cached_settled_amounts[pair_0_id]
                 else:
                     # Compute on-demand if somehow not in cache
-                    settled_child_value = self._get_settled_amount_iterative(
+                    settled_child_value = self.get_settled_amount_iterative(
                         pair_0_id, child_map, status_cache, amount_cache
                     )
                     cached_settled_amounts[pair_0_id] = settled_child_value
