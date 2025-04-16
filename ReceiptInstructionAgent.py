@@ -90,8 +90,11 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         if available_to_settle > min_settlement_amount:
             #  Create receipt child instructions with the computed amounts.
             receipt_child_1 = ReceiptInstructionAgent(
-                                      self.model,f"{self.uniqueID}_1", self.uniqueID, self.institution, self.securitiesAccount, self.cashAccount, self.securityType, available_to_settle,True,"Validated",f"{self.linkcode}_1", creation_time=self.model.simulated_time, linkedTransaction=None, depth = self.depth + 1, original_mother_amount=self.original_mother_amount
-                                        )
+                            self.model,f"{self.uniqueID}_1", self.uniqueID, self.institution,
+                            self.securitiesAccount, self.cashAccount, self.securityType, available_to_settle,
+                            True,"Validated",f"{self.linkcode}_1", creation_time=self.model.simulated_time,
+                            linkedTransaction=None, depth = self.depth + 1, original_mother_amount=self.original_mother_amount
+                                )
 
             receipt_child_2 = ReceiptInstructionAgent(
                             self.model,f"{self.uniqueID}_2", self.uniqueID, self.institution,
@@ -99,6 +102,15 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                                  True,"Validated",f"{self.linkcode}_2", creation_time=self.model.simulated_time,
                                linkedTransaction=None, depth = self.depth + 1, original_mother_amount=self.original_mother_amount
                                 )
+
+            # add children to fast lookup list
+            if receipt_child_1.linkcode not in self.model.validated_receipt_instructions:
+                self.model.validated_receipt_instructions[receipt_child_1.get_linkcode] = []
+            self.model.validated_receipt_instructions[receipt_child_1.get_linkcode].append(receipt_child_1)
+
+            if receipt_child_2.linkcode not in self.model.validated_receipt_instructions:
+                self.model.validated_receipt_instructions[receipt_child_2.get_linkcode] = []
+            self.model.validated_receipt_instructions[receipt_child_2.get_linkcode].append(receipt_child_2)
 
             #ensures that the intended_settlement_time of children = mother
             receipt_child_1.set_intended_settlement_date(self.get_intended_settlement_date())

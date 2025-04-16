@@ -94,6 +94,15 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
                                                 self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.model.simulated_time, None, depth = self.depth +1, original_mother_amount=self.original_mother_amount
                                                 )
 
+            #add children to fast lookup list
+            if delivery_child_1.linkcode not in self.model.validated_delivery_instructions:
+                self.model.validated_delivery_instructions[delivery_child_1.get_linkcode] = []
+            self.model.validated_delivery_instructions[delivery_child_1.get_linkcode].append(delivery_child_1)
+
+            if delivery_child_2.linkcode not in self.model.validated_delivery_instructions:
+                self.model.validated_delivery_instructions[delivery_child_2.get_linkcode] = []
+            self.model.validated_delivery_instructions[delivery_child_2.get_linkcode].append(delivery_child_2)
+
             #pass intended settlement time of mother to the children
             delivery_child_1.set_intended_settlement_date(self.get_intended_settlement_date())
             delivery_child_2.set_intended_settlement_date(self.get_intended_settlement_date())
