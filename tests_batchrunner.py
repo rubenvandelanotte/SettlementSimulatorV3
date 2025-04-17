@@ -8,7 +8,8 @@ from SettlementModel import SettlementModel
 from RuntimeTracker import RuntimeTracker
 import gc
 import sys
-
+import scipy.stats as stats
+import logging
 
 def get_memory_usage():
     """
@@ -75,11 +76,12 @@ def run_partial_allowance_analysis(runs_per_config=10, base_seed=42):
     # Create folders for logs
     log_folder = "partial_allowance_logs"
     depth_folder = "partial_allowance_depth"
+    folder = "partial_allowance_files"
     ensure_directory(log_folder)
     ensure_directory(depth_folder)
 
     # Create a runtime tracker
-    tracker = RuntimeTracker(os.path.join(depth_folder, "runtime_partial_allowance.json"))
+    tracker = RuntimeTracker(os.path.join(folder, "runtime_partial_allowance.json"))
 
     num_institutions = 10  # Number of institutions in the simulation
     seed_list = [base_seed + i for i in range(runs_per_config)]
@@ -133,7 +135,6 @@ def run_partial_allowance_analysis(runs_per_config=10, base_seed=42):
                                         # Optionally save events to a temporary file before clearing
                                         temp_file = f"temp_events_{true_count}_{run}_{step_count}.json"
                                         with open(temp_file, 'w') as f:
-                                            import json
                                             json.dump(model.logger.events, f)
                                         print(f"Saved events to {temp_file}")
                                         model.logger.events = []
@@ -321,7 +322,7 @@ def run_partial_allowance_analysis(runs_per_config=10, base_seed=42):
 
             # Save incremental results after each run
             df_incremental = pd.DataFrame(efficiencies)
-            df_incremental.to_csv(os.path.join(depth_folder,"partial_allowance_results_incremental.csv"), index=False)
+            df_incremental.to_csv(os.path.join(folder,"partial_allowance_results_incremental.csv"), index=False)
 
             # Force deep cleanup between runs
             print("Performing deep memory cleanup between runs...")
@@ -338,12 +339,15 @@ def run_partial_allowance_analysis(runs_per_config=10, base_seed=42):
 
     # Save final results
     df = pd.DataFrame(efficiencies)
-    df.to_csv(os.path.join(depth_folder, "partial_allowance_final_results.csv"), index=False)
+    df.to_csv(os.path.join(folder, "partial_allowance_final_results.csv"), index=False)
+
+    print("\nAnalyzing results with confidence intervals...")
+    analyze_results_with_confidence_intervals(df, "true_count", folder)
 
     return efficiencies
 
 
-def run_max_child_depth_analysis(depths_to_test=[5, 10, 15], runs_per_config=5, base_seed=42):
+def run_max_child_depth_analysis(depths_to_test=[3, 5, 10], runs_per_config=5, base_seed=42):
     """
     Run analysis to test different maximum child depths.
 
@@ -360,11 +364,12 @@ def run_max_child_depth_analysis(depths_to_test=[5, 10, 15], runs_per_config=5, 
     # Create folders for logs
     log_folder = "max_depth_logs"
     depth_folder = "max_depth_stats"
+    folder = "max_depth_files"
     ensure_directory(log_folder)
     ensure_directory(depth_folder)
 
     # Create a runtime tracker
-    tracker = RuntimeTracker(os.path.join(depth_folder, "runtime_max_depth.json"))
+    tracker = RuntimeTracker(os.path.join(folder, "runtime_max_depth.json"))
 
     seed_list = [base_seed + i for i in range(runs_per_config)]
 
@@ -614,7 +619,7 @@ def run_max_child_depth_analysis(depths_to_test=[5, 10, 15], runs_per_config=5, 
 
             # Save incremental results after each run
             df_incremental = pd.DataFrame(efficiencies)
-            df_incremental.to_csv(os.path.join(depth_folder,"max_child_depth_results_incremental.csv"), index=False)
+            df_incremental.to_csv(os.path.join(folder,"max_child_depth_results_incremental.csv"), index=False)
 
             # Force deep cleanup between runs
             print("Performing deep memory cleanup between runs...")
@@ -631,12 +636,15 @@ def run_max_child_depth_analysis(depths_to_test=[5, 10, 15], runs_per_config=5, 
 
     # Save final results
     df = pd.DataFrame(efficiencies)
-    df.to_csv(os.path.join(depth_folder, "max_child_depth_final_results.csv"), index=False)
+    df.to_csv(os.path.join(folder, "max_child_depth_final_results.csv"), index=False)
+
+    print("\nAnalyzing results with confidence intervals...")
+    analyze_results_with_confidence_intervals(df, "max_child_depth", folder)
 
     return efficiencies
 
 
-def run_min_settlement_amount_analysis(percentages_to_test=[0.1, 0.25, 0.5], runs_per_config=5, base_seed=42):
+def run_min_settlement_amount_analysis(percentages_to_test=[0.025, 0.05, 0.1], runs_per_config=5, base_seed=42):
     """
     Run analysis to test different minimum settlement amounts.
 
@@ -653,11 +661,12 @@ def run_min_settlement_amount_analysis(percentages_to_test=[0.1, 0.25, 0.5], run
     # Create folders for logs
     log_folder = "min_amount_logs"
     depth_folder = "min_amount_stats"
+    folder = "min_settlement_files"
     ensure_directory(log_folder)
     ensure_directory(depth_folder)
 
     # Create a runtime tracker
-    tracker = RuntimeTracker(os.path.join(depth_folder, "runtime_min_amount.json"))
+    tracker = RuntimeTracker(os.path.join(folder, "runtime_min_amount.json"))
 
     seed_list = [base_seed + i for i in range(runs_per_config)]
 
@@ -904,7 +913,7 @@ def run_min_settlement_amount_analysis(percentages_to_test=[0.1, 0.25, 0.5], run
 
             # Save incremental results after each run
             df_incremental = pd.DataFrame(efficiencies)
-            df_incremental.to_csv(os.path.join(depth_folder,"min_settlement_amount_results_incremental.csv"), index=False)
+            df_incremental.to_csv(os.path.join(folder,"min_settlement_amount_results_incremental.csv"), index=False)
 
             # Force deep cleanup between runs
             print("Performing deep memory cleanup between runs...")
@@ -922,9 +931,119 @@ def run_min_settlement_amount_analysis(percentages_to_test=[0.1, 0.25, 0.5], run
 
     # Save final results
     df = pd.DataFrame(efficiencies)
-    df.to_csv(os.path.join(depth_folder,"min_settlement_amount_final_results.csv"), index=False)
+    df.to_csv(os.path.join(folder,"min_settlement_amount_final_results.csv"), index=False)
+
+    print("\nAnalyzing results with confidence intervals...")
+    analyze_results_with_confidence_intervals(df, "min_settlement_percentage", folder)
 
     return efficiencies
+
+def analyze_results_with_confidence_intervals(results_df, group_column, output_folder):
+    """
+    Analyze results with confidence intervals and log them.
+
+    Args:
+        results_df (pandas.DataFrame): DataFrame containing the results
+        group_column (str): Column name to group by (e.g., 'true_count', 'Partial', 'max_child_depth')
+        output_folder (str): Folder to save the confidence interval logs
+    """
+        # Set up logging
+    log_file = os.path.join(output_folder, "confidence_intervals.log")
+    ci_logger = logging.getLogger("confidence_intervals")
+
+    # Check if handlers already exist to avoid duplicate handlers
+    if not ci_logger.handlers:
+        file_handler = logging.FileHandler(log_file, mode="w")
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        file_handler.setFormatter(formatter)
+        ci_logger.setLevel(logging.INFO)
+        ci_logger.addHandler(file_handler)
+
+    def compute_confidence_interval(data, confidence=0.95):
+        """
+        Calculate the mean and confidence interval for the given data.
+        """
+        n = len(data)
+        if n < 2:
+            return data.mean(), data.mean(), data.mean()  # Can't compute CI with single value
+
+        mean = data.mean()
+        std_err = stats.sem(data)
+        h = std_err * stats.t.ppf((1 + confidence) / 2., n - 1)
+        return mean, mean - h, mean + h
+
+    # List of metrics to analyze
+    metrics = [
+        'instruction_efficiency',
+        'value_efficiency',
+        'settled_count',
+        'settled_amount'
+    ]
+
+    # Add other metrics if they exist in the DataFrame
+    if 'avg_tree_depth' in results_df.columns:
+        metrics.append('avg_tree_depth')
+    if 'partial_settlements' in results_df.columns:
+        metrics.append('partial_settlements')
+    if 'runtime_seconds' in results_df.columns:
+        metrics.append('runtime_seconds')
+
+    results = {}
+
+    # Analyze each metric
+    for metric in metrics:
+        if metric not in results_df.columns:
+            print(f"Metric {metric} not found in results")
+            continue
+
+        grouped = results_df.groupby(group_column)[metric]
+        metric_results = {}
+
+        ci_logger.info(f"Confidence intervals for {metric} by {group_column}:")
+        print(f"\nConfidence intervals for {metric} by {group_column}:")
+
+        for config, values in grouped:
+            try:
+                # Skip if all values are NaN or there's only one value
+                if values.isnull().all() or len(values) < 2:
+                    mean = values.mean() if not values.isnull().all() else 0
+                    ci_logger.info(f"{metric.upper()},{group_column}={config},Mean={mean:.4f},CI=N/A")
+                    print(f"{config}: Mean = {mean:.2f}, CI = N/A (insufficient data)")
+                    continue
+
+                mean, lower, upper = compute_confidence_interval(values)
+                metric_results[config] = {"mean": mean, "CI lower": lower, "CI upper": upper}
+                ci_logger.info(
+                    f"{metric.upper()},{group_column}={config},Mean={mean:.4f},Lower={lower:.4f},Upper={upper:.4f}")
+                print(f"{config}: Mean = {mean:.2f}, CI = [{lower:.2f}, {upper:.2f}]")
+            except Exception as e:
+                ci_logger.error(f"Error computing CI for {metric}, {group_column}={config}: {str(e)}")
+                print(f"Error for {config}: {str(e)}")
+
+        results[metric] = metric_results
+
+    # Save the results to a structured CSV file
+    try:
+        ci_data = []
+        for metric, configs in results.items():
+            for config, stats_dict in configs.items():
+                ci_data.append({
+                    'metric': metric,
+                    group_column: config,
+                    'mean': stats_dict.get('mean', 0),
+                    'ci_lower': stats_dict.get('CI lower', 0),
+                    'ci_upper': stats_dict.get('CI upper', 0)
+                })
+
+        ci_df = pd.DataFrame(ci_data)
+        ci_csv = os.path.join(output_folder, f"{group_column}_confidence_intervals.csv")
+        ci_df.to_csv(ci_csv, index=False)
+        print(f"Confidence intervals saved to {ci_csv}")
+    except Exception as e:
+        print(f"Error saving confidence intervals to CSV: {str(e)}")
+
+    return results
+
 
 # Main entry point
 if __name__ == "__main__":
