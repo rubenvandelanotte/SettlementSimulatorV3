@@ -94,7 +94,7 @@ def plot_instruction_efficiency(instruction_data, settled_counts, title, color, 
     # Primary axis: Efficiency percentage
     ax1.set_xlabel("Configuratie (aantal True waarden in Partial)", fontsize=12)
     ax1.set_ylabel("Efficiëntie (%)", fontsize=12, color=color)
-    ax1.set_ylim(80, 100)  # Adjusted to focus on the relevant range
+    ax1.set_ylim(50, 100)  # Adjusted to focus on the relevant range
 
     # Plot means with error bars
     ax1.errorbar(configs, means, yerr=[lower_errors, upper_errors], fmt='o', color=color,
@@ -185,7 +185,7 @@ def plot_value_efficiency(value_data, settled_amounts, title, color, filename):
     # Primary axis: Efficiency percentage
     ax1.set_xlabel("Configuratie (aantal True waarden in Partial)", fontsize=12)
     ax1.set_ylabel("Value Efficiëntie (%)", fontsize=12, color=color)
-    ax1.set_ylim(60, 100)  # Adjusted to focus on the relevant range
+    ax1.set_ylim(50, 100)  # Adjusted to focus on the relevant range
 
     # Plot means with error bars
     ax1.errorbar(configs, means, yerr=[lower_errors, upper_errors], fmt='o', color=color,
@@ -317,7 +317,7 @@ def plot_combined_with_settled_count(instruction_data, value_data, settled_count
     ax1.errorbar(configs, means_instr, yerr=[lower_errors_instr, upper_errors_instr],
                  fmt='o', color='skyblue', capsize=5, label='Instruction Efficiency', markersize=8)
     ax1.plot(configs, means_instr, 'o', color='skyblue', markersize=8)
-    ax1.set_ylim(80, 100)  # Adjusted to focus on the relevant range
+    ax1.set_ylim(50, 100)  # Adjusted to focus on the relevant range
     ax1.tick_params(axis='y', labelcolor='skyblue')
 
     ax1b = ax1.twinx()
@@ -350,7 +350,7 @@ def plot_combined_with_settled_count(instruction_data, value_data, settled_count
     ax2.errorbar(configs, means_value, yerr=[lower_errors_value, upper_errors_value],
                  fmt='o', color='salmon', capsize=5, label='Value Efficiency', markersize=8)
     ax2.plot(configs, means_value, 'o', color='salmon', markersize=8)
-    ax2.set_ylim(60, 100)  # Adjusted to focus on the relevant range
+    ax2.set_ylim(50, 100)  # Adjusted to focus on the relevant range
     ax2.tick_params(axis='y', labelcolor='salmon')
 
     ax2b = ax2.twinx()
