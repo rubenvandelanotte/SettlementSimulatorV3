@@ -8,14 +8,14 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.colors as mcolors
 
 
-class MaxDepthVisualizer:
+class MinSettlementAmountVisualizer:
     """
-    A class to visualize the results of the max child depth analysis simulations.
-    Focuses on comparing different max child depth configurations averaged across runs.
+    A class to visualize the results of the minimum settlement amount analysis simulations.
+    Focuses on comparing different minimum settlement percentage configurations averaged across runs.
     """
 
-    def __init__(self, results_csv = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\max_depth_stats\max_child_depth_final_results.csv"
-, output_dir="max_depth_visualizations"):
+    def __init__(self, results_csv="min_settlement_files/min_settlement_amount_final_results.csv",
+                 output_dir="min_settlement_visualizations"):
         """
         Initialize the visualizer with the path to the results CSV file.
 
@@ -43,8 +43,8 @@ class MaxDepthVisualizer:
             for col in df.columns:
                 print(f"  - {col}: {df[col].dtype}")
 
-            # Group by max_child_depth
-            grouped = df.groupby('max_child_depth')
+            # Group by min_settlement_percentage
+            grouped = df.groupby('min_settlement_percentage')
 
             # Create a dictionary to hold our statistics
             stats_dict = {}
@@ -52,8 +52,8 @@ class MaxDepthVisualizer:
             # Calculate statistics for each column we need
             columns_to_process = [
                 'instruction_efficiency', 'value_efficiency', 'runtime_seconds',
-                'settled_count', 'settled_amount', 'avg_tree_depth',
-                'partial_settlements', 'memory_usage_mb'
+                'settled_count', 'settled_amount', 'partial_settlements',
+                'memory_usage_mb'
             ]
 
             for col in columns_to_process:
@@ -85,7 +85,7 @@ class MaxDepthVisualizer:
         x = self.config_stats['runtime_seconds_mean']
 
         # Plotting variables
-        depths = self.config_stats.index.tolist()
+        percentages = self.config_stats.index.tolist()
 
         # Create figure for instruction efficiency
         plt.figure(figsize=(12, 8))
@@ -98,9 +98,9 @@ class MaxDepthVisualizer:
         plt.errorbar(x, y, yerr=yerr, fmt='o-', linewidth=2, markersize=10,
                      capsize=5, color='blue', label='Instruction Efficiency')
 
-        # Add depth labels to each point
-        for i, depth in enumerate(depths):
-            plt.annotate(f"Depth: {depth}",
+        # Add percentage labels to each point
+        for i, pct in enumerate(percentages):
+            plt.annotate(f"Min %: {pct * 100:.1f}%",
                          (x.iloc[i], y.iloc[i]),
                          xytext=(10, 5),
                          textcoords='offset points',
@@ -138,9 +138,9 @@ class MaxDepthVisualizer:
         plt.errorbar(x, y, yerr=yerr, fmt='o-', linewidth=2, markersize=10,
                      capsize=5, color='green', label='Value Efficiency')
 
-        # Add depth labels to each point
-        for i, depth in enumerate(depths):
-            plt.annotate(f"Depth: {depth}",
+        # Add percentage labels to each point
+        for i, pct in enumerate(percentages):
+            plt.annotate(f"Min %: {pct * 100:.1f}%",
                          (x.iloc[i], y.iloc[i]),
                          xytext=(10, 5),
                          textcoords='offset points',
@@ -169,13 +169,15 @@ class MaxDepthVisualizer:
 
         print(f"Created runtime vs efficiency plots in {self.output_dir}")
 
-    def plot_efficiency_vs_depth(self):
+    def plot_efficiency_vs_percentage(self):
         """
-        Plot instruction and value efficiency against maximum child depth.
+        Plot instruction and value efficiency against minimum settlement percentage.
         Shows if there's a point of diminishing returns.
         """
         # Prepare the data for plotting
-        depths = self.config_stats.index.tolist()
+        percentages = self.config_stats.index.tolist()
+        # Format percentages for display
+        percentage_labels = [f"{pct * 100:.1f}%" for pct in percentages]
 
         # Create a figure with two y-axes
         fig, ax1 = plt.subplots(figsize=(12, 8))
@@ -186,12 +188,16 @@ class MaxDepthVisualizer:
 
         # Plot instruction efficiency
         color = 'blue'
-        ax1.errorbar(depths, instruction_eff, yerr=instruction_err, fmt='o-',
+        ax1.errorbar(percentages, instruction_eff, yerr=instruction_err, fmt='o-',
                      linewidth=2, markersize=10, capsize=5, color=color,
                      label='Instruction Efficiency')
-        ax1.set_xlabel('Maximum Child Depth', fontsize=14)
+        ax1.set_xlabel('Minimum Settlement Percentage', fontsize=14)
         ax1.set_ylabel('Instruction Efficiency (%)', color=color, fontsize=14)
         ax1.tick_params(axis='y', labelcolor=color)
+
+        # Format x-axis tick labels as percentages
+        ax1.set_xticks(percentages)
+        ax1.set_xticklabels(percentage_labels)
 
         # Second y-axis for value efficiency
         ax2 = ax1.twinx()
@@ -200,7 +206,7 @@ class MaxDepthVisualizer:
 
         # Plot value efficiency
         color = 'green'
-        ax2.errorbar(depths, value_eff, yerr=value_err, fmt='s--',
+        ax2.errorbar(percentages, value_eff, yerr=value_err, fmt='s--',
                      linewidth=2, markersize=10, capsize=5, color=color,
                      label='Value Efficiency')
         ax2.set_ylabel('Value Efficiency (%)', color=color, fontsize=14)
@@ -212,41 +218,42 @@ class MaxDepthVisualizer:
         ax1.legend(lines1 + lines2, labels1 + labels2, loc='best', fontsize=12)
 
         # Add title
-        plt.title('Efficiency Metrics vs Maximum Child Depth', fontsize=16)
+        plt.title('Efficiency Metrics vs Minimum Settlement Percentage', fontsize=16)
         plt.grid(True, alpha=0.3)
 
         # Add data point labels
-        for i, depth in enumerate(depths):
+        for i, pct in enumerate(percentages):
             # Label instruction efficiency points
             ax1.annotate(f"{instruction_eff.iloc[i]:.2f}%",
-                         (depth, instruction_eff.iloc[i]),
+                         (pct, instruction_eff.iloc[i]),
                          xytext=(0, 10), textcoords='offset points',
                          ha='center', fontsize=10, color='blue')
 
             # Label value efficiency points
             ax2.annotate(f"{value_eff.iloc[i]:.2f}%",
-                         (depth, value_eff.iloc[i]),
+                         (pct, value_eff.iloc[i]),
                          xytext=(0, -15), textcoords='offset points',
                          ha='center', fontsize=10, color='green')
 
         # Save the plot
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, 'efficiency_vs_depth.png'), dpi=300)
+        plt.savefig(os.path.join(self.output_dir, 'efficiency_vs_percentage.png'), dpi=300)
         plt.close()
 
-        print(f"Created efficiency vs depth plot in {self.output_dir}")
+        print(f"Created efficiency vs percentage plot in {self.output_dir}")
 
-    def plot_settled_amount_vs_depth(self):
+    def plot_settled_amount_vs_percentage(self):
         """
-        Plot the total settled amount against maximum child depth.
-        Shows how settlement magnitude changes with different depth limits.
+        Plot the total settled amount against minimum settlement percentage.
+        Shows how settlement magnitude changes with different percentage limits.
         """
         if 'settled_amount_mean' not in self.config_stats.columns:
             print("Warning: settled_amount data not available. Skipping this plot.")
             return
 
         # Prepare the data for plotting
-        depths = self.config_stats.index.tolist()
+        percentages = self.config_stats.index.tolist()
+        percentage_labels = [f"{pct * 100:.1f}%" for pct in percentages]
         values = self.config_stats['settled_amount_mean']
         errors = self.config_stats['settled_amount_std']
 
@@ -254,7 +261,7 @@ class MaxDepthVisualizer:
         plt.figure(figsize=(12, 8))
 
         # Create bar chart with error bars
-        bars = plt.bar(depths, values, yerr=errors, capsize=5,
+        bars = plt.bar(percentage_labels, values, yerr=errors, capsize=5,
                        color='skyblue', edgecolor='navy', alpha=0.7)
 
         # Add data labels on top of bars
@@ -275,14 +282,13 @@ class MaxDepthVisualizer:
                      ha='center', va='bottom', fontsize=12)
 
         # Customize plot
-        plt.xlabel('Maximum Child Depth', fontsize=14)
+        plt.xlabel('Minimum Settlement Percentage', fontsize=14)
         plt.ylabel('Average Settled Amount', fontsize=14)
-        plt.title('Settlement Amount vs Maximum Child Depth', fontsize=16)
+        plt.title('Settlement Amount vs Minimum Settlement Percentage', fontsize=16)
         plt.grid(axis='y', alpha=0.3)
-        plt.xticks(depths)
 
         # Add a line showing the trend
-        plt.plot(depths, values, 'ro-', linewidth=2, alpha=0.7)
+        plt.plot(range(len(percentages)), values, 'ro-', linewidth=2, alpha=0.7)
 
         # Format y-axis to show abbreviated large numbers
         from matplotlib.ticker import FuncFormatter
@@ -300,22 +306,23 @@ class MaxDepthVisualizer:
 
         # Save the plot
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, 'settled_amount_vs_depth.png'), dpi=300)
+        plt.savefig(os.path.join(self.output_dir, 'settled_amount_vs_percentage.png'), dpi=300)
         plt.close()
 
-        print(f"Created settled amount vs depth plot in {self.output_dir}")
+        print(f"Created settled amount vs percentage plot in {self.output_dir}")
 
-    def plot_partial_settlements_vs_depth(self):
+    def plot_partial_settlements_vs_percentage(self):
         """
-        Plot the number of partial settlements against maximum child depth.
-        Shows how the frequency of partial settlements changes with different depth limits.
+        Plot the number of partial settlements against minimum settlement percentage.
+        Shows how the frequency of partial settlements changes with different percentage limits.
         """
         if 'partial_settlements_mean' not in self.config_stats.columns:
             print("Warning: partial_settlements data not available. Skipping this plot.")
             return
 
         # Prepare the data for plotting
-        depths = self.config_stats.index.tolist()
+        percentages = self.config_stats.index.tolist()
+        percentage_labels = [f"{pct * 100:.1f}%" for pct in percentages]
         values = self.config_stats['partial_settlements_mean']
         errors = self.config_stats['partial_settlements_std']
 
@@ -323,7 +330,7 @@ class MaxDepthVisualizer:
         plt.figure(figsize=(12, 8))
 
         # Create bar chart with error bars
-        bars = plt.bar(depths, values, yerr=errors, capsize=5,
+        bars = plt.bar(percentage_labels, values, yerr=errors, capsize=5,
                        color='lightgreen', edgecolor='darkgreen', alpha=0.7)
 
         # Add data labels on top of bars
@@ -334,85 +341,33 @@ class MaxDepthVisualizer:
                      ha='center', va='bottom', fontsize=12)
 
         # Customize plot
-        plt.xlabel('Maximum Child Depth', fontsize=14)
+        plt.xlabel('Minimum Settlement Percentage', fontsize=14)
         plt.ylabel('Average Number of Partial Settlements', fontsize=14)
-        plt.title('Partial Settlements vs Maximum Child Depth', fontsize=16)
+        plt.title('Partial Settlements vs Minimum Settlement Percentage', fontsize=16)
         plt.grid(axis='y', alpha=0.3)
-        plt.xticks(depths)
 
         # Add a line showing the trend
-        plt.plot(depths, values, 'ro-', linewidth=2, alpha=0.7)
+        plt.plot(range(len(percentages)), values, 'ro-', linewidth=2, alpha=0.7)
 
         # Save the plot
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, 'partial_settlements_vs_depth.png'), dpi=300)
+        plt.savefig(os.path.join(self.output_dir, 'partial_settlements_vs_percentage.png'), dpi=300)
         plt.close()
 
-        print(f"Created partial settlements vs depth plot in {self.output_dir}")
+        print(f"Created partial settlements vs percentage plot in {self.output_dir}")
 
-    def plot_avg_tree_depth_vs_max_depth(self):
+    def plot_memory_usage_vs_percentage(self):
         """
-        Plot the average tree depth against maximum configured child depth.
-        Shows if the actual tree depth approaches the maximum limit.
-        """
-        if 'avg_tree_depth_mean' not in self.config_stats.columns:
-            print("Warning: avg_tree_depth data not available. Skipping this plot.")
-            return
-
-        # Prepare the data for plotting
-        depths = self.config_stats.index.tolist()
-        values = self.config_stats['avg_tree_depth_mean']
-        errors = self.config_stats['avg_tree_depth_std']
-
-        # Create the figure
-        plt.figure(figsize=(12, 8))
-
-        # Create scatter plot with error bars
-        plt.errorbar(depths, values, yerr=errors, fmt='o-',
-                     linewidth=2, markersize=10, capsize=5,
-                     color='purple', label='Average Tree Depth')
-
-        # Add reference line (y = x)
-        max_depth = max(depths)
-        plt.plot([0, max_depth], [0, max_depth], 'k--',
-                 alpha=0.7, label='Maximum Possible (y = x)')
-
-        # Add data labels
-        for i, depth in enumerate(depths):
-            plt.annotate(f"{values.iloc[i]:.2f}",
-                         (depth, values.iloc[i]),
-                         xytext=(5, 5), textcoords='offset points',
-                         fontsize=12)
-
-        # Customize plot
-        plt.xlabel('Maximum Child Depth Configuration', fontsize=14)
-        plt.ylabel('Average Tree Depth Achieved', fontsize=14)
-        plt.title('Average Tree Depth vs Maximum Configured Depth', fontsize=16)
-        plt.grid(True, alpha=0.3)
-        plt.legend(fontsize=12)
-
-        # Set axis limits
-        plt.xlim(-0.5, max_depth + 0.5)
-        plt.ylim(-0.5, max(max_depth + 0.5, max(values) * 1.1))
-
-        # Save the plot
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, 'avg_tree_depth_vs_max_depth.png'), dpi=300)
-        plt.close()
-
-        print(f"Created average tree depth vs max depth plot in {self.output_dir}")
-
-    def plot_memory_usage_vs_depth(self):
-        """
-        Plot memory usage against maximum child depth.
-        Shows how computational resources scale with depth configuration.
+        Plot memory usage against minimum settlement percentage.
+        Shows how computational resources scale with percentage configuration.
         """
         if 'memory_usage_mb_mean' not in self.config_stats.columns:
             print("Warning: memory_usage_mb data not available. Skipping this plot.")
             return
 
         # Prepare the data for plotting
-        depths = self.config_stats.index.tolist()
+        percentages = self.config_stats.index.tolist()
+        percentage_labels = [f"{pct * 100:.1f}%" for pct in percentages]
         values = self.config_stats['memory_usage_mb_mean']
         errors = self.config_stats['memory_usage_mb_std']
 
@@ -420,93 +375,81 @@ class MaxDepthVisualizer:
         plt.figure(figsize=(12, 8))
 
         # Create scatter plot with error bars
-        plt.errorbar(depths, values, yerr=errors, fmt='o-',
+        plt.errorbar(percentages, values, yerr=errors, fmt='o-',
                      linewidth=2, markersize=10, capsize=5,
                      color='orange', label='Memory Usage')
 
         # Add data labels
-        for i, depth in enumerate(depths):
+        for i, pct in enumerate(percentages):
             plt.annotate(f"{values.iloc[i]:.1f} MB",
-                         (depth, values.iloc[i]),
+                         (pct, values.iloc[i]),
                          xytext=(5, 5), textcoords='offset points',
                          fontsize=12)
 
         # Customize plot
-        plt.xlabel('Maximum Child Depth', fontsize=14)
+        plt.xlabel('Minimum Settlement Percentage', fontsize=14)
+        plt.xticks(percentages, percentage_labels)
         plt.ylabel('Average Memory Usage (MB)', fontsize=14)
-        plt.title('Memory Usage vs Maximum Child Depth', fontsize=16)
+        plt.title('Memory Usage vs Minimum Settlement Percentage', fontsize=16)
         plt.grid(True, alpha=0.3)
 
         # Save the plot
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, 'memory_usage_vs_depth.png'), dpi=300)
+        plt.savefig(os.path.join(self.output_dir, 'memory_usage_vs_percentage.png'), dpi=300)
         plt.close()
 
-        print(f"Created memory usage vs depth plot in {self.output_dir}")
+        print(f"Created memory usage vs percentage plot in {self.output_dir}")
 
     def plot_runtime_scaling(self):
         """
-        Plot the relationship between max child depth and runtime on a log scale.
-        Helps identify potential exponential growth in computation time.
+        Plot the relationship between minimum settlement percentage and runtime.
+        Helps identify how computation time scales with the percentage threshold.
         """
         # Prepare the data for plotting
-        depths = self.config_stats.index.tolist()
+        percentages = self.config_stats.index.tolist()
+        percentage_labels = [f"{pct * 100:.1f}%" for pct in percentages]
         runtimes = self.config_stats['runtime_seconds_mean']
 
         # Create the figure
         plt.figure(figsize=(12, 8))
 
-        # Create log scale scatter plot
-        plt.plot(depths, runtimes, 'o-', linewidth=2, markersize=10, color='red')
+        # Create scatter plot
+        plt.plot(percentages, runtimes, 'o-', linewidth=2, markersize=10, color='red')
 
         # Add data labels
-        for i, depth in enumerate(depths):
+        for i, pct in enumerate(percentages):
             plt.annotate(f"{runtimes.iloc[i]:.2f}s",
-                         (depth, runtimes.iloc[i]),
+                         (pct, runtimes.iloc[i]),
                          xytext=(5, 5), textcoords='offset points',
                          fontsize=12)
 
-        # Set log scale for y-axis
-        plt.yscale('log')
-
         # Customize plot
-        plt.xlabel('Maximum Child Depth', fontsize=14)
-        plt.ylabel('Runtime (seconds, log scale)', fontsize=14)
-        plt.title('Runtime Scaling (Log Scale) vs Maximum Child Depth', fontsize=16)
-        plt.grid(True, which="both", alpha=0.3)
+        plt.xlabel('Minimum Settlement Percentage', fontsize=14)
+        plt.xticks(percentages, percentage_labels)
+        plt.ylabel('Runtime (seconds)', fontsize=14)
+        plt.title('Runtime vs Minimum Settlement Percentage', fontsize=16)
+        plt.grid(True, alpha=0.3)
 
-        # Add exponential and polynomial fit lines
+        # Add polynomial fit
         try:
-            # Exponential fit
+            # Polynomial fit
             from scipy.optimize import curve_fit
 
-            def exp_func(x, a, b, c):
-                return a * np.exp(b * x) + c
+            def poly_func(x, a, b, c):
+                return a * (x ** 2) + b * x + c
 
-            def power_func(x, a, b, c):
-                return a * (x ** b) + c
-
-            x_data = np.array(depths)
+            x_data = np.array(percentages)
             y_data = np.array(runtimes)
 
-            # Try exponential fit
+            # Try polynomial fit
             try:
-                exp_params, _ = curve_fit(exp_func, x_data, y_data)
+                poly_params, _ = curve_fit(poly_func, x_data, y_data)
                 x_fit = np.linspace(min(x_data), max(x_data), 100)
-                y_fit = exp_func(x_fit, *exp_params)
-                plt.plot(x_fit, y_fit, 'b--',
-                         label=f'Exponential: a*e^(b*x)+c\na={exp_params[0]:.2e}, b={exp_params[1]:.4f}, c={exp_params[2]:.2f}')
-            except:
-                print("Warning: Could not fit exponential curve to runtime data")
-
-            # Try power law fit
-            try:
-                power_params, _ = curve_fit(power_func, x_data, y_data)
-                y_fit = power_func(x_fit, *power_params)
+                y_fit = poly_func(x_fit, *poly_params)
                 plt.plot(x_fit, y_fit, 'g--',
-                         label=f'Power: a*x^b+c\na={power_params[0]:.2f}, b={power_params[1]:.2f}, c={power_params[2]:.2f}')
+                         label=f'Quadratic: a*x²+b*x+c\na={poly_params[0]:.4f}, b={poly_params[1]:.4f}, c={poly_params[2]:.2f}')
             except:
-                print("Warning: Could not fit power curve to runtime data")
+                print("Warning: Could not fit polynomial curve to runtime data")
 
             plt.legend(fontsize=12)
 
@@ -515,85 +458,86 @@ class MaxDepthVisualizer:
 
         # Save the plot
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, 'runtime_scaling_log.png'), dpi=300)
-
-        # Create linear scale version as well
-        plt.yscale('linear')
-        plt.title('Runtime Scaling (Linear Scale) vs Maximum Child Depth', fontsize=16)
-        plt.ylabel('Runtime (seconds)', fontsize=14)
-        plt.savefig(os.path.join(self.output_dir, 'runtime_scaling_linear.png'), dpi=300)
+        plt.savefig(os.path.join(self.output_dir, 'runtime_scaling.png'), dpi=300)
         plt.close()
 
-        print(f"Created runtime scaling plots in {self.output_dir}")
+        print(f"Created runtime scaling plot in {self.output_dir}")
 
     def plot_elbow_analysis(self):
         """
-        Create elbow plots to find the optimal maximum child depth.
+        Create elbow plots to find the optimal minimum settlement percentage.
         Balances efficiency gains against computational costs.
         """
         # Prepare the data
-        depths = self.config_stats.index.tolist()
+        percentages = self.config_stats.index.tolist()
+        percentage_labels = [f"{pct * 100:.1f}%" for pct in percentages]
 
         # Create a figure with multiple subplots
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
 
-        # 1. Value Efficiency vs Depth
+        # 1. Value Efficiency vs Percentage
         ax = axes[0, 0]
         y = self.config_stats['value_efficiency_mean']
-        ax.plot(depths, y, 'o-', linewidth=2, markersize=10, color='green')
+        ax.plot(percentages, y, 'o-', linewidth=2, markersize=10, color='green')
 
         # Add data labels
-        for i, depth in enumerate(depths):
+        for i, pct in enumerate(percentages):
             ax.annotate(f"{y.iloc[i]:.2f}%",
-                        (depth, y.iloc[i]),
+                        (pct, y.iloc[i]),
                         xytext=(5, 5), textcoords='offset points',
                         fontsize=10)
 
-        ax.set_xlabel('Maximum Child Depth')
+        ax.set_xlabel('Minimum Settlement Percentage')
+        ax.set_xticks(percentages)
+        ax.set_xticklabels(percentage_labels)
         ax.set_ylabel('Value Efficiency (%)')
-        ax.set_title('Value Efficiency vs Depth')
+        ax.set_title('Value Efficiency vs Percentage')
         ax.grid(True, alpha=0.3)
 
-        # 2. Runtime vs Depth
+        # 2. Runtime vs Percentage
         ax = axes[0, 1]
         y = self.config_stats['runtime_seconds_mean']
-        ax.plot(depths, y, 'o-', linewidth=2, markersize=10, color='red')
+        ax.plot(percentages, y, 'o-', linewidth=2, markersize=10, color='red')
 
         # Add data labels
-        for i, depth in enumerate(depths):
+        for i, pct in enumerate(percentages):
             ax.annotate(f"{y.iloc[i]:.2f}s",
-                        (depth, y.iloc[i]),
+                        (pct, y.iloc[i]),
                         xytext=(5, 5), textcoords='offset points',
                         fontsize=10)
 
-        ax.set_xlabel('Maximum Child Depth')
+        ax.set_xlabel('Minimum Settlement Percentage')
+        ax.set_xticks(percentages)
+        ax.set_xticklabels(percentage_labels)
         ax.set_ylabel('Runtime (seconds)')
-        ax.set_title('Runtime vs Depth')
+        ax.set_title('Runtime vs Percentage')
         ax.grid(True, alpha=0.3)
 
-        # 3. Efficiency per Second vs Depth
+        # 3. Efficiency per Second vs Percentage
         ax = axes[1, 0]
 
         # Calculate efficiency per second
         y = self.config_stats['value_efficiency_mean'] / self.config_stats['runtime_seconds_mean']
-        ax.plot(depths, y, 'o-', linewidth=2, markersize=10, color='purple')
+        ax.plot(percentages, y, 'o-', linewidth=2, markersize=10, color='purple')
 
         # Add data labels
-        for i, depth in enumerate(depths):
+        for i, pct in enumerate(percentages):
             ax.annotate(f"{y.iloc[i]:.4f}",
-                        (depth, y.iloc[i]),
+                        (pct, y.iloc[i]),
                         xytext=(5, 5), textcoords='offset points',
                         fontsize=10)
 
-        ax.set_xlabel('Maximum Child Depth')
+        ax.set_xlabel('Minimum Settlement Percentage')
+        ax.set_xticks(percentages)
+        ax.set_xticklabels(percentage_labels)
         ax.set_ylabel('Value Efficiency per Second')
-        ax.set_title('Efficiency/Runtime Ratio vs Depth')
+        ax.set_title('Efficiency/Runtime Ratio vs Percentage')
         ax.grid(True, alpha=0.3)
 
         # Identify the "elbow point" (maximum)
-        best_depth = depths[y.argmax()]
-        ax.axvline(x=best_depth, color='k', linestyle='--', alpha=0.5,
-                   label=f'Optimal Depth: {best_depth}')
+        best_pct = percentages[y.argmax()]
+        ax.axvline(x=best_pct, color='k', linestyle='--', alpha=0.5,
+                   label=f'Optimal Percentage: {best_pct * 100:.1f}%')
         ax.legend()
 
         # 4. Normalized metrics to show tradeoffs
@@ -602,28 +546,32 @@ class MaxDepthVisualizer:
         # Normalize metrics to 0-1 scale for comparison
         runtime_norm = (self.config_stats['runtime_seconds_mean'] - self.config_stats['runtime_seconds_mean'].min()) / \
                        (self.config_stats['runtime_seconds_mean'].max() - self.config_stats[
-                           'runtime_seconds_mean'].min())
+                           'runtime_seconds_mean'].min()) if len(
+            self.config_stats['runtime_seconds_mean'].unique()) > 1 else self.config_stats['runtime_seconds_mean'] * 0
 
         efficiency_norm = (self.config_stats['value_efficiency_mean'] - self.config_stats[
             'value_efficiency_mean'].min()) / \
                           (self.config_stats['value_efficiency_mean'].max() - self.config_stats[
-                              'value_efficiency_mean'].min())
+                              'value_efficiency_mean'].min()) if len(
+            self.config_stats['value_efficiency_mean'].unique()) > 1 else self.config_stats['value_efficiency_mean'] * 0
 
         # Plot normalized metrics
-        ax.plot(depths, runtime_norm, 'o-', linewidth=2, markersize=8, color='red', label='Runtime (normalized)')
-        ax.plot(depths, efficiency_norm, 'o-', linewidth=2, markersize=8, color='green',
+        ax.plot(percentages, runtime_norm, 'o-', linewidth=2, markersize=8, color='red', label='Runtime (normalized)')
+        ax.plot(percentages, efficiency_norm, 'o-', linewidth=2, markersize=8, color='green',
                 label='Efficiency (normalized)')
 
         # Calculate and plot the difference (efficiency gain - runtime cost)
         tradeoff = efficiency_norm - runtime_norm
-        ax.plot(depths, tradeoff, 'o-', linewidth=2, markersize=8, color='blue', label='Efficiency - Runtime')
+        ax.plot(percentages, tradeoff, 'o-', linewidth=2, markersize=8, color='blue', label='Efficiency - Runtime')
 
-        # Identify optimal depth based on tradeoff
-        optimal_depth = depths[tradeoff.argmax()]
-        ax.axvline(x=optimal_depth, color='k', linestyle='--', alpha=0.5,
-                   label=f'Optimal Depth: {optimal_depth}')
+        # Identify optimal percentage based on tradeoff
+        optimal_pct = percentages[tradeoff.argmax()]
+        ax.axvline(x=optimal_pct, color='k', linestyle='--', alpha=0.5,
+                   label=f'Optimal Percentage: {optimal_pct * 100:.1f}%')
 
-        ax.set_xlabel('Maximum Child Depth')
+        ax.set_xlabel('Minimum Settlement Percentage')
+        ax.set_xticks(percentages)
+        ax.set_xticklabels(percentage_labels)
         ax.set_ylabel('Normalized Value')
         ax.set_title('Efficiency vs Runtime Tradeoff')
         ax.grid(True, alpha=0.3)
@@ -631,13 +579,13 @@ class MaxDepthVisualizer:
 
         # Add a note with recommendations
         plt.figtext(0.5, 0.01,
-                    f"Recommended max_child_depth based on efficiency/runtime ratio: {best_depth}\n"
-                    f"Recommended max_child_depth based on efficiency-runtime tradeoff: {optimal_depth}",
+                    f"Recommended min_settlement_percentage based on efficiency/runtime ratio: {best_pct * 100:.1f}%\n"
+                    f"Recommended min_settlement_percentage based on efficiency-runtime tradeoff: {optimal_pct * 100:.1f}%",
                     ha="center", fontsize=14,
                     bbox={"facecolor": "lightgray", "alpha": 0.5, "pad": 5})
 
         plt.tight_layout(rect=[0, 0.03, 1, 0.97])
-        plt.suptitle('Elbow Analysis for Optimal Maximum Child Depth', fontsize=18)
+        plt.suptitle('Elbow Analysis for Optimal Minimum Settlement Percentage', fontsize=18)
 
         # Save the plot
         plt.savefig(os.path.join(self.output_dir, 'elbow_analysis.png'), dpi=300)
@@ -648,11 +596,11 @@ class MaxDepthVisualizer:
     def plot_3d_surface(self):
         """
         Create a 3D surface plot showing the relationship between
-        max child depth, runtime, and efficiency.
+        minimum settlement percentage, runtime, and efficiency.
         """
         try:
             # Prepare data for 3D plotting
-            depths = self.config_stats.index.tolist()
+            percentages = self.config_stats.index.tolist()
             runtimes = self.config_stats['runtime_seconds_mean'].tolist()
             efficiencies = self.config_stats['value_efficiency_mean'].tolist()
 
@@ -661,7 +609,7 @@ class MaxDepthVisualizer:
             ax = fig.add_subplot(111, projection='3d')
 
             # Create scatter plot
-            scatter = ax.scatter(depths, runtimes, efficiencies,
+            scatter = ax.scatter(percentages, runtimes, efficiencies,
                                  c=efficiencies, s=100, cmap='viridis')
 
             # Add color bar
@@ -669,23 +617,23 @@ class MaxDepthVisualizer:
             cbar.set_label('Value Efficiency (%)', fontsize=12)
 
             # Connect points with lines
-            ax.plot(depths, runtimes, efficiencies, '-', color='gray', alpha=0.5)
+            ax.plot(percentages, runtimes, efficiencies, '-', color='gray', alpha=0.5)
 
             # Add text labels for each point
-            for i, (d, r, e) in enumerate(zip(depths, runtimes, efficiencies)):
-                ax.text(d, r, e, f'Depth: {d}\nEff: {e:.2f}%', fontsize=10)
+            for i, (p, r, e) in enumerate(zip(percentages, runtimes, efficiencies)):
+                ax.text(p, r, e, f'Min %: {p * 100:.1f}%\nEff: {e:.2f}%', fontsize=10)
 
             # Add a surface fit (if more than 3 data points)
-            if len(depths) > 3:
+            if len(percentages) > 3:
                 try:
                     # Create a mesh grid
-                    depth_range = np.linspace(min(depths), max(depths), 20)
+                    pct_range = np.linspace(min(percentages), max(percentages), 20)
                     runtime_range = np.linspace(min(runtimes), max(runtimes), 20)
-                    X, Y = np.meshgrid(depth_range, runtime_range)
+                    X, Y = np.meshgrid(pct_range, runtime_range)
 
                     # Fit a 2D polynomial
                     from scipy.interpolate import griddata
-                    Z = griddata((depths, runtimes), efficiencies, (X, Y), method='cubic')
+                    Z = griddata((percentages, runtimes), efficiencies, (X, Y), method='cubic')
 
                     # Plot the surface
                     surf = ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.6,
@@ -694,10 +642,17 @@ class MaxDepthVisualizer:
                     print(f"Warning: Could not create surface fit: {e}")
 
             # Set labels and title
-            ax.set_xlabel('Maximum Child Depth', fontsize=12)
+            ax.set_xlabel('Minimum Settlement Percentage', fontsize=12)
             ax.set_ylabel('Runtime (seconds)', fontsize=12)
             ax.set_zlabel('Value Efficiency (%)', fontsize=12)
-            ax.set_title('3D Relationship: Depth, Runtime, and Efficiency', fontsize=14)
+            ax.set_title('3D Relationship: Percentage, Runtime, and Efficiency', fontsize=14)
+
+            # Format x-axis tick labels
+            from matplotlib.ticker import FuncFormatter
+            def pct_fmt(x, pos):
+                return f'{x * 100:.1f}%'
+
+            ax.xaxis.set_major_formatter(FuncFormatter(pct_fmt))
 
             # Save the plot
             plt.tight_layout()
@@ -709,6 +664,112 @@ class MaxDepthVisualizer:
             print(f"Warning: Could not create 3D surface plot: {e}")
             print("This might be due to missing dependencies or too few data points.")
 
+    def plot_comparative_bar_chart(self):
+        """
+        Create a comparative bar chart showing how different metrics
+        vary across minimum settlement percentage configurations.
+        """
+        if 'instruction_efficiency_mean' not in self.config_stats.columns or \
+                'value_efficiency_mean' not in self.config_stats.columns or \
+                'partial_settlements_mean' not in self.config_stats.columns:
+            print("Warning: Required metrics not available. Skipping this plot.")
+            return
+
+        # Prepare the data for plotting
+        percentages = self.config_stats.index.tolist()
+        percentage_labels = [f"{pct * 100:.1f}%" for pct in percentages]
+
+        # Metrics to include in the comparison
+        metrics = [
+            ('instruction_efficiency_mean', 'Instruction Efficiency (%)', 'blue'),
+            ('value_efficiency_mean', 'Value Efficiency (%)', 'green'),
+            ('partial_settlements_mean', 'Partial Settlements (count)', 'orange')
+        ]
+
+        # Normalize metrics for fair comparison
+        normalized_data = {}
+        for metric_name, label, color in metrics:
+            values = self.config_stats[metric_name]
+            if values.max() - values.min() > 0:  # Avoid division by zero
+                norm_values = (values - values.min()) / (values.max() - values.min())
+            else:
+                norm_values = values * 0  # If all values are identical, set to zero
+            normalized_data[metric_name] = norm_values
+
+        # Create the figure
+        plt.figure(figsize=(14, 8))
+
+        # Set up the plot
+        bar_width = 0.2
+        index = np.arange(len(percentages))
+
+        # Plot each metric as a grouped bar
+        for i, (metric_name, label, color) in enumerate(metrics):
+            offset = (i - 1) * bar_width
+            plt.bar(index + offset, normalized_data[metric_name],
+                    bar_width, label=label, color=color, alpha=0.7)
+
+        # Customize plot
+        plt.xlabel('Minimum Settlement Percentage', fontsize=14)
+        plt.ylabel('Normalized Value (0-1 scale)', fontsize=14)
+        plt.title('Comparative Analysis of Key Metrics Across Percentage Configurations', fontsize=16)
+        plt.xticks(index, percentage_labels)
+        plt.legend(fontsize=12)
+        plt.grid(axis='y', alpha=0.3)
+
+        # Save the plot
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, 'comparative_metrics.png'), dpi=300)
+        plt.close()
+
+        print(f"Created comparative bar chart in {self.output_dir}")
+
+    def plot_efficiency_distribution(self):
+        """
+        Create a violin plot showing the distribution of efficiency values
+        across different minimum settlement percentage configurations.
+        """
+        # Check if we have raw data with multiple runs per configuration
+        if not hasattr(self, 'df'):
+            print("Warning: Raw data not available. Skipping efficiency distribution plot.")
+            return
+
+        # Create the figure
+        plt.figure(figsize=(14, 8))
+
+        # Prepare data in the format needed for violin plot
+        df_plot = self.df.copy()
+        # Format the percentage for better display
+        df_plot['min_pct_label'] = df_plot['min_settlement_percentage'].apply(lambda x: f"{x * 100:.1f}%")
+
+        # Create violin plot for instruction efficiency
+        ax1 = plt.subplot(1, 2, 1)
+        sns.violinplot(x='min_pct_label', y='instruction_efficiency', data=df_plot,
+                       palette="Blues", inner="points", ax=ax1)
+        plt.title('Instruction Efficiency Distribution', fontsize=14)
+        plt.xlabel('Minimum Settlement Percentage', fontsize=12)
+        plt.ylabel('Instruction Efficiency (%)', fontsize=12)
+        plt.grid(axis='y', alpha=0.3)
+
+        # Create violin plot for value efficiency
+        ax2 = plt.subplot(1, 2, 2)
+        sns.violinplot(x='min_pct_label', y='value_efficiency', data=df_plot,
+                       palette="Greens", inner="points", ax=ax2)
+        plt.title('Value Efficiency Distribution', fontsize=14)
+        plt.xlabel('Minimum Settlement Percentage', fontsize=12)
+        plt.ylabel('Value Efficiency (%)', fontsize=12)
+        plt.grid(axis='y', alpha=0.3)
+
+        # Add overall title
+        plt.suptitle('Efficiency Distributions by Minimum Settlement Percentage', fontsize=16)
+
+        # Save the plot
+        plt.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust for suptitle
+        plt.savefig(os.path.join(self.output_dir, 'efficiency_distribution.png'), dpi=300)
+        plt.close()
+
+        print(f"Created efficiency distribution plot in {self.output_dir}")
+
     def generate_all_visualizations(self):
         """Generate all visualization plots."""
         # Base visualizations from initial request
@@ -716,20 +777,17 @@ class MaxDepthVisualizer:
         self.plot_runtime_vs_efficiency()
 
         # Additional visualizations
-        print("Generating efficiency vs depth plot...")
-        self.plot_efficiency_vs_depth()
+        print("Generating efficiency vs percentage plot...")
+        self.plot_efficiency_vs_percentage()
 
-        print("Generating settled amount vs depth plot...")
-        self.plot_settled_amount_vs_depth()
+        print("Generating settled amount vs percentage plot...")
+        self.plot_settled_amount_vs_percentage()
 
-        print("Generating partial settlements vs depth plot...")
-        self.plot_partial_settlements_vs_depth()
+        print("Generating partial settlements vs percentage plot...")
+        self.plot_partial_settlements_vs_percentage()
 
-        print("Generating average tree depth vs max depth plot...")
-        self.plot_avg_tree_depth_vs_max_depth()
-
-        print("Generating memory usage vs depth plot...")
-        self.plot_memory_usage_vs_depth()
+        print("Generating memory usage vs percentage plot...")
+        self.plot_memory_usage_vs_percentage()
 
         print("Generating runtime scaling plot...")
         self.plot_runtime_scaling()
@@ -740,11 +798,17 @@ class MaxDepthVisualizer:
         print("Generating 3D surface plot...")
         self.plot_3d_surface()
 
+        print("Generating comparative bar chart...")
+        self.plot_comparative_bar_chart()
+
+        print("Generating efficiency distribution plot...")
+        self.plot_efficiency_distribution()
+
         print("\nAll visualizations have been generated successfully.")
         print(f"Results are available in: {os.path.abspath(self.output_dir)}")
 
 
 if __name__ == "__main__":
     # Create visualizer and generate all plots
-    visualizer = MaxDepthVisualizer()
+    visualizer = MinSettlementAmountVisualizer()
     visualizer.generate_all_visualizations()

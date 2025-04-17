@@ -6,6 +6,10 @@ import os
 import seaborn as sns
 from collections import defaultdict
 import glob
+import re
+import numpy as np
+import matplotlib.ticker as ticker
+
 
 
 class SettlementAnalyzer:
@@ -42,7 +46,7 @@ class SettlementAnalyzer:
         self.configs = {}
         self.config_runs = defaultdict(dict)  # Store runs for each configuration
 
-        depth_stats_dir = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\depth_statistics"
+        depth_stats_dir = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_depth"
 
         # Check if directory exists
         if not os.path.exists(depth_stats_dir):
@@ -50,7 +54,7 @@ class SettlementAnalyzer:
             return
 
         # Get all jsonocel files
-        depth_files = glob.glob(os.path.join(depth_stats_dir, "*.jsonocel"))
+        depth_files = glob.glob(os.path.join(depth_stats_dir, "*.json"))
 
         print(f"Found {len(depth_files)} .jsonocel files")
 
@@ -388,7 +392,7 @@ class SettlementAnalyzer:
         df.to_csv(output_file, index=False)
         print(f"Summary table saved to {output_file}")
 
-    def analyze_all(self, output_base="settlement_analysis/"):
+    def analyze_all(self, output_base="partial_allowance_visualisations/", ci_log_path=None):
         """
         Analyze all configurations individually and comparatively
 
@@ -414,21 +418,29 @@ class SettlementAnalyzer:
 
         # Generate settlement lateness visualizations
         self.analyze_lateness_from_depth_stats(
-            stats_folder="depth_statistics",
-            output_dir=os.path.join(output_base, "lateness")
+            stats_folder="partial_allowance_depth",
+            output_dir=os.path.join(output_base, "lateness"),
+            measurement_csv = "partial_allowance_depth/partial_allowance_final_results.csv"
         )
 
         # Generate runtime visualizations
         self.analyze_runtime(
-            runtime_file="runtime_results.json",
+            runtime_file="partial_allowance_depth/runtime_partial_allowance.json",
             output_dir=os.path.join(output_base, "runtime"),
-            measurement_csv="New_measurement.csv"
+            measurement_csv="partial_allowance_depth/partial_allowance_final_results.csv"
         )
 
-        # self.analyze_lateness_hours(
-        #     log_folder="simulatie_logs",
-        #     output_dir=os.path.join(output_base, "lateness_hours")
-        # )
+        self.analyze_lateness_hours(
+            log_folder="partial_allowance_logs",
+            output_dir=os.path.join(output_base, "lateness_hours")
+        )
+
+        # Analyze confidence intervals if log file is provided
+        if ci_log_path and os.path.exists(ci_log_path):
+            self.analyze_confidence_intervals(
+                log_path=ci_log_path,
+                output_dir=os.path.join(output_base, "confidence_intervals")
+            )
 
         print(f"Analysis complete. Results in {output_base}")
 
@@ -731,13 +743,13 @@ class SettlementAnalyzer:
 
         print(f"Generated comparison visualizations in {output_dir}")
 
-    def analyze_rtp_vs_batch_from_logs(self, log_folder="simulatie_logs/",
-                                       output_dir="settlement_analysis/rtp_vs_batch/"):
+    def analyze_rtp_vs_batch_from_logs(self, log_folder="partial_allowance_logs/",
+                                       output_dir="partial_allowance_visualisations/rtp_vs_batch/"):
         """
-        Analyze settlement timing patterns from the CSV logs to determine RTP vs Batch processing
+        Analyze settlement timing patterns from the logs to determine RTP vs Batch processing
 
         Args:
-            log_folder: Directory containing simulation logs in CSV format
+            log_folder: Directory containing simulation logs
             output_dir: Directory to save visualizations
         """
         import os
@@ -745,32 +757,40 @@ class SettlementAnalyzer:
         import csv
         from datetime import datetime, time
         from collections import defaultdict
+        import matplotlib.pyplot as plt
+        import numpy as np
+        import json
 
         os.makedirs(output_dir, exist_ok=True)
 
         # Dictionary to store data for each configuration
         config_data = defaultdict(lambda: {"rtp": 0, "batch": 0})
 
-        # Find all CSV log files
+        # Find all log files (both CSV and JSONOCEL)
         if not os.path.exists(log_folder):
             print(f"Log directory '{log_folder}' does not exist!")
             print(f"Current working directory: {os.getcwd()}")
             return
 
-        log_files = [f for f in os.listdir(log_folder) if f.endswith(".csv") and f.startswith("log_config")]
+        # Try to find JSONOCEL files first
+        log_files = [f for f in os.listdir(log_folder) if f.endswith(".jsonocel") and "simulation" in f]
 
         if not log_files:
-            print(f"No CSV log files found in {log_folder}")
+            # Also look for simplified JSON files
+            log_files = [f for f in os.listdir(log_folder) if f.endswith(".json") and "simplified" in f]
+
+        if not log_files:
+            print(f"No suitable log files found in {log_folder}")
             print(f"Files in directory: {os.listdir(log_folder)}")
             return
 
-        print(f"Found {len(log_files)} CSV log files for analysis")
+        print(f"Found {len(log_files)} log files for analysis")
 
         # Process each log file
         settlements_found = False
 
         for log_file in log_files:
-            # Extract configuration number from filename (e.g., log_config6_run8.csv)
+            # Extract configuration number from filename
             try:
                 import re
                 config_match = re.search(r'config(\d+)', log_file)
@@ -784,48 +804,79 @@ class SettlementAnalyzer:
                 config_name = log_file.split('.')[0]
 
             try:
-                # Open and process the CSV file
+                # Open and process the file
                 with open(os.path.join(log_folder, log_file), 'r', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
+                    # Check file format based on extension
+                    if log_file.endswith('.jsonocel'):
+                        # Process JSONOCEL format
+                        log_data = json.load(f)
 
-                    # Check if we have the required columns
-                    if log_file == log_files[0]:
-                        try:
-                            first_row = next(reader)
-                            print(f"CSV columns: {list(first_row.keys())}")
-                            f.seek(0)  # Reset to beginning
-                            reader = csv.DictReader(f)  # Recreate reader
-                        except StopIteration:
-                            print(f"Empty CSV file: {log_file}")
-                            continue
+                        # Handle OCEL events
+                        if "ocel:events" in log_data:
+                            events = log_data["ocel:events"]
+                            for event_id, event in events.items():
+                                activity = event.get("ocel:activity", "")
+                                if "Settled" in activity:
+                                    settlements_found = True
+                                    timestamp_str = event.get("ocel:timestamp", "")
 
-                    for row in reader:
-                        # Look for settlement events
-                        activity = row.get('activity', '')
-                        if 'Settled' in activity:
+                                    if timestamp_str:
+                                        try:
+                                            timestamp = datetime.fromisoformat(
+                                                timestamp_str.replace('Z', '+00:00').replace('T', ' '))
+                                            event_time = timestamp.time()
+
+                                            # Determine if RTP or Batch based on time of day
+                                            if time(1, 30) <= event_time <= time(19, 30):
+                                                config_data[config_name]["rtp"] += 1
+                                            else:
+                                                config_data[config_name]["batch"] += 1
+                                        except Exception as e:
+                                            print(f"Error parsing timestamp '{timestamp_str}': {e}")
+
+                        # Handle alternative format with events array
+                        elif "events" in log_data:
+                            events = log_data["events"]
+                            for event in events:
+                                event_type = event.get("type", "")
+                                if "Settled" in event_type:
+                                    settlements_found = True
+                                    timestamp_str = event.get("timestamp", "")
+
+                                    if timestamp_str:
+                                        try:
+                                            timestamp = datetime.fromisoformat(
+                                                timestamp_str.replace('Z', '+00:00').replace('T', ' '))
+                                            event_time = timestamp.time()
+
+                                            # Determine if RTP or Batch
+                                            if time(1, 30) <= event_time <= time(19, 30):
+                                                config_data[config_name]["rtp"] += 1
+                                            else:
+                                                config_data[config_name]["batch"] += 1
+                                        except Exception as e:
+                                            print(f"Error parsing timestamp '{timestamp_str}': {e}")
+
+                    elif log_file.endswith('.json'):
+                        # Handle simplified JSON format
+                        log_data = json.load(f)
+
+                        # Look for settlement data in the simplified format
+                        if "results" in log_data and "settled_count" in log_data["results"]:
                             settlements_found = True
 
-                            # Extract timestamp
-                            timestamp_str = row.get('timestamp', '')
-                            if timestamp_str:
-                                try:
-                                    timestamp = datetime.fromisoformat(
-                                        timestamp_str.replace('Z', '+00:00').replace('T', ' '))
-                                    event_time = timestamp.time()
-
-                                    # Determine if RTP or Batch based on time of day
-                                    if time(1, 30) <= event_time <= time(19, 30):
-                                        config_data[config_name]["rtp"] += 1
-                                    else:
-                                        config_data[config_name]["batch"] += 1
-                                except Exception as e:
-                                    print(f"Error parsing timestamp '{timestamp_str}': {e}")
+                            # Since simplified format may not have RTP vs batch data,
+                            # we'll make a rough estimate based on typical patterns
+                            settled_count = log_data["results"]["settled_count"]
+                            # Assume 70% RTP, 30% batch as a default pattern
+                            config_data[config_name]["rtp"] += int(settled_count * 0.7)
+                            config_data[config_name]["batch"] += int(settled_count * 0.3)
 
             except Exception as e:
                 print(f"Error processing file {log_file}: {e}")
 
         if not settlements_found:
-            print("No settlement events found in the log files. Check CSV format.")
+            print("No settlement events found in the log files.")
             return
 
         # Create visualizations if we have data
@@ -880,6 +931,9 @@ class SettlementAnalyzer:
         plt.savefig(os.path.join(output_dir, "rtp_vs_batch_percentage.png"), dpi=300)
         plt.close()
 
+        # Create additional visualizations as in the original code
+        # ...
+
         # 2. Create absolute count bar chart
         plt.figure(figsize=(12, 8))
         width = 0.35
@@ -933,10 +987,9 @@ class SettlementAnalyzer:
 
         print(f"RTP vs Batch analysis visualizations created in {output_dir}")
 
-
-    def analyze_lateness_from_depth_stats(self, stats_folder="depth_statistics/",
-                                          output_dir="settlement_analysis/lateness/",
-                                          measurement_csv="New_measurement.csv"):
+    def analyze_lateness_from_depth_stats(self, stats_folder="partial_allowance_depth/",
+                                          output_dir="partial_allowance_visualisations/lateness/",
+                                          measurement_csv="partial_allowance_depth/partial_allowance_final_results.csv"):
         """
         Analyze settlement lateness patterns using depth statistics files
 
@@ -961,7 +1014,7 @@ class SettlementAnalyzer:
             print(f"Current working directory: {os.getcwd()}")
             return
 
-        stats_files = [f for f in os.listdir(stats_folder) if f.endswith(".jsonocel") and f.startswith("depth_statistics")]
+        stats_files = [f for f in os.listdir(stats_folder) if f.endswith(".json") and f.startswith("partial_allowance_depth")]
 
         if not stats_files:
             print(f"No depth statistics files found in {stats_folder}")
@@ -981,17 +1034,13 @@ class SettlementAnalyzer:
                 print(f"Columns: {df.columns.tolist()}")
 
                 # Check if we have settled_amount column
-                if 'settled_amount' in df.columns and 'Partial' in df.columns:
+                if 'settled_amount' in df.columns and 'true_count' in df.columns:
                     amount_data_available = True
 
-                    # Group by Partial configuration and calculate average settled amount
-                    for _, group in df.groupby('Partial'):
-                        config_str = group['Partial'].iloc[0]
-
-                        # Extract config number from the string
-                        import re
-                        true_count = config_str.count("True")
-                        config_name = f"Config {true_count}"
+                    # Group by true_count configuration and calculate average settled amount
+                    for _, group in df.groupby('true_count'):
+                        config_num = group['true_count'].iloc[0]
+                        config_name = f"Config {config_num}"
 
                         # Calculate average settled amount for this config
                         avg_amount = group['settled_amount'].mean()
@@ -1354,8 +1403,8 @@ class SettlementAnalyzer:
 
         print(f"Settlement lateness visualizations created in {output_dir}")
 
-    def analyze_runtime(self, runtime_file="runtime_results.json", output_dir="settlement_analysis/runtime/",
-                        measurement_csv="New_measurement.csv"):
+    def analyze_runtime(self, runtime_file="partial_allowance_depth/runtime_partial_allowance.json", output_dir="partial_allowance_visualisations/runtime/",
+                        measurement_csv="partial_allowance_depth/partial_allowance_final_results.csv"):
         """
         Analyze and visualize runtime data from the runtime_results.json file
 
@@ -1402,7 +1451,7 @@ class SettlementAnalyzer:
                     config_num = int(config_match.group(1))
 
                     # Extract runtime
-                    execution_time = record.get("execution_time_seconds", 0)
+                    execution_time = record.get("execution_info", {}).get("execution_time_seconds", 0)
 
                     # Store in appropriate data structures
                     config_runtimes[config_num].append(execution_time)
@@ -1527,8 +1576,8 @@ class SettlementAnalyzer:
                         # Calculate average metrics for each configuration
                         config_metrics = df.groupby('config_num').agg({
                             'runtime_seconds': 'mean',
-                            'instruction efficiency': 'mean',
-                            'value efficiency': 'mean',
+                            'instruction_efficiency': 'mean',
+                            'value_efficiency': 'mean',
                             'settled_count': 'mean',
                             'settled_amount': 'mean'
                         }).reset_index()
@@ -1642,572 +1691,1036 @@ class SettlementAnalyzer:
         except Exception as e:
             print(f"Error analyzing runtime data: {e}")
 
-    # def analyze_lateness_hours(self, log_folder="simulation_logs/", output_dir="settlement_analysis/lateness_hours/"):
-    #     """
-    #     Analyze and visualize settlement lateness hours from logs
-    #
-    #     This method processes logs with lateness_hours attribute to create
-    #     visualizations of how many hours settlements are late across configurations.
-    #
-    #     Args:
-    #         log_folder: Directory containing logs with lateness_hours data
-    #         output_dir: Directory to save visualizations
-    #     """
-    #     import os
-    #     import json
-    #     import numpy as np
-    #     import matplotlib.pyplot as plt
-    #     from collections import defaultdict
-    #     import re
-    #     from datetime import datetime, timedelta
-    #
-    #     os.makedirs(output_dir, exist_ok=True)
-    #
-    #     print("Analyzing lateness hours from logs...")
-    #
-    #     # Find all JSONOCEL files
-    #     if not os.path.exists(log_folder):
-    #         print(f"Log directory '{log_folder}' does not exist!")
-    #         print(f"Current working directory: {os.getcwd()}")
-    #         return
-    #
-    #     log_files = [f for f in os.listdir(log_folder) if f.endswith(".jsonocel") and "simulation" in f]
-    #
-    #     if not log_files:
-    #         print(f"No simulation log files found in {log_folder}")
-    #         print(f"Files in directory: {os.listdir(log_folder)}")
-    #         return
-    #
-    #     print(f"Found {len(log_files)} log files for analysis")
-    #
-    #     # Prepare data structures
-    #     config_lateness = defaultdict(list)  # lateness hours by configuration
-    #     lateness_by_depth = defaultdict(list)  # lateness hours by depth level
-    #     all_lateness_hours = []  # all lateness hours across all configurations
-    #
-    #     # Track if we found any lateness data
-    #     lateness_data_found = False
-    #
-    #     # Process each log file
-    #     for log_file in log_files:
-    #         # Extract configuration number
-    #         config_match = re.search(r'config(\d+)', log_file)
-    #         if config_match:
-    #             config_num = int(config_match.group(1))
-    #             config_name = f"Config {config_num}"
-    #         else:
-    #             print(f"Could not extract configuration number from {log_file}")
-    #             continue
-    #
-    #         try:
-    #             # Load the log file
-    #             with open(os.path.join(log_folder, log_file), 'r') as f:
-    #                 log_data = json.load(f)
-    #
-    #             # Handle different JSON structures
-    #             if isinstance(log_data, dict):
-    #                 # Check for different event formats
-    #                 if "ocel:events" in log_data:
-    #                     # Classic OCEL format
-    #                     event_key = "ocel:events"
-    #                     attr_key = "ocel:attributes"
-    #                     activity_key = "ocel:activity"
-    #
-    #                     # Process events (dictionary format)
-    #                     events = log_data.get(event_key, {})
-    #                     for event_id, event in events.items():
-    #                         # Check if this is a "Settled Late" event
-    #                         if event.get(activity_key) == "Settled Late":
-    #                             attributes = event.get(attr_key, {})
-    #
-    #                             # Try to get lateness_hours if available
-    #                             if "lateness_hours" in attributes:
-    #                                 lateness_hours = float(attributes["lateness_hours"])
-    #                                 lateness_data_found = True
-    #
-    #                                 # Collect lateness data
-    #                                 config_lateness[config_name].append(lateness_hours)
-    #                                 all_lateness_hours.append(lateness_hours)
-    #
-    #                                 # If depth information is available, collect by depth
-    #                                 if "depth" in attributes:
-    #                                     depth = int(attributes["depth"])
-    #                                     lateness_by_depth[depth].append(lateness_hours)
-    #
-    #                 elif "events" in log_data:
-    #                     # Alternative format with events as an array
-    #                     events = log_data.get("events", [])
-    #
-    #                     for event in events:
-    #                         # Check if this is a "Settled Late" event
-    #                         event_type = event.get("type")
-    #                         if event_type == "Settled Late" or event_type == "transaction_settled_late":
-    #                             # Try to get attributes
-    #                             attributes = []
-    #                             for attr in event.get("attributes", []):
-    #                                 if attr["name"] == "lateness_hours" and "value" in attr:
-    #                                     try:
-    #                                         lateness_hours = float(attr["value"])
-    #                                         lateness_data_found = True
-    #
-    #                                         # Collect lateness data
-    #                                         config_lateness[config_name].append(lateness_hours)
-    #                                         all_lateness_hours.append(lateness_hours)
-    #                                     except (ValueError, TypeError):
-    #                                         pass
-    #
-    #                                 elif attr["name"] == "depth" and "value" in attr:
-    #                                     try:
-    #                                         depth = int(attr["value"])
-    #
-    #                                         # If we already found lateness_hours, add to depth data
-    #                                         if lateness_data_found and all_lateness_hours:
-    #                                             lateness_by_depth[depth].append(all_lateness_hours[-1])
-    #                                     except (ValueError, TypeError):
-    #                                         pass
-    #
-    #                             # If lateness_hours not found in attributes but we have timestamp
-    #                             # Calculate approximate lateness from timestamp (fallback)
-    #                             if not lateness_data_found and "time" in event:
-    #                                 try:
-    #                                     # Parse timestamp
-    #                                     timestamp = event["time"]
-    #                                     event_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-    #
-    #                                     # Use a fixed lateness of 1 hour as fallback
-    #                                     lateness_hours = 1.0
-    #                                     lateness_data_found = True
-    #
-    #                                     # Collect lateness data
-    #                                     config_lateness[config_name].append(lateness_hours)
-    #                                     all_lateness_hours.append(lateness_hours)
-    #
-    #                                     # Try to get depth from relationships
-    #                                     for rel in event.get("relationships", []):
-    #                                         if "objectId" in rel:
-    #                                             # Extract depth from object ID if format allows
-    #                                             obj_id = rel["objectId"]
-    #                                             depth_match = re.search(r'_(\d+)_', obj_id)
-    #                                             if depth_match:
-    #                                                 depth = int(depth_match.group(1))
-    #                                                 lateness_by_depth[depth].append(lateness_hours)
-    #                                                 break
-    #                                 except Exception as time_error:
-    #                                     pass
-    #                 else:
-    #                     print(f"Unknown dictionary format in {log_file}")
-    #
-    #             else:
-    #                 print(f"Unexpected data type in {log_file}: {type(log_data).__name__}")
-    #
-    #         except Exception as e:
-    #             print(f"Error processing file {log_file}: {e}")
-    #
-    #     if not lateness_data_found:
-    #         print("No lateness_hours data found in logs. Check your logging implementation.")
-    #         return
-    #
-    #     print(f"Collected lateness data for {len(config_lateness)} configurations")
-    #     print(f"Total number of late settlements: {len(all_lateness_hours)}")
-    #
-    #     # Sort configurations by number
-    #     configs = sorted(config_lateness.keys(), key=lambda x: int(x.split()[1]))
-    #
-    #     # Calculate average lateness for each configuration
-    #     avg_lateness = [np.mean(config_lateness[config]) for config in configs]
-    #     median_lateness = [np.median(config_lateness[config]) for config in configs]
-    #     max_lateness = [np.max(config_lateness[config]) for config in configs]
-    #
-    #     # 1. Create boxplot of lateness hours by configuration
-    #     plt.figure(figsize=(14, 8))
-    #
-    #     # Prepare data for boxplot
-    #     box_data = [config_lateness[config] for config in configs]
-    #
-    #     # Create boxplot
-    #     bp = plt.boxplot(box_data, labels=configs, patch_artist=True)
-    #
-    #     # Customize box colors
-    #     for box in bp['boxes']:
-    #         box.set(facecolor='lightblue', alpha=0.8)
-    #
-    #     # Add jittered points to show distribution
-    #     for i, data in enumerate(box_data):
-    #         # Limit points to avoid overcrowding
-    #         if len(data) > 100:
-    #             import random
-    #             data = random.sample(data, 100)
-    #
-    #         x = np.random.normal(i + 1, 0.08, size=len(data))
-    #         plt.scatter(x, data, alpha=0.5, s=10, color='navy')
-    #
-    #     plt.xlabel('Configuration')
-    #     plt.ylabel('Hours Late')
-    #     plt.title('Distribution of Settlement Lateness Hours by Configuration')
-    #     plt.grid(axis='y', linestyle='--', alpha=0.3)
-    #
-    #     plt.tight_layout()
-    #     plt.savefig(os.path.join(output_dir, "lateness_hours_boxplot.png"), dpi=300)
-    #     plt.close()
-    #
-    #     # 2. Create histogram of lateness hours
-    #     plt.figure(figsize=(12, 8))
-    #
-    #     # Determine appropriate number of bins based on data range
-    #     max_hours = max(all_lateness_hours)
-    #     if max_hours < 24:
-    #         # If all settlements are less than a day late, use hourly bins
-    #         bins = np.linspace(0, max_hours * 1.1, min(24, int(max_hours) + 1))
-    #     else:
-    #         # If settlements are very late, use more bins
-    #         bins = np.linspace(0, max_hours * 1.1, 30)
-    #
-    #     plt.hist(all_lateness_hours, bins=bins, alpha=0.7, color='skyblue', edgecolor='black')
-    #     plt.xlabel('Hours Late')
-    #     plt.ylabel('Frequency')
-    #     plt.title('Overall Distribution of Settlement Lateness Hours')
-    #     plt.grid(axis='y', linestyle='--', alpha=0.3)
-    #
-    #     # Add statistics
-    #     mean_late = np.mean(all_lateness_hours)
-    #     median_late = np.median(all_lateness_hours)
-    #
-    #     plt.axvline(x=mean_late, color='red', linestyle='--', label=f'Mean: {mean_late:.2f} hours')
-    #     plt.axvline(x=median_late, color='green', linestyle='--', label=f'Median: {median_late:.2f} hours')
-    #     plt.legend()
-    #
-    #     plt.tight_layout()
-    #     plt.savefig(os.path.join(output_dir, "lateness_hours_histogram.png"), dpi=300)
-    #     plt.close()
-    #
-    #     # 3. Create bar chart comparing average, median, and max lateness across configurations
-    #     plt.figure(figsize=(14, 8))
-    #
-    #     # Set width of bars
-    #     bar_width = 0.25
-    #     x = np.arange(len(configs))
-    #
-    #     # Create bars
-    #     plt.bar(x - bar_width, avg_lateness, width=bar_width, label='Average', color='skyblue')
-    #     plt.bar(x, median_lateness, width=bar_width, label='Median', color='forestgreen')
-    #     plt.bar(x + bar_width, max_lateness, width=bar_width, label='Maximum', color='salmon')
-    #
-    #     # Add value labels
-    #     def add_labels(positions, values):
-    #         for pos, value in zip(positions, values):
-    #             plt.text(pos, value, f'{value:.1f}', ha='center', va='bottom')
-    #
-    #     add_labels(x - bar_width, avg_lateness)
-    #     add_labels(x, median_lateness)
-    #     add_labels(x + bar_width, max_lateness)
-    #
-    #     plt.xlabel('Configuration')
-    #     plt.ylabel('Hours Late')
-    #     plt.title('Lateness Statistics by Configuration')
-    #     plt.xticks(x, configs)
-    #     plt.legend()
-    #     plt.grid(axis='y', linestyle='--', alpha=0.3)
-    #
-    #     plt.tight_layout()
-    #     plt.savefig(os.path.join(output_dir, "lateness_hours_statistics.png"), dpi=300)
-    #     plt.close()
-    #
-    #     # 4. Create line charts showing how lateness varies by depth
-    #     if lateness_by_depth:
-    #         depths = sorted(lateness_by_depth.keys())
-    #
-    #         # Calculate statistics by depth
-    #         avg_lateness_by_depth = [np.mean(lateness_by_depth[depth]) for depth in depths]
-    #         median_lateness_by_depth = [np.median(lateness_by_depth[depth]) for depth in depths]
-    #         max_lateness_by_depth = [np.max(lateness_by_depth[depth]) for depth in depths]
-    #
-    #         plt.figure(figsize=(14, 8))
-    #
-    #         # Plot line charts
-    #         plt.plot(depths, avg_lateness_by_depth, 'o-', linewidth=2, markersize=8,
-    #                  color='blue', label='Average')
-    #         plt.plot(depths, median_lateness_by_depth, 's--', linewidth=2, markersize=8,
-    #                  color='green', label='Median')
-    #         plt.plot(depths, max_lateness_by_depth, '^:', linewidth=2, markersize=8,
-    #                  color='red', label='Maximum')
-    #
-    #         # Add data labels for average lateness
-    #         for i, hours in enumerate(avg_lateness_by_depth):
-    #             plt.text(depths[i], hours, f"{hours:.1f}", ha='center', va='bottom')
-    #
-    #         plt.xlabel('Instruction Depth')
-    #         plt.ylabel('Hours Late')
-    #         plt.title('Settlement Lateness by Instruction Depth')
-    #         plt.xticks(depths)
-    #         plt.legend()
-    #         plt.grid(True, linestyle='--', alpha=0.3)
-    #
-    #         plt.tight_layout()
-    #         plt.savefig(os.path.join(output_dir, "lateness_hours_by_depth.png"), dpi=300)
-    #         plt.close()
-    #
-    #         # 5. Create violin plot to show lateness distribution by depth
-    #         plt.figure(figsize=(14, 8))
-    #
-    #         # Prepare data for violin plot
-    #         violin_data = [lateness_by_depth[depth] for depth in depths]
-    #
-    #         # Create violin plot
-    #         parts = plt.violinplot(violin_data, positions=depths, showmeans=True, showmedians=True)
-    #
-    #         # Customize violin plot
-    #         for pc in parts['bodies']:
-    #             pc.set_facecolor('lightblue')
-    #             pc.set_alpha(0.7)
-    #
-    #         parts['cmeans'].set_color('red')
-    #         parts['cmedians'].set_color('green')
-    #
-    #         plt.xlabel('Instruction Depth')
-    #         plt.ylabel('Hours Late')
-    #         plt.title('Distribution of Lateness Hours by Instruction Depth')
-    #         plt.grid(True, linestyle='--', alpha=0.3)
-    #
-    #         # Add legend
-    #         from matplotlib.lines import Line2D
-    #         legend_elements = [
-    #             Line2D([0], [0], color='red', lw=2, label='Mean'),
-    #             Line2D([0], [0], color='green', lw=2, label='Median')
-    #         ]
-    #         plt.legend(handles=legend_elements)
-    #
-    #         plt.tight_layout()
-    #         plt.savefig(os.path.join(output_dir, "lateness_hours_violin.png"), dpi=300)
-    #         plt.close()
-    #
-    #     # 6. Create heatmap of lateness hours by depth and configuration
-    #     # We need to collect more data first
-    #     lateness_by_config_depth = defaultdict(lambda: defaultdict(list))
-    #
-    #     # Process log files again to get lateness by depth and config
-    #     for log_file in log_files:
-    #         config_match = re.search(r'config(\d+)', log_file)
-    #         if not config_match:
-    #             continue
-    #
-    #         config_num = int(config_match.group(1))
-    #         config_name = f"Config {config_num}"
-    #
-    #         try:
-    #             with open(os.path.join(log_folder, log_file), 'r') as f:
-    #                 log_data = json.load(f)
-    #
-    #             # Handle different formats
-    #             if isinstance(log_data, dict):
-    #                 if "ocel:events" in log_data:
-    #                     # Classic OCEL format
-    #                     event_key = "ocel:events"
-    #                     attr_key = "ocel:attributes"
-    #                     activity_key = "ocel:activity"
-    #
-    #                     # Process events (dictionary format)
-    #                     events = log_data.get(event_key, {})
-    #                     for event_id, event in events.items():
-    #                         if event.get(activity_key) == "Settled Late":
-    #                             attributes = event.get(attr_key, {})
-    #
-    #                             if "lateness_hours" in attributes and "depth" in attributes:
-    #                                 lateness_hours = float(attributes["lateness_hours"])
-    #                                 depth = int(attributes["depth"])
-    #
-    #                                 lateness_by_config_depth[config_name][depth].append(lateness_hours)
-    #
-    #                 elif "events" in log_data:
-    #                     # Alternative format with events as an array
-    #                     events = log_data.get("events", [])
-    #
-    #                     for event in events:
-    #                         event_type = event.get("type")
-    #                         if event_type == "Settled Late" or event_type == "transaction_settled_late":
-    #                             # Try to extract depth and lateness
-    #                             lateness_hours = None
-    #                             depth = None
-    #
-    #                             # Try attributes for lateness_hours and depth
-    #                             for attr in event.get("attributes", []):
-    #                                 if attr["name"] == "lateness_hours" and "value" in attr:
-    #                                     try:
-    #                                         lateness_hours = float(attr["value"])
-    #                                     except (ValueError, TypeError):
-    #                                         pass
-    #                                 elif attr["name"] == "depth" and "value" in attr:
-    #                                     try:
-    #                                         depth = int(attr["value"])
-    #                                     except (ValueError, TypeError):
-    #                                         pass
-    #
-    #                             # If we didn't find depth in attributes, try extracting from object IDs
-    #                             if depth is None:
-    #                                 for rel in event.get("relationships", []):
-    #                                     if "objectId" in rel:
-    #                                         obj_id = rel["objectId"]
-    #                                         depth_match = re.search(r'_(\d+)_', obj_id)
-    #                                         if depth_match:
-    #                                             depth = int(depth_match.group(1))
-    #                                             break
-    #
-    #                             # If no lateness_hours but we need a value, use 1 hour as fallback
-    #                             if lateness_hours is None:
-    #                                 lateness_hours = 1.0
-    #
-    #                             # If we have both pieces of data, store it
-    #                             if lateness_hours is not None and depth is not None:
-    #                                 lateness_by_config_depth[config_name][depth].append(lateness_hours)
-    #         except Exception as e:
-    #             pass  # Already logged errors above
-    #
-    #     # Create heatmap if we have data
-    #     if lateness_by_config_depth:
-    #         # Get all depths across all configurations
-    #         all_depths = set()
-    #         for config in lateness_by_config_depth:
-    #             all_depths.update(lateness_by_config_depth[config].keys())
-    #
-    #         depths_for_heatmap = sorted(all_depths)
-    #         configs_for_heatmap = sorted(lateness_by_config_depth.keys(),
-    #                                      key=lambda x: int(x.split()[1]))
-    #
-    #         if depths_for_heatmap and configs_for_heatmap:
-    #             # Create matrix for average lateness hours
-    #             heatmap_data = np.zeros((len(depths_for_heatmap), len(configs_for_heatmap)))
-    #
-    #             for i, depth in enumerate(depths_for_heatmap):
-    #                 for j, config in enumerate(configs_for_heatmap):
-    #                     hours = lateness_by_config_depth[config].get(depth, [])
-    #                     if hours:
-    #                         heatmap_data[i, j] = np.mean(hours)
-    #
-    #             plt.figure(figsize=(14, 10))
-    #
-    #             # Create heatmap with custom colormap
-    #             cmap = plt.cm.get_cmap('YlOrRd')
-    #             aspect = max(0.1, min(5, len(configs_for_heatmap) / len(depths_for_heatmap)))
-    #             im = plt.imshow(heatmap_data, cmap=cmap, aspect=aspect)
-    #
-    #             # Add colorbar
-    #             plt.colorbar(im, label='Average Hours Late')
-    #
-    #             # Configure axes
-    #             plt.yticks(range(len(depths_for_heatmap)), depths_for_heatmap)
-    #             plt.xticks(range(len(configs_for_heatmap)), configs_for_heatmap,
-    #                        rotation=45, ha='right')
-    #             plt.ylabel('Instruction Depth')
-    #             plt.xlabel('Configuration')
-    #             plt.title('Average Lateness Hours by Depth and Configuration')
-    #
-    #             # Add values in cells
-    #             for i in range(len(depths_for_heatmap)):
-    #                 for j in range(len(configs_for_heatmap)):
-    #                     if heatmap_data[i, j] > 0:
-    #                         text_color = 'white' if heatmap_data[i, j] > np.max(heatmap_data) * 0.7 else 'black'
-    #                         plt.text(j, i, f"{heatmap_data[i, j]:.1f}",
-    #                                  ha="center", va="center", color=text_color)
-    #
-    #             plt.tight_layout()
-    #             plt.savefig(os.path.join(output_dir, "lateness_hours_heatmap.png"), dpi=300)
-    #             plt.close()
-    #
-    #     # 7. Create scatter plot of lateness hours vs depth
-    #     if lateness_by_depth:
-    #         plt.figure(figsize=(12, 8))
-    #
-    #         # Collect data for scatter plot
-    #         x_values = []  # depth values
-    #         y_values = []  # hours late values
-    #
-    #         for depth, hours_list in lateness_by_depth.items():
-    #             for hours in hours_list:
-    #                 x_values.append(depth)
-    #                 y_values.append(hours)
-    #
-    #         # Create scatter plot with transparency
-    #         plt.scatter(x_values, y_values, alpha=0.5, c='blue')
-    #
-    #         # Add trend line
-    #         z = np.polyfit(x_values, y_values, 1)
-    #         p = np.poly1d(z)
-    #
-    #         # Generate x values for trend line
-    #         x_trend = range(min(depths), max(depths) + 1)
-    #         plt.plot(x_trend, p(x_trend), "r--", label=f"Trend: y = {z[0]:.3f}x + {z[1]:.3f}")
-    #
-    #         plt.xlabel('Instruction Depth')
-    #         plt.ylabel('Hours Late')
-    #         plt.title('Relationship Between Instruction Depth and Lateness Hours')
-    #         plt.grid(True, linestyle='--', alpha=0.3)
-    #         plt.legend()
-    #
-    #         plt.tight_layout()
-    #         plt.savefig(os.path.join(output_dir, "lateness_hours_scatter.png"), dpi=300)
-    #         plt.close()
-    #
-    #     # 8. Create time bucket analysis - categorize lateness
-    #     plt.figure(figsize=(12, 8))
-    #
-    #     # Define time buckets (in hours)
-    #     buckets = [
-    #         (0, 1, "< 1 hour"),
-    #         (1, 6, "1-6 hours"),
-    #         (6, 12, "6-12 hours"),
-    #         (12, 24, "12-24 hours"),
-    #         (24, 48, "1-2 days"),
-    #         (48, float('inf'), "> 2 days")
-    #     ]
-    #
-    #     # Count instances in each bucket for each configuration
-    #     bucket_counts = {config: [0] * len(buckets) for config in configs}
-    #
-    #     for config, hours_list in config_lateness.items():
-    #         for hours in hours_list:
-    #             for i, (lower, upper, _) in enumerate(buckets):
-    #                 if lower <= hours < upper:
-    #                     bucket_counts[config][i] += 1
-    #                     break
-    #
-    #     # Calculate percentages
-    #     bucket_pcts = {}
-    #     for config, counts in bucket_counts.items():
-    #         total = sum(counts)
-    #         if total > 0:
-    #             bucket_pcts[config] = [count / total * 100 for count in counts]
-    #         else:
-    #             bucket_pcts[config] = [0] * len(buckets)
-    #
-    #     # Create stacked bar chart
-    #     bottom = np.zeros(len(configs))
-    #     bucket_colors = ['green', 'yellowgreen', 'gold', 'orange', 'darkorange', 'red']
-    #
-    #     for i, (_, _, bucket_name) in enumerate(buckets):
-    #         values = [bucket_pcts[config][i] for config in configs]
-    #         plt.bar(configs, values, bottom=bottom, label=bucket_name, color=bucket_colors[i])
-    #
-    #         # Add percentage labels if large enough
-    #         for j, v in enumerate(values):
-    #             if v > 7:  # Only show label if segment is large enough
-    #                 plt.text(j, bottom[j] + v / 2, f'{v:.1f}%', ha='center', va='center',
-    #                          color='black', fontweight='bold')
-    #
-    #         bottom += np.array(values)
-    #
-    #     plt.xlabel('Configuration')
-    #     plt.ylabel('Percentage of Late Settlements')
-    #     plt.title('Lateness Time Categories by Configuration')
-    #     plt.legend(title="Lateness Category")
-    #     plt.grid(axis='y', linestyle='--', alpha=0.3)
-    #
-    #     plt.tight_layout()
-    #     plt.savefig(os.path.join(output_dir, "lateness_categories.png"), dpi=300)
-    #     plt.close()
-    #
-    #     print(f"Lateness hours analysis visualizations created in {output_dir}")
+    def analyze_lateness_hours(self, log_folder="partial_allowance_logs/",
+                               output_dir="partial_allowance_visualisations/lateness_hours/"):
+        """
+        Analyze and visualize settlement lateness hours from logs
+
+        This method processes logs with lateness_hours attribute to create
+        visualizations of how many hours settlements are late across configurations.
+
+        Args:
+            log_folder: Directory containing logs with lateness_hours data
+            output_dir: Directory to save visualizations
+        """
+        import os
+        import json
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from collections import defaultdict
+        import re
+        from datetime import datetime, timedelta
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        print("Analyzing lateness hours from logs...")
+
+        # Find all JSONOCEL files
+        if not os.path.exists(log_folder):
+            print(f"Log directory '{log_folder}' does not exist!")
+            print(f"Current working directory: {os.getcwd()}")
+            return
+
+        log_files = [f for f in os.listdir(log_folder) if f.endswith(".jsonocel") and "simulation" in f]
+
+        if not log_files:
+            print(f"No simulation log files found in {log_folder}")
+            print(f"Files in directory: {os.listdir(log_folder)}")
+            return
+
+        print(f"Found {len(log_files)} log files for analysis")
+
+        # Prepare data structures
+        config_lateness = defaultdict(list)  # lateness hours by configuration
+        lateness_by_depth = defaultdict(list)  # lateness hours by depth level
+        all_lateness_hours = []  # all lateness hours across all configurations
+
+        # Track if we found any lateness data
+        lateness_data_found = False
+
+        # Process each log file
+        for log_file in log_files:
+            # Extract configuration number
+            config_match = re.search(r'config(\d+)', log_file)
+            if config_match:
+                config_num = int(config_match.group(1))
+                config_name = f"Config {config_num}"
+            else:
+                print(f"Could not extract configuration number from {log_file}")
+                continue
+
+            try:
+                # Load the log file
+                with open(os.path.join(log_folder, log_file), 'r') as f:
+                    log_data = json.load(f)
+
+                # Handle different JSON structures
+                if isinstance(log_data, dict):
+                    # Check for different event formats
+                    if "ocel:events" in log_data:
+                        # Classic OCEL format
+                        event_key = "ocel:events"
+                        attr_key = "ocel:attributes"
+                        activity_key = "ocel:activity"
+
+                        # Process events (dictionary format)
+                        events = log_data.get(event_key, {})
+                        for event_id, event in events.items():
+                            # Check if this is a "Settled Late" event
+                            if event.get(activity_key) == "Settled Late":
+                                attributes = event.get(attr_key, {})
+
+                                # Try to get lateness_hours if available
+                                if "lateness_hours" in attributes:
+                                    lateness_hours = float(attributes["lateness_hours"])
+                                    lateness_data_found = True
+
+                                    # Collect lateness data
+                                    config_lateness[config_name].append(lateness_hours)
+                                    all_lateness_hours.append(lateness_hours)
+
+                                    # If depth information is available, collect by depth
+                                    if "depth" in attributes:
+                                        depth = int(attributes["depth"])
+                                        lateness_by_depth[depth].append(lateness_hours)
+
+                    elif "events" in log_data:
+                        # Alternative format with events as an array
+                        events = log_data.get("events", [])
+
+                        for event in events:
+                            # Check if this is a "Settled Late" event
+                            event_type = event.get("type")
+                            if event_type == "Settled Late" or event_type == "transaction_settled_late":
+                                # Try to get attributes
+                                attributes = []
+                                for attr in event.get("attributes", []):
+                                    if attr["name"] == "lateness_hours" and "value" in attr:
+                                        try:
+                                            lateness_hours = float(attr["value"])
+                                            lateness_data_found = True
+
+                                            # Collect lateness data
+                                            config_lateness[config_name].append(lateness_hours)
+                                            all_lateness_hours.append(lateness_hours)
+                                        except (ValueError, TypeError):
+                                            pass
+
+                                    elif attr["name"] == "depth" and "value" in attr:
+                                        try:
+                                            depth = int(attr["value"])
+
+                                            # If we already found lateness_hours, add to depth data
+                                            if lateness_data_found and all_lateness_hours:
+                                                lateness_by_depth[depth].append(all_lateness_hours[-1])
+                                        except (ValueError, TypeError):
+                                            pass
+
+                                # If lateness_hours not found in attributes but we have timestamp
+                                # Calculate approximate lateness from timestamp (fallback)
+                                if not lateness_data_found and "time" in event:
+                                    try:
+                                        # Parse timestamp
+                                        timestamp = event["time"]
+                                        event_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+
+                                        # Use a fixed lateness of 1 hour as fallback
+                                        lateness_hours = 1.0
+                                        lateness_data_found = True
+
+                                        # Collect lateness data
+                                        config_lateness[config_name].append(lateness_hours)
+                                        all_lateness_hours.append(lateness_hours)
+
+                                        # Try to get depth from relationships
+                                        for rel in event.get("relationships", []):
+                                            if "objectId" in rel:
+                                                # Extract depth from object ID if format allows
+                                                obj_id = rel["objectId"]
+                                                depth_match = re.search(r'_(\d+)_', obj_id)
+                                                if depth_match:
+                                                    depth = int(depth_match.group(1))
+                                                    lateness_by_depth[depth].append(lateness_hours)
+                                                    break
+                                    except Exception as time_error:
+                                        pass
+                    else:
+                        print(f"Unknown dictionary format in {log_file}")
+
+                else:
+                    print(f"Unexpected data type in {log_file}: {type(log_data).__name__}")
+
+            except Exception as e:
+                print(f"Error processing file {log_file}: {e}")
+
+        if not lateness_data_found:
+            print("No lateness_hours data found in logs. Check your logging implementation.")
+            return
+
+        print(f"Collected lateness data for {len(config_lateness)} configurations")
+        print(f"Total number of late settlements: {len(all_lateness_hours)}")
+
+        # Sort configurations by number
+        configs = sorted(config_lateness.keys(), key=lambda x: int(x.split()[1]))
+
+        # Calculate average lateness for each configuration
+        avg_lateness = [np.mean(config_lateness[config]) for config in configs]
+        median_lateness = [np.median(config_lateness[config]) for config in configs]
+        max_lateness = [np.max(config_lateness[config]) for config in configs]
+
+        # 1. Create boxplot of lateness hours by configuration
+        plt.figure(figsize=(14, 8))
+
+        # Prepare data for boxplot
+        box_data = [config_lateness[config] for config in configs]
+
+        # Create boxplot
+        bp = plt.boxplot(box_data, labels=configs, patch_artist=True)
+
+        # Customize box colors
+        for box in bp['boxes']:
+            box.set(facecolor='lightblue', alpha=0.8)
+
+        # Add jittered points to show distribution
+        for i, data in enumerate(box_data):
+            # Limit points to avoid overcrowding
+            if len(data) > 100:
+                import random
+                data = random.sample(data, 100)
+
+            x = np.random.normal(i + 1, 0.08, size=len(data))
+            plt.scatter(x, data, alpha=0.5, s=10, color='navy')
+
+        plt.xlabel('Configuration')
+        plt.ylabel('Hours Late')
+        plt.title('Distribution of Settlement Lateness Hours by Configuration')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "lateness_hours_boxplot.png"), dpi=300)
+        plt.close()
+
+        # 2. Create histogram of lateness hours
+        plt.figure(figsize=(12, 8))
+
+        # Determine appropriate number of bins based on data range
+        max_hours = max(all_lateness_hours)
+        if max_hours < 24:
+            # If all settlements are less than a day late, use hourly bins
+            bins = np.linspace(0, max_hours * 1.1, min(24, int(max_hours) + 1))
+        else:
+            # If settlements are very late, use more bins
+            bins = np.linspace(0, max_hours * 1.1, 30)
+
+        plt.hist(all_lateness_hours, bins=bins, alpha=0.7, color='skyblue', edgecolor='black')
+        plt.xlabel('Hours Late')
+        plt.ylabel('Frequency')
+        plt.title('Overall Distribution of Settlement Lateness Hours')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+
+        # Add statistics
+        mean_late = np.mean(all_lateness_hours)
+        median_late = np.median(all_lateness_hours)
+
+        plt.axvline(x=mean_late, color='red', linestyle='--', label=f'Mean: {mean_late:.2f} hours')
+        plt.axvline(x=median_late, color='green', linestyle='--', label=f'Median: {median_late:.2f} hours')
+        plt.legend()
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "lateness_hours_histogram.png"), dpi=300)
+        plt.close()
+
+        # 3. Create bar chart comparing average, median, and max lateness across configurations
+        plt.figure(figsize=(14, 8))
+
+        # Set width of bars
+        bar_width = 0.25
+        x = np.arange(len(configs))
+
+        # Create bars
+        plt.bar(x - bar_width, avg_lateness, width=bar_width, label='Average', color='skyblue')
+        plt.bar(x, median_lateness, width=bar_width, label='Median', color='forestgreen')
+        plt.bar(x + bar_width, max_lateness, width=bar_width, label='Maximum', color='salmon')
+
+        # Add value labels
+        def add_labels(positions, values):
+            for pos, value in zip(positions, values):
+                plt.text(pos, value, f'{value:.1f}', ha='center', va='bottom')
+
+        add_labels(x - bar_width, avg_lateness)
+        add_labels(x, median_lateness)
+        add_labels(x + bar_width, max_lateness)
+
+        plt.xlabel('Configuration')
+        plt.ylabel('Hours Late')
+        plt.title('Lateness Statistics by Configuration')
+        plt.xticks(x, configs)
+        plt.legend()
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "lateness_hours_statistics.png"), dpi=300)
+        plt.close()
+
+        # 4. Create line charts showing how lateness varies by depth
+        if lateness_by_depth:
+            depths = sorted(lateness_by_depth.keys())
+
+            # Calculate statistics by depth
+            avg_lateness_by_depth = [np.mean(lateness_by_depth[depth]) for depth in depths]
+            median_lateness_by_depth = [np.median(lateness_by_depth[depth]) for depth in depths]
+            max_lateness_by_depth = [np.max(lateness_by_depth[depth]) for depth in depths]
+
+            plt.figure(figsize=(14, 8))
+
+            # Plot line charts
+            plt.plot(depths, avg_lateness_by_depth, 'o-', linewidth=2, markersize=8,
+                     color='blue', label='Average')
+            plt.plot(depths, median_lateness_by_depth, 's--', linewidth=2, markersize=8,
+                     color='green', label='Median')
+            plt.plot(depths, max_lateness_by_depth, '^:', linewidth=2, markersize=8,
+                     color='red', label='Maximum')
+
+            # Add data labels for average lateness
+            for i, hours in enumerate(avg_lateness_by_depth):
+                plt.text(depths[i], hours, f"{hours:.1f}", ha='center', va='bottom')
+
+            plt.xlabel('Instruction Depth')
+            plt.ylabel('Hours Late')
+            plt.title('Settlement Lateness by Instruction Depth')
+            plt.xticks(depths)
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.3)
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, "lateness_hours_by_depth.png"), dpi=300)
+            plt.close()
+
+            # 5. Create violin plot to show lateness distribution by depth
+            plt.figure(figsize=(14, 8))
+
+            # Prepare data for violin plot
+            violin_data = [lateness_by_depth[depth] for depth in depths]
+
+            # Create violin plot
+            parts = plt.violinplot(violin_data, positions=depths, showmeans=True, showmedians=True)
+
+            # Customize violin plot
+            for pc in parts['bodies']:
+                pc.set_facecolor('lightblue')
+                pc.set_alpha(0.7)
+
+            parts['cmeans'].set_color('red')
+            parts['cmedians'].set_color('green')
+
+            plt.xlabel('Instruction Depth')
+            plt.ylabel('Hours Late')
+            plt.title('Distribution of Lateness Hours by Instruction Depth')
+            plt.grid(True, linestyle='--', alpha=0.3)
+
+            # Add legend
+            from matplotlib.lines import Line2D
+            legend_elements = [
+                Line2D([0], [0], color='red', lw=2, label='Mean'),
+                Line2D([0], [0], color='green', lw=2, label='Median')
+            ]
+            plt.legend(handles=legend_elements)
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, "lateness_hours_violin.png"), dpi=300)
+            plt.close()
+
+        # 6. Create heatmap of lateness hours by depth and configuration
+        # We need to collect more data first
+        lateness_by_config_depth = defaultdict(lambda: defaultdict(list))
+
+        # Process log files again to get lateness by depth and config
+        for log_file in log_files:
+            config_match = re.search(r'config(\d+)', log_file)
+            if not config_match:
+                continue
+
+            config_num = int(config_match.group(1))
+            config_name = f"Config {config_num}"
+
+            try:
+                with open(os.path.join(log_folder, log_file), 'r') as f:
+                    log_data = json.load(f)
+
+                # Handle different formats
+                if isinstance(log_data, dict):
+                    if "ocel:events" in log_data:
+                        # Classic OCEL format
+                        event_key = "ocel:events"
+                        attr_key = "ocel:attributes"
+                        activity_key = "ocel:activity"
+
+                        # Process events (dictionary format)
+                        events = log_data.get(event_key, {})
+                        for event_id, event in events.items():
+                            if event.get(activity_key) == "Settled Late":
+                                attributes = event.get(attr_key, {})
+
+                                if "lateness_hours" in attributes and "depth" in attributes:
+                                    lateness_hours = float(attributes["lateness_hours"])
+                                    depth = int(attributes["depth"])
+
+                                    lateness_by_config_depth[config_name][depth].append(lateness_hours)
+
+                    elif "events" in log_data:
+                        # Alternative format with events as an array
+                        events = log_data.get("events", [])
+
+                        for event in events:
+                            event_type = event.get("type")
+                            if event_type == "Settled Late" or event_type == "transaction_settled_late":
+                                # Try to extract depth and lateness
+                                lateness_hours = None
+                                depth = None
+
+                                # Try attributes for lateness_hours and depth
+                                for attr in event.get("attributes", []):
+                                    if attr["name"] == "lateness_hours" and "value" in attr:
+                                        try:
+                                            lateness_hours = float(attr["value"])
+                                        except (ValueError, TypeError):
+                                            pass
+                                    elif attr["name"] == "depth" and "value" in attr:
+                                        try:
+                                            depth = int(attr["value"])
+                                        except (ValueError, TypeError):
+                                            pass
+
+                                # If we didn't find depth in attributes, try extracting from object IDs
+                                if depth is None:
+                                    for rel in event.get("relationships", []):
+                                        if "objectId" in rel:
+                                            obj_id = rel["objectId"]
+                                            depth_match = re.search(r'_(\d+)_', obj_id)
+                                            if depth_match:
+                                                depth = int(depth_match.group(1))
+                                                break
+
+                                # If no lateness_hours but we need a value, use 1 hour as fallback
+                                if lateness_hours is None:
+                                    lateness_hours = 1.0
+
+                                # If we have both pieces of data, store it
+                                if lateness_hours is not None and depth is not None:
+                                    lateness_by_config_depth[config_name][depth].append(lateness_hours)
+            except Exception as e:
+                pass  # Already logged errors above
+
+        # Create heatmap if we have data
+        if lateness_by_config_depth:
+            # Get all depths across all configurations
+            all_depths = set()
+            for config in lateness_by_config_depth:
+                all_depths.update(lateness_by_config_depth[config].keys())
+
+            depths_for_heatmap = sorted(all_depths)
+            configs_for_heatmap = sorted(lateness_by_config_depth.keys(),
+                                         key=lambda x: int(x.split()[1]))
+
+            if depths_for_heatmap and configs_for_heatmap:
+                # Create matrix for average lateness hours
+                heatmap_data = np.zeros((len(depths_for_heatmap), len(configs_for_heatmap)))
+
+                for i, depth in enumerate(depths_for_heatmap):
+                    for j, config in enumerate(configs_for_heatmap):
+                        hours = lateness_by_config_depth[config].get(depth, [])
+                        if hours:
+                            heatmap_data[i, j] = np.mean(hours)
+
+                plt.figure(figsize=(14, 10))
+
+                # Create heatmap with custom colormap
+                cmap = plt.cm.get_cmap('YlOrRd')
+                aspect = max(0.1, min(5, len(configs_for_heatmap) / len(depths_for_heatmap)))
+                im = plt.imshow(heatmap_data, cmap=cmap, aspect=aspect)
+
+                # Add colorbar
+                plt.colorbar(im, label='Average Hours Late')
+
+                # Configure axes
+                plt.yticks(range(len(depths_for_heatmap)), depths_for_heatmap)
+                plt.xticks(range(len(configs_for_heatmap)), configs_for_heatmap,
+                           rotation=45, ha='right')
+                plt.ylabel('Instruction Depth')
+                plt.xlabel('Configuration')
+                plt.title('Average Lateness Hours by Depth and Configuration')
+
+                # Add values in cells
+                for i in range(len(depths_for_heatmap)):
+                    for j in range(len(configs_for_heatmap)):
+                        if heatmap_data[i, j] > 0:
+                            text_color = 'white' if heatmap_data[i, j] > np.max(heatmap_data) * 0.7 else 'black'
+                            plt.text(j, i, f"{heatmap_data[i, j]:.1f}",
+                                     ha="center", va="center", color=text_color)
+
+                plt.tight_layout()
+                plt.savefig(os.path.join(output_dir, "lateness_hours_heatmap.png"), dpi=300)
+                plt.close()
+
+        # 7. Create scatter plot of lateness hours vs depth
+        if lateness_by_depth:
+            plt.figure(figsize=(12, 8))
+
+            # Collect data for scatter plot
+            x_values = []  # depth values
+            y_values = []  # hours late values
+
+            for depth, hours_list in lateness_by_depth.items():
+                for hours in hours_list:
+                    x_values.append(depth)
+                    y_values.append(hours)
+
+            # Create scatter plot with transparency
+            plt.scatter(x_values, y_values, alpha=0.5, c='blue')
+
+            # Add trend line
+            z = np.polyfit(x_values, y_values, 1)
+            p = np.poly1d(z)
+
+            # Generate x values for trend line
+            x_trend = range(min(depths), max(depths) + 1)
+            plt.plot(x_trend, p(x_trend), "r--", label=f"Trend: y = {z[0]:.3f}x + {z[1]:.3f}")
+
+            plt.xlabel('Instruction Depth')
+            plt.ylabel('Hours Late')
+            plt.title('Relationship Between Instruction Depth and Lateness Hours')
+            plt.grid(True, linestyle='--', alpha=0.3)
+            plt.legend()
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, "lateness_hours_scatter.png"), dpi=300)
+            plt.close()
+
+        # 8. Create time bucket analysis - categorize lateness
+        plt.figure(figsize=(12, 8))
+
+        # Define time buckets (in hours)
+        buckets = [
+            (0, 1, "< 1 hour"),
+            (1, 6, "1-6 hours"),
+            (6, 12, "6-12 hours"),
+            (12, 24, "12-24 hours"),
+            (24, 48, "1-2 days"),
+            (48, float('inf'), "> 2 days")
+        ]
+
+        # Count instances in each bucket for each configuration
+        bucket_counts = {config: [0] * len(buckets) for config in configs}
+
+        for config, hours_list in config_lateness.items():
+            for hours in hours_list:
+                for i, (lower, upper, _) in enumerate(buckets):
+                    if lower <= hours < upper:
+                        bucket_counts[config][i] += 1
+                        break
+
+        # Calculate percentages
+        bucket_pcts = {}
+        for config, counts in bucket_counts.items():
+            total = sum(counts)
+            if total > 0:
+                bucket_pcts[config] = [count / total * 100 for count in counts]
+            else:
+                bucket_pcts[config] = [0] * len(buckets)
+
+        # Create stacked bar chart
+        bottom = np.zeros(len(configs))
+        bucket_colors = ['green', 'yellowgreen', 'gold', 'orange', 'darkorange', 'red']
+
+        for i, (_, _, bucket_name) in enumerate(buckets):
+            values = [bucket_pcts[config][i] for config in configs]
+            plt.bar(configs, values, bottom=bottom, label=bucket_name, color=bucket_colors[i])
+
+            # Add percentage labels if large enough
+            for j, v in enumerate(values):
+                if v > 7:  # Only show label if segment is large enough
+                    plt.text(j, bottom[j] + v / 2, f'{v:.1f}%', ha='center', va='center',
+                             color='black', fontweight='bold')
+
+            bottom += np.array(values)
+
+        plt.xlabel('Configuration')
+        plt.ylabel('Percentage of Late Settlements')
+        plt.title('Lateness Time Categories by Configuration')
+        plt.legend(title="Lateness Category")
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "lateness_categories.png"), dpi=300)
+        plt.close()
+
+        print(f"Lateness hours analysis visualizations created in {output_dir}")
+
+    def parse_confidence_intervals(self, log_path):
+        """
+        Parse confidence interval log file and extract data for visualization
+
+        Args:
+            log_path: Path to the confidence intervals log file
+
+        Returns:
+            Tuple of dictionaries containing data for different metrics
+        """
+        instruction_data = {}
+        value_data = {}
+        settled_count_data = {}
+        settled_amount_data = {}
+
+        # Regex pattern to match the log entries, handling potential nan values
+        pattern = r"(INSTRUCTION_CI|VALUE_CI|SETTLED_COUNT|SETTLED_AMOUNT),Partial=\((.*?)\),Mean=([0-9.]+|nan),Lower=([0-9.]+|nan),Upper=([0-9.]+|nan)"
+
+        with open(log_path, "r") as f:
+            for line in f:
+                match = re.search(pattern, line)
+                if match:
+                    entry_type, partial_str, mean, lower, upper = match.groups()
+
+                    # Extract the boolean values from the partial string
+                    bool_values = [val.strip() == "True" for val in partial_str.split(',')]
+
+                    # Count True values to determine configuration number (1-10)
+                    config_num = sum(bool_values)
+
+                    # Handle 'nan' values
+                    mean_val = float(mean) if mean != 'nan' else np.nan
+                    lower_val = float(lower) if lower != 'nan' else mean_val  # Use mean if lower is nan
+                    upper_val = float(upper) if upper != 'nan' else mean_val  # Use mean if upper is nan
+
+                    entry = {
+                        "mean": mean_val,
+                        "CI lower": lower_val,
+                        "CI upper": upper_val
+                    }
+
+                    if entry_type == "INSTRUCTION_CI":
+                        instruction_data[config_num] = entry
+                    elif entry_type == "VALUE_CI":
+                        value_data[config_num] = entry
+                    elif entry_type == "SETTLED_COUNT":
+                        settled_count_data[config_num] = entry
+                    elif entry_type == "SETTLED_AMOUNT":
+                        settled_amount_data[config_num] = entry
+
+        return instruction_data, value_data, settled_count_data, settled_amount_data
+
+    def plot_instruction_efficiency_with_ci(self, instruction_data, settled_counts, output_file, color="skyblue"):
+        """
+        Plot instruction efficiency with confidence intervals and settled instruction counts
+
+        Args:
+            instruction_data: Dictionary of instruction efficiency data with means and CI
+            settled_counts: Dictionary of settled count data
+            output_file: Path to save the visualization
+            color: Color for the primary line
+        """
+        # Sort configurations to ensure they're in order
+        configs = sorted(instruction_data.keys())
+        means = [instruction_data[config]["mean"] for config in configs]
+
+        # Calculate errors, handling nan values
+        lower_errors = []
+        upper_errors = []
+
+        for config in configs:
+            mean = instruction_data[config]["mean"]
+            lower = instruction_data[config]["CI lower"]
+            upper = instruction_data[config]["CI upper"]
+
+            # For lower error, if mean or lower is nan, use 0
+            if np.isnan(mean) or np.isnan(lower):
+                lower_errors.append(0)
+            else:
+                lower_errors.append(mean - lower)
+
+            # For upper error, if mean or upper is nan, use 0
+            if np.isnan(mean) or np.isnan(upper):
+                upper_errors.append(0)
+            else:
+                upper_errors.append(upper - mean)
+
+        # Get settled counts for the same configurations
+        settled_means = []
+        for config in configs:
+            if config in settled_counts:
+                settled_means.append(settled_counts[config]["mean"])
+            else:
+                print(f"Warning: No settled count data for configuration {config}. Using 0.")
+                settled_means.append(0)
+
+        # Create the plot with two y-axes
+        plt.figure(figsize=(12, 7))
+        fig, ax1 = plt.subplots(figsize=(12, 7))
+
+        # Primary axis: Efficiency percentage
+        ax1.set_xlabel("Configuration (Number of True Values in Partial)")
+        ax1.set_ylabel("Instruction Efficiency (%)", color=color)
+        ax1.set_ylim(50, 100)  # Adjusted to focus on the relevant range
+
+        # Plot means with error bars
+        ax1.errorbar(configs, means, yerr=[lower_errors, upper_errors], fmt='o', color=color,
+                     capsize=5, label='Instruction Efficiency (%)', markersize=8)
+
+        # Add markers for just the means (to show even when CI is nan)
+        ax1.plot(configs, means, 'o', color=color, markersize=8)
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        # Secondary axis: Number of settled instructions
+        ax2 = ax1.twinx()
+        ax2.set_ylabel('Number of Settled Instructions', color='darkgreen')
+        ax2.plot(configs, settled_means, 's-', color='darkgreen', markersize=8, label='Number Settled')
+        ax2.tick_params(axis='y', labelcolor='darkgreen')
+
+        # Improved y-axis range for settled counts
+        if settled_means:
+            # Calculate a better min/max with padding
+            all_values = [v for v in settled_means if v > 0]
+            if all_values:
+                min_val = min(all_values) * 0.9  # 10% padding below
+                max_val = max(all_values) * 1.1  # 10% padding above
+                y_range = max_val - min_val
+                # Make the range slightly larger to prevent data points touching axis limits
+                ax2.set_ylim(min_val - 0.05 * y_range, max_val + 0.05 * y_range)
+            else:
+                ax2.set_ylim(0, 1000)
+        else:
+            ax2.set_ylim(0, 1000)
+
+        # Add thousands separator to y-axis labels
+        ax2.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{int(x):,}'))
+
+        # Title and grid
+        plt.title("Confidence Intervals for Instruction Efficiency by Configuration")
+        ax1.grid(axis='y', linestyle='--', alpha=0.3)
+
+        # Legend for both axes
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
+
+        plt.tight_layout()
+        plt.savefig(output_file, dpi=300)
+        plt.close()
+
+    def plot_value_efficiency_with_ci(self, value_data, settled_amounts, output_file, color="salmon"):
+        """
+        Plot value efficiency with confidence intervals and settled amounts
+
+        Args:
+            value_data: Dictionary of value efficiency data with means and CI
+            settled_amounts: Dictionary of settled amount data
+            output_file: Path to save the visualization
+            color: Color for the primary line
+        """
+        # Sort configurations to ensure they're in order
+        configs = sorted(value_data.keys())
+        means = [value_data[config]["mean"] for config in configs]
+
+        # Calculate errors, handling nan values
+        lower_errors = []
+        upper_errors = []
+
+        for config in configs:
+            mean = value_data[config]["mean"]
+            lower = value_data[config]["CI lower"]
+            upper = value_data[config]["CI upper"]
+
+            # For lower error, if mean or lower is nan, use 0
+            if np.isnan(mean) or np.isnan(lower):
+                lower_errors.append(0)
+            else:
+                lower_errors.append(mean - lower)
+
+            # For upper error, if mean or upper is nan, use 0
+            if np.isnan(mean) or np.isnan(upper):
+                upper_errors.append(0)
+            else:
+                upper_errors.append(upper - mean)
+
+        # Get settled amounts for the same configurations
+        settled_means = []
+        for config in configs:
+            if config in settled_amounts:
+                settled_means.append(settled_amounts[config]["mean"])
+            else:
+                print(f"Warning: No settled amount data for configuration {config}. Using 0.")
+                settled_means.append(0)
+
+        # Create the plot with two y-axes
+        plt.figure(figsize=(12, 7))
+        fig, ax1 = plt.subplots(figsize=(12, 7))
+
+        # Primary axis: Efficiency percentage
+        ax1.set_xlabel("Configuration (Number of True Values in Partial)")
+        ax1.set_ylabel("Value Efficiency (%)", color=color)
+        ax1.set_ylim(50, 100)  # Adjusted to focus on the relevant range
+
+        # Plot means with error bars
+        ax1.errorbar(configs, means, yerr=[lower_errors, upper_errors], fmt='o', color=color,
+                     capsize=5, label='Value Efficiency (%)', markersize=8)
+
+        # Add markers for just the means (to show even when CI is nan)
+        ax1.plot(configs, means, 'o', color=color, markersize=8)
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        # Secondary axis: Total settled amount
+        ax2 = ax1.twinx()
+        ax2.set_ylabel('Total Settled Amount (€)', color='darkgreen')
+        ax2.plot(configs, settled_means, 's-', color='darkgreen', markersize=8, label='Total Settled Amount')
+        ax2.tick_params(axis='y', labelcolor='darkgreen')
+
+        # Improved y-axis scaling for settled amounts
+        if settled_means:
+            # Calculate a better min/max with padding
+            all_values = [v for v in settled_means if v > 0]
+            if all_values:
+                min_val = min(all_values) * 0.9  # 10% padding below
+                max_val = max(all_values) * 1.1  # 10% padding above
+                y_range = max_val - min_val
+                # Make the range slightly larger to prevent data points touching axis limits
+                ax2.set_ylim(min_val - 0.05 * y_range, max_val + 0.05 * y_range)
+            else:
+                ax2.set_ylim(0, 2e12)  # Default range for currency values
+        else:
+            ax2.set_ylim(0, 2e12)  # Default range for currency values
+
+        # Format y-axis labels for large numbers (trillions/billions/millions)
+        def currency_formatter(x, pos):
+            if abs(x) >= 1e12:
+                return f'{x / 1e12:.1f}T'
+            elif abs(x) >= 1e9:
+                return f'{x / 1e9:.1f}B'
+            elif abs(x) >= 1e6:
+                return f'{x / 1e6:.1f}M'
+            else:
+                return f'{x:.0f}'
+
+        ax2.yaxis.set_major_formatter(ticker.FuncFormatter(currency_formatter))
+
+        # Title and grid
+        plt.title("Confidence Intervals for Value Efficiency by Configuration")
+        ax1.grid(axis='y', linestyle='--', alpha=0.3)
+
+        # Legend for both axes
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
+
+        plt.tight_layout()
+        plt.savefig(output_file, dpi=300)
+        plt.close()
+
+    def plot_combined_efficiency_with_ci(self, instruction_data, value_data, settled_counts, settled_amounts,
+                                         output_file):
+        """
+        Plot combined efficiency metrics with confidence intervals
+
+        Args:
+            instruction_data: Dictionary of instruction efficiency data with means and CI
+            value_data: Dictionary of value efficiency data with means and CI
+            settled_counts: Dictionary of settled count data
+            settled_amounts: Dictionary of settled amount data
+            output_file: Path to save the visualization
+        """
+        # Sort configurations
+        configs = sorted(instruction_data.keys())
+
+        # Get means
+        means_instr = [instruction_data[config]["mean"] for config in configs]
+        means_value = [value_data[config]["mean"] for config in configs]
+
+        # Calculate errors for instruction efficiency
+        lower_errors_instr = []
+        upper_errors_instr = []
+
+        for config in configs:
+            mean = instruction_data[config]["mean"]
+            lower = instruction_data[config]["CI lower"]
+            upper = instruction_data[config]["CI upper"]
+
+            if np.isnan(mean) or np.isnan(lower):
+                lower_errors_instr.append(0)
+            else:
+                lower_errors_instr.append(mean - lower)
+
+            if np.isnan(mean) or np.isnan(upper):
+                upper_errors_instr.append(0)
+            else:
+                upper_errors_instr.append(upper - mean)
+
+        # Calculate errors for value efficiency
+        lower_errors_value = []
+        upper_errors_value = []
+
+        for config in configs:
+            mean = value_data[config]["mean"]
+            lower = value_data[config]["CI lower"]
+            upper = value_data[config]["CI upper"]
+
+            if np.isnan(mean) or np.isnan(lower):
+                lower_errors_value.append(0)
+            else:
+                lower_errors_value.append(mean - lower)
+
+            if np.isnan(mean) or np.isnan(upper):
+                upper_errors_value.append(0)
+            else:
+                upper_errors_value.append(upper - mean)
+
+        # Get settled counts for the same configurations
+        settled_count_means = []
+        for config in configs:
+            if config in settled_counts:
+                settled_count_means.append(settled_counts[config]["mean"])
+            else:
+                print(f"Warning: No settled count data for configuration {config}. Using 0.")
+                settled_count_means.append(0)
+
+        # Get settled amounts for the same configurations
+        settled_amount_means = []
+        for config in configs:
+            if config in settled_amounts:
+                settled_amount_means.append(settled_amounts[config]["mean"])
+            else:
+                print(f"Warning: No settled amount data for configuration {config}. Using 0.")
+                settled_amount_means.append(0)
+
+        # Create the plot with two y-axes
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12), sharex=True)
+
+        # First subplot: Instruction Efficiency with Number of Instructions
+        ax1.set_ylabel('Instruction Efficiency (%)', color='skyblue')
+        ax1.errorbar(configs, means_instr, yerr=[lower_errors_instr, upper_errors_instr],
+                     fmt='o', color='skyblue', capsize=5, label='Instruction Efficiency', markersize=8)
+        ax1.plot(configs, means_instr, 'o', color='skyblue', markersize=8)
+        ax1.set_ylim(50, 100)  # Adjusted to focus on the relevant range
+        ax1.tick_params(axis='y', labelcolor='skyblue')
+
+        ax1b = ax1.twinx()
+        ax1b.set_ylabel('Number of Settled Instructions', color='darkgreen')
+        ax1b.plot(configs, settled_count_means, 's-', color='darkgreen', markersize=8, label='Number Settled')
+        ax1b.tick_params(axis='y', labelcolor='darkgreen')
+
+        # Improved y-axis range for settled counts
+        if settled_count_means:
+            all_values = [v for v in settled_count_means if v > 0]
+            if all_values:
+                min_val = min(all_values) * 0.9
+                max_val = max(all_values) * 1.1
+                y_range = max_val - min_val
+                ax1b.set_ylim(min_val - 0.05 * y_range, max_val + 0.05 * y_range)
+
+        # Add thousands separator to y-axis labels
+        ax1b.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{int(x):,}'))
+
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines1b, labels1b = ax1b.get_legend_handles_labels()
+        ax1.legend(lines1 + lines1b, labels1 + labels1b, loc='lower right')
+
+        ax1.set_title('Confidence Intervals for Instruction Efficiency by Configuration')
+        ax1.grid(axis='y', linestyle='--', alpha=0.3)
+
+        # Second subplot: Value Efficiency with Total Amount
+        ax2.set_ylabel('Value Efficiency (%)', color='salmon')
+        ax2.errorbar(configs, means_value, yerr=[lower_errors_value, upper_errors_value],
+                     fmt='o', color='salmon', capsize=5, label='Value Efficiency', markersize=8)
+        ax2.plot(configs, means_value, 'o', color='salmon', markersize=8)
+        ax2.set_ylim(50, 100)  # Adjusted to focus on the relevant range
+        ax2.tick_params(axis='y', labelcolor='salmon')
+
+        ax2b = ax2.twinx()
+        ax2b.set_ylabel('Total Settled Amount (€)', color='darkgreen')
+        ax2b.plot(configs, settled_amount_means, 's-', color='darkgreen', markersize=8, label='Total Settled Amount')
+        ax2b.tick_params(axis='y', labelcolor='darkgreen')
+
+        # Improved y-axis scaling for settled amounts
+        if settled_amount_means:
+            all_values = [v for v in settled_amount_means if v > 0]
+            if all_values:
+                min_val = min(all_values) * 0.9
+                max_val = max(all_values) * 1.1
+                y_range = max_val - min_val
+                ax2b.set_ylim(min_val - 0.05 * y_range, max_val + 0.05 * y_range)
+
+        # Format y-axis labels for large numbers
+        def currency_formatter(x, pos):
+            if abs(x) >= 1e12:
+                return f'{x / 1e12:.1f}T'
+            elif abs(x) >= 1e9:
+                return f'{x / 1e9:.1f}B'
+            elif abs(x) >= 1e6:
+                return f'{x / 1e6:.1f}M'
+            else:
+                return f'{x:.0f}'
+
+        ax2b.yaxis.set_major_formatter(ticker.FuncFormatter(currency_formatter))
+
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        lines2b, labels2b = ax2b.get_legend_handles_labels()
+        ax2.legend(lines2 + lines2b, labels2 + labels2b, loc='lower right')
+
+        ax2.set_title('Confidence Intervals for Value Efficiency by Configuration')
+        ax2.grid(axis='y', linestyle='--', alpha=0.3)
+
+        # Common x-axis label
+        fig.text(0.5, 0.04, 'Configuration (Number of True Values in Partial)', ha='center')
+
+        plt.tight_layout()
+        plt.subplots_adjust(hspace=0.3, bottom=0.1)
+        plt.savefig(output_file, dpi=300)
+        plt.close()
+
+    def analyze_confidence_intervals(self, log_path, output_dir="confidence_intervals/"):
+        """
+        Analyze and visualize confidence intervals from log file
+
+        Args:
+            log_path: Path to the confidence intervals log file
+            output_dir: Directory to save visualizations
+        """
+        import os
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Parse the log file
+        instruction_data, value_data, settled_counts, settled_amount_data = self.parse_confidence_intervals(log_path)
+
+        if not instruction_data or not value_data:
+            print("No confidence interval data found in log file")
+            return
+
+        print(f"Found confidence interval data for {len(instruction_data)} configurations")
+
+        # Generate visualizations
+        self.plot_instruction_efficiency_with_ci(
+            instruction_data,
+            settled_counts,
+            os.path.join(output_dir, "instruction_efficiency_ci.png"),
+            "skyblue"
+        )
+
+        self.plot_value_efficiency_with_ci(
+            value_data,
+            settled_amount_data,
+            os.path.join(output_dir, "value_efficiency_ci.png"),
+            "salmon"
+        )
+
+        self.plot_combined_efficiency_with_ci(
+            instruction_data,
+            value_data,
+            settled_counts,
+            settled_amount_data,
+            os.path.join(output_dir, "combined_efficiency_ci.png")
+        )
+
+        print(f"Confidence interval visualizations created in {output_dir}")
 
 if __name__ == "__main__":
     # Create analyzer and run analysis
     print("Starting SettlementAnalyzer...")
     analyzer = SettlementAnalyzer()
-    analyzer.analyze_all("settlement_analysis/")
+    analyzer.analyze_all("partial_allowance_visualizations/")
