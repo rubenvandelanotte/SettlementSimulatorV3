@@ -56,7 +56,7 @@ class SettlementAnalyzer:
         # Get all jsonocel files
         depth_files = glob.glob(os.path.join(depth_stats_dir, "*.json"))
 
-        print(f"Found {len(depth_files)} .jsonocel files")
+        print(f"Found {len(depth_files)} .json files")
 
         if not depth_files:
             print(f"No statistics files found in {depth_stats_dir}")
@@ -392,7 +392,7 @@ class SettlementAnalyzer:
         df.to_csv(output_file, index=False)
         print(f"Summary table saved to {output_file}")
 
-    def analyze_all(self, output_base="partial_allowance_visualisations/", ci_log_path=None):
+    def analyze_all(self, output_base="partial_allowance_visualisations/", ci_log_path=r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_files\true_count_confidence_intervals.csv"):
         """
         Analyze all configurations individually and comparatively
 
@@ -412,7 +412,7 @@ class SettlementAnalyzer:
 
         # Generate RTP vs Batch visualizations
         self.analyze_rtp_vs_batch_from_logs(
-            log_folder="simulatie_logs",
+            log_folder="partial_allowance_logs",
             output_dir=os.path.join(output_base, "rtp_vs_batch")
         )
 
@@ -420,14 +420,14 @@ class SettlementAnalyzer:
         self.analyze_lateness_from_depth_stats(
             stats_folder="partial_allowance_depth",
             output_dir=os.path.join(output_base, "lateness"),
-            measurement_csv = "partial_allowance_depth/partial_allowance_final_results.csv"
+            measurement_csv = "partial_allowance_files/partial_allowance_final_results.csv"
         )
 
         # Generate runtime visualizations
         self.analyze_runtime(
-            runtime_file="partial_allowance_depth/runtime_partial_allowance.json",
+            runtime_file="partial_allowance_files/runtime_partial_allowance.json",
             output_dir=os.path.join(output_base, "runtime"),
-            measurement_csv="partial_allowance_depth/partial_allowance_final_results.csv"
+            measurement_csv="partial_allowance_files/partial_allowance_final_results.csv"
         )
 
         self.analyze_lateness_hours(
@@ -989,7 +989,7 @@ class SettlementAnalyzer:
 
     def analyze_lateness_from_depth_stats(self, stats_folder="partial_allowance_depth/",
                                           output_dir="partial_allowance_visualisations/lateness/",
-                                          measurement_csv="partial_allowance_depth/partial_allowance_final_results.csv"):
+                                          measurement_csv="partial_allowance_files/partial_allowance_final_results.csv"):
         """
         Analyze settlement lateness patterns using depth statistics files
 
@@ -1014,7 +1014,7 @@ class SettlementAnalyzer:
             print(f"Current working directory: {os.getcwd()}")
             return
 
-        stats_files = [f for f in os.listdir(stats_folder) if f.endswith(".json") and f.startswith("partial_allowance_depth")]
+        stats_files = [f for f in os.listdir(stats_folder) if f.endswith(".json") and f.startswith("depth_statistics")]
 
         if not stats_files:
             print(f"No depth statistics files found in {stats_folder}")
@@ -1403,8 +1403,8 @@ class SettlementAnalyzer:
 
         print(f"Settlement lateness visualizations created in {output_dir}")
 
-    def analyze_runtime(self, runtime_file="partial_allowance_depth/runtime_partial_allowance.json", output_dir="partial_allowance_visualisations/runtime/",
-                        measurement_csv="partial_allowance_depth/partial_allowance_final_results.csv"):
+    def analyze_runtime(self, runtime_file="partial_allowance_files/runtime_partial_allowance.json", output_dir="partial_allowance_visualisations/runtime/",
+                        measurement_csv="partial_allowance_files/partial_allowance_final_results.csv"):
         """
         Analyze and visualize runtime data from the runtime_results.json file
 
@@ -1584,8 +1584,8 @@ class SettlementAnalyzer:
 
                         # 5. Create scatter plot of runtime vs. efficiency metrics
                         metrics_to_plot = [
-                            ('instruction efficiency', 'Instruction Efficiency (%)', 'blue'),
-                            ('value efficiency', 'Value Efficiency (%)', 'green'),
+                            ('instruction_efficiency', 'Instruction Efficiency (%)', 'blue'),
+                            ('value_efficiency', 'Value Efficiency (%)', 'green'),
                         ]
 
                         for metric_col, metric_label, color in metrics_to_plot:
@@ -1632,8 +1632,8 @@ class SettlementAnalyzer:
                         plt.figure(figsize=(10, 8))
 
                         # Calculate correlation matrix
-                        corr_matrix = config_metrics[['runtime_seconds', 'instruction efficiency',
-                                                      'value efficiency', 'settled_count',
+                        corr_matrix = config_metrics[['runtime_seconds', 'instruction_efficiency',
+                                                      'value_efficiency', 'settled_count',
                                                       'settled_amount']].corr()
 
                         # Create heatmap
@@ -1661,9 +1661,9 @@ class SettlementAnalyzer:
                         color2 = 'tab:green'
                         color3 = 'tab:orange'
                         ax2.set_ylabel('Efficiency (%)')
-                        line2 = ax2.plot(config_metrics['config_num'], config_metrics['instruction efficiency'],
+                        line2 = ax2.plot(config_metrics['config_num'], config_metrics['instruction_efficiency'],
                                          's--', color=color2, linewidth=2, label='Instruction Efficiency')
-                        line3 = ax2.plot(config_metrics['config_num'], config_metrics['value efficiency'],
+                        line3 = ax2.plot(config_metrics['config_num'], config_metrics['value_efficiency'],
                                          '^:', color=color3, linewidth=2, label='Value Efficiency')
 
                         # Add data labels for runtime
