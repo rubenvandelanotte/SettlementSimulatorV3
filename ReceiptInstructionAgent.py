@@ -134,11 +134,11 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             )
             return (receipt_child_1, receipt_child_2)
         else:
-            self.model.log_event(
-                event_type="Partial Settlement Failed: Insufficient Funds",
-                object_ids=[self.uniqueID],
-                attributes={"status": self.status}
-            )
+            # self.model.log_event(
+            #     event_type="Partial Settlement Failed: Insufficient Funds",
+            #     object_ids=[self.uniqueID],
+            #     attributes={"status": self.status}
+            # )
             return (None, None)
 
     def match(self):

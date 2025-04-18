@@ -28,11 +28,11 @@ class TransactionAgent(Agent):
         )
 
         #new logging (I think this one should be removed)
-        self.model.log_event(
-            event_type="Transaction Created",
-            object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
-            attributes={"status": self.status}
-        )
+        # self.model.log_event(
+        #     event_type="Transaction Created",
+        #     object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+        #     attributes={"status": self.status}
+        # )
 
     def get_transactionID(self):
         return self.transactionID
