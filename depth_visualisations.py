@@ -762,122 +762,58 @@ class SettlementAnalyzer:
         import json
 
         os.makedirs(output_dir, exist_ok=True)
-
-        # Dictionary to store data for each configuration
         config_data = defaultdict(lambda: {"rtp": 0, "batch": 0})
 
-        # Find all log files (both CSV and JSONOCEL)
-        if not os.path.exists(log_folder):
-            print(f"Log directory '{log_folder}' does not exist!")
-            print(f"Current working directory: {os.getcwd()}")
-            return
-
-        # Try to find JSONOCEL files first
-        log_files = [f for f in os.listdir(log_folder) if f.endswith(".jsonocel") and "simulation" in f]
+        # Find all JSONOCEL files
+        log_files = [f for f in os.listdir(log_folder) if f.endswith(".jsonocel")]
 
         if not log_files:
-            # Also look for simplified JSON files
-            log_files = [f for f in os.listdir(log_folder) if f.endswith(".json") and "simplified" in f]
-
-        if not log_files:
-            print(f"No suitable log files found in {log_folder}")
-            print(f"Files in directory: {os.listdir(log_folder)}")
+            print(f"No JSONOCEL files found in {log_folder}")
             return
 
-        print(f"Found {len(log_files)} log files for analysis")
+        print(f"Found {len(log_files)} JSONOCEL files for analysis")
 
         # Process each log file
-        settlements_found = False
-
         for log_file in log_files:
             # Extract configuration number from filename
-            try:
-                import re
-                config_match = re.search(r'config(\d+)', log_file)
-                if config_match:
-                    config_num = int(config_match.group(1))
-                    config_name = f"Config {config_num}"
-                else:
-                    config_name = log_file.split('.')[0]  # Fallback
-            except Exception as e:
-                print(f"Error extracting config number from {log_file}: {e}")
-                config_name = log_file.split('.')[0]
+            parts = log_file.split("_")
+            if len(parts) >= 3 and parts[0] == "simulation" and parts[1].startswith("config"):
+                config_num = int(parts[1].replace("config", ""))
+                config_name = f"Config {config_num}"
+            else:
+                continue
 
             try:
-                # Open and process the file
-                with open(os.path.join(log_folder, log_file), 'r', encoding='utf-8') as f:
-                    # Check file format based on extension
-                    if log_file.endswith('.jsonocel'):
-                        # Process JSONOCEL format
-                        log_data = json.load(f)
+                # Load JSONOCEL data
+                with open(os.path.join(log_folder, log_file), 'r') as f:
+                    log_data = json.load(f)
 
-                        # Handle OCEL events
-                        if "ocel:events" in log_data:
-                            events = log_data["ocel:events"]
-                            for event_id, event in events.items():
-                                activity = event.get("ocel:activity", "")
-                                if "Settled" in activity:
-                                    settlements_found = True
-                                    timestamp_str = event.get("ocel:timestamp", "")
+                # Extract events from the file - this is the key part to fix
+                events = log_data.get("events", [])
 
-                                    if timestamp_str:
-                                        try:
-                                            timestamp = datetime.fromisoformat(
-                                                timestamp_str.replace('Z', '+00:00').replace('T', ' '))
-                                            event_time = timestamp.time()
+                # Process each event
+                for event in events:
+                    event_type = event.get("type", "")
 
-                                            # Determine if RTP or Batch based on time of day
-                                            if time(1, 30) <= event_time <= time(19, 30):
-                                                config_data[config_name]["rtp"] += 1
-                                            else:
-                                                config_data[config_name]["batch"] += 1
-                                        except Exception as e:
-                                            print(f"Error parsing timestamp '{timestamp_str}': {e}")
+                    # Check if this is a settlement event
+                    if event_type in ["Settled On Time", "Settled Late"]:
+                        timestamp_str = event.get("time", "")
 
-                        # Handle alternative format with events array
-                        elif "events" in log_data:
-                            events = log_data["events"]
-                            for event in events:
-                                event_type = event.get("type", "")
-                                if "Settled" in event_type:
-                                    settlements_found = True
-                                    timestamp_str = event.get("timestamp", "")
+                        if timestamp_str:
+                            try:
+                                # Parse the timestamp
+                                timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                                event_time = timestamp.time()
 
-                                    if timestamp_str:
-                                        try:
-                                            timestamp = datetime.fromisoformat(
-                                                timestamp_str.replace('Z', '+00:00').replace('T', ' '))
-                                            event_time = timestamp.time()
-
-                                            # Determine if RTP or Batch
-                                            if time(1, 30) <= event_time <= time(19, 30):
-                                                config_data[config_name]["rtp"] += 1
-                                            else:
-                                                config_data[config_name]["batch"] += 1
-                                        except Exception as e:
-                                            print(f"Error parsing timestamp '{timestamp_str}': {e}")
-
-                    elif log_file.endswith('.json'):
-                        # Handle simplified JSON format
-                        log_data = json.load(f)
-
-                        # Look for settlement data in the simplified format
-                        if "results" in log_data and "settled_count" in log_data["results"]:
-                            settlements_found = True
-
-                            # Since simplified format may not have RTP vs batch data,
-                            # we'll make a rough estimate based on typical patterns
-                            settled_count = log_data["results"]["settled_count"]
-                            # Assume 70% RTP, 30% batch as a default pattern
-                            config_data[config_name]["rtp"] += int(settled_count * 0.7)
-                            config_data[config_name]["batch"] += int(settled_count * 0.3)
-
+                                # Check if it's RTP (trading hours) or Batch time
+                                if time(1, 30) <= event_time <= time(19, 30):
+                                    config_data[config_name]["rtp"] += 1
+                                elif event_time >= time(22, 0):
+                                    config_data[config_name]["batch"] += 1
+                            except Exception as e:
+                                print(f"Error parsing timestamp {timestamp_str}: {e}")
             except Exception as e:
                 print(f"Error processing file {log_file}: {e}")
-
-        if not settlements_found:
-            print("No settlement events found in the log files.")
-            return
 
         # Create visualizations if we have data
         if not config_data or all(sum(data.values()) == 0 for data in config_data.values()):
@@ -1451,7 +1387,7 @@ class SettlementAnalyzer:
                     config_num = int(config_match.group(1))
 
                     # Extract runtime
-                    execution_time = record.get("execution_info", {}).get("execution_time_seconds", 0)
+                    execution_time = record.get("execution_time_seconds", 0)
 
                     # Store in appropriate data structures
                     config_runtimes[config_num].append(execution_time)
