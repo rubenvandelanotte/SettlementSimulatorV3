@@ -14,8 +14,8 @@ class MinSettlementAmountVisualizer:
     Focuses on comparing different minimum settlement percentage configurations averaged across runs.
     """
 
-    def __init__(self, results_csv="min_settlement_files/min_settlement_amount_final_results.csv",
-                 output_dir="min_settlement_visualizations"):
+    def __init__(self, results_csv="min_amount_files/min_settlement_amount_final_results.csv",
+                 output_dir="min_amount_visualizations"):
         """
         Initialize the visualizer with the path to the results CSV file.
 

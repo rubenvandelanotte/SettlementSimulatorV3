@@ -14,7 +14,7 @@ class MaxDepthVisualizer:
     Focuses on comparing different max child depth configurations averaged across runs.
     """
 
-    def __init__(self, results_csv = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\max_depth_stats\max_child_depth_final_results.csv"
+    def __init__(self, results_csv = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\max_depth_files\max_child_depth_final_results.csv"
 , output_dir="max_depth_visualizations"):
         """
         Initialize the visualizer with the path to the results CSV file.
