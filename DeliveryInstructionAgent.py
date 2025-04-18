@@ -199,7 +199,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
 
             #new logging
             self.model.log_event(
-                event_type="Cancelled due to Timeout",
+                event_type="Cancelled due to timeout",
                 object_ids=[self.uniqueID],
                 attributes={"status": "Cancelled due to timeout"}
             )
@@ -213,7 +213,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
 
             #new logging
             self.model.log_event(
-                event_type="Cancelled due to Timeout",
+                event_type="Cancelled due to timeout",
                 object_ids=[self.uniqueID, self.linkedTransaction.receiver.uniqueID, self.linkedTransaction.transactionID],
                 attributes={"status": "Cancelled due to timeout"}
             )
