@@ -347,7 +347,7 @@ def run_partial_allowance_analysis(runs_per_config=10, base_seed=42):
     return efficiencies
 
 
-def run_max_child_depth_analysis(depths_to_test=[3, 5, 10], runs_per_config=5, base_seed=42):
+def run_max_child_depth_analysis(depths_to_test=[3, 5, 10], runs_per_config=20, base_seed=42):
     """
     Run analysis to test different maximum child depths.
 
@@ -661,7 +661,7 @@ def run_min_settlement_amount_analysis(percentages_to_test=[0.025, 0.05, 0.1], r
     # Create folders for logs
     log_folder = "min_amount_logs"
     depth_folder = "min_amount_stats"
-    folder = "min_settlement_files"
+    folder = "min_amount_files"
     ensure_directory(log_folder)
     ensure_directory(depth_folder)
 
