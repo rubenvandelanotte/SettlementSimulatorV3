@@ -347,7 +347,7 @@ def run_partial_allowance_analysis(runs_per_config=10, base_seed=42):
     return efficiencies
 
 
-def run_max_child_depth_analysis(depths_to_test=[3, 5, 10], runs_per_config=20, base_seed=42):
+def run_max_child_depth_analysis(depths_to_test=[3, 8, 15], runs_per_config=20, base_seed=42):
     """
     Run analysis to test different maximum child depths.
 
@@ -1043,6 +1043,7 @@ def analyze_results_with_confidence_intervals(results_df, group_column, output_f
         print(f"Error saving confidence intervals to CSV: {str(e)}")
 
     return results
+
 
 
 # Main entry point

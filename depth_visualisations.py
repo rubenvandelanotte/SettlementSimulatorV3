@@ -734,7 +734,7 @@ class SettlementAnalyzer:
         self._compare_depth_distributions(os.path.join(output_dir, "depth_distribution_comparison.png"))
         self._generate_summary_table(os.path.join(output_dir, "summary.csv"))
 
-        # New additional comparisons
+        # New additional comparisons.
         self.compare_settlement_times(os.path.join(output_dir, "settlement_times_comparison.png"))
         self.compare_depth_completion_rates(os.path.join(output_dir, "depth_completion_rates.png"))
         self.compare_status_distributions(os.path.join(output_dir, "status_distribution_comparison.png"))
