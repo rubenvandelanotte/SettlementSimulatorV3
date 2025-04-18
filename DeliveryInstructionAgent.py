@@ -114,7 +114,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             self.model.instructions.append(delivery_child_2)
             self.model.log_event(
                 event_type="Delivery Children Created",
-                object_ids=[delivery_child_1.uniqueID, delivery_child_2.uniqueID, self.uniqueID],
+                object_ids=[self.uniqueID],
                 attributes={"parentInstructionID": self.uniqueID,
                             "parent_depth": self.depth,
                             "child1_depth": self.depth +1,
