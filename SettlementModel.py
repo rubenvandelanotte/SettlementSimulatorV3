@@ -3,7 +3,7 @@ from mesa import Model
 from datetime import datetime, timedelta
 import pandas as pd
 from sympy.physics.units import seconds
-
+import math
 import InstitutionAgent
 import Account
 import random
@@ -30,7 +30,7 @@ class SettlementModel(Model):
         self.max_total_accounts = 10
         self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
         self.min_settlement_percentage = 0.05
-        self.max_child_depth = 10
+        self.max_child_depth = 15
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
         self.log_only_main_events= True
@@ -63,8 +63,12 @@ class SettlementModel(Model):
         self.transactions = []
 
         #mini batching
-        self.mini_batch_times = [timedelta(hours=h, minutes=m) for h in range(2, 19) for m in [0, 30]] + [
-            timedelta(hours=19, minutes=0)]
+        self.mini_batch_times = [
+                                    timedelta(hours=h, minutes=m)
+                                    for h in range(2, 19)
+                                    for m in range(0, 60, 20)
+                                ] + [timedelta(hours=19, minutes=0)]
+
         self.mini_batches_processed = set()
 
         # Instruction indices for fast lookup
@@ -124,19 +128,16 @@ class SettlementModel(Model):
         random_time = self.simulation_start + timedelta(seconds=random_seconds)
         return random_time  # Now returns a datetime object
 
-
-
     def sample_instruction_amount(self):
         """
-        Samples an instruction amount (in EUR) based on a two-point mixture distribution.
-        With probability ~88% return a 'low' amount (around €20 million, ±10% noise),
-        and with probability ~12% return a 'high' amount (around €2.57 billion, ±5% noise)
-        so that overall: mean ≈ €324M, std ≈ €829M, and median ≈ €20M.
+        Samples an instruction amount (in EUR) from a log-normal distribution
+        that approximates the mean (€324M), std (€829M), and median (€20M)
+        of the original two-point distribution.
         """
-        if random.random() < 0.881:
-            return int(random.uniform(18e6, 22e6))
-        else:
-            return int(random.uniform(2.45e9, 2.70e9))
+        mu = 18.5857  # ln(median)
+        sigma = 1.42166  # controls skewness and std
+        amount = random.lognormvariate(mu, sigma)
+        return int(amount)
 
     def generate_data(self):
         print("Generate Accounts & Institutions:")
@@ -151,7 +152,7 @@ class SettlementModel(Model):
             new_cash_accountID = generate_iban()
             new_cash_accountType = "Cash"
             new_cash_balance =  int(random.uniform(6e9, 9e9))  # Increased balance range
-            new_cash_creditLimit = int(random.uniform(0.25, 1))*new_cash_balance
+            new_cash_creditLimit = 0.1*new_cash_balance
             new_cash_Account = Account.Account(accountID=new_cash_accountID, accountType= new_cash_accountType, balance= new_cash_balance, creditLimit=new_cash_creditLimit)
             inst_accounts.append(new_cash_Account)
             self.accounts.append(new_cash_Account)
@@ -169,7 +170,7 @@ class SettlementModel(Model):
                 new_security_accountID = generate_iban()
                 new_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
 
-                new_security_balance = int(random.uniform(600e7, 900e7))
+                new_security_balance = int(random.uniform(60e7, 90e7))
                 new_security_creditLimit = 0
                 new_security_Account = Account.Account(accountID=new_security_accountID, accountType= new_security_accountType, balance= new_security_balance, creditLimit= new_security_creditLimit)
                 inst_accounts.append(new_security_Account)
@@ -391,9 +392,9 @@ class SettlementModel(Model):
             amount_cache (dict): Dictionary mapping instruction IDs to their amounts
 
         Returns:
-            float: Total settled amount from all descendants
+            int: Total settled amount from all descendants
         """
-        total = 0.0
+        total = 0
         processed = set()
 
         # Start with direct children of parent
