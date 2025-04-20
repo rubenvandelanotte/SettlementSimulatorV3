@@ -14,7 +14,23 @@ class TransactionAgent(Agent):
         self.transactionID = transactionID
         self.deliverer = deliverer
         self.receiver = receiver
+
+
+
+
         self.status = status
+        if self.deliverer.get_amount() != self.receiver.get_amount():
+            self.status = "Cancelled due to error"
+            self.model.log_event(
+                event_type="Transaction Creation Failed: Instruction Amount Mismatch",
+                object_ids=[self.deliverer.uniqueID, self.receiver.uniqueID],
+                attributes={
+                    "deliverer_amount": self.deliverer.get_amount(),
+                    "receiver_amount": self.receiver.get_amount(),
+                    "status": self.status
+                }
+            )
+            return
 
 
         self.model.log_object(
@@ -34,6 +50,8 @@ class TransactionAgent(Agent):
         #     attributes={"status": self.status}
         # )
 
+
+
     def get_transactionID(self):
         return self.transactionID
 
@@ -46,6 +64,7 @@ class TransactionAgent(Agent):
     # --- Final Merged and Optimized settle() Method ---
     def settle(self):
         # Unified logging - new format
+
         self.model.log_event(
             event_type="Attempting to Settle",
             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
@@ -54,6 +73,19 @@ class TransactionAgent(Agent):
 
 
         if self.deliverer.get_status() == "Matched" and self.receiver.get_status() == "Matched" and self.status == "Matched":
+            if self.deliverer.get_amount() != self.receiver.get_amount():
+                self.model.log_event(
+                    event_type="Settlement Failed: Instruction Amount Mismatch",
+                    object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+                    attributes={
+                        "deliverer_amount": self.deliverer.get_amount(),
+                        "receiver_amount": self.receiver.get_amount(),
+                        "status": self.status
+                    }
+                )
+                return
+
+
 
             if (self.deliverer.securitiesAccount.checkBalance(self.deliverer.get_amount(),
                                                               self.deliverer.get_securityType())
@@ -79,6 +111,11 @@ class TransactionAgent(Agent):
                         self.deliverer.set_status("Cancelled due to error")
                         self.receiver.set_status("Cancelled due to error")
                         self.status = "Cancelled due to error"
+
+                        print(f"[ERROR] Mismatch in settlement for {self.transactionID}:")
+                        print(f"  Delivered securities: {delivered_securities}, Received securities: {received_securities}")
+                        print(f"  Delivered cash: {delivered_cash}, Received cash: {received_cash}")
+                        print(f"  Expected amount: {self.deliverer.get_amount()} vs {self.receiver.get_amount()}")
 
                         self.model.log_event(
                             event_type="Cancelled due to error",
@@ -147,6 +184,40 @@ class TransactionAgent(Agent):
                         #new implementation:
                         delivery_child_1, delivery_child_2 = delivery_children
                         receipt_child_1, receipt_child_2 = receipt_children
+
+                        # Synchronize amounts for the first child
+                        min_amount = min(delivery_child_1.get_amount(), receipt_child_1.get_amount())
+                        delivery_child_1.amount = min_amount
+                        receipt_child_1.amount = min_amount
+
+                        # Validate matching before creating child transaction
+                        if delivery_child_1.get_amount() != receipt_child_1.get_amount():
+                            self.model.log_event(
+                                event_type="Child Transaction Aborted: Amount Mismatch",
+                                object_ids=[delivery_child_1.uniqueID, receipt_child_1.uniqueID],
+                                attributes={
+                                    "delivery_amount": delivery_child_1.get_amount(),
+                                    "receipt_amount": receipt_child_1.get_amount()
+                                }
+                            )
+                            return
+
+                            # --- Sync and verify second child pair ---
+
+                        min_amount_2 = min(delivery_child_2.get_amount(), receipt_child_2.get_amount())
+                        delivery_child_2.amount = min_amount_2
+                        receipt_child_2.amount = min_amount_2
+
+                        if delivery_child_2.get_amount() != receipt_child_2.get_amount():
+                            self.model.log_event(
+                                event_type="Child Transaction Aborted: Amount Mismatch",
+                                object_ids=[delivery_child_2.uniqueID, receipt_child_2.uniqueID],
+                                attributes={
+                                    "delivery_amount": delivery_child_2.get_amount(),
+                                    "receipt_amount": receipt_child_2.get_amount()
+                                }
+                            )
+                            return
 
                         child_transaction_1 = TransactionAgent(
                             model=self.model,
