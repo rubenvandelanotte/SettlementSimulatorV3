@@ -75,7 +75,7 @@ class TransactionAgent(Agent):
                     if delivery_children == (None, None) or receipt_children == (None, None):
                         self.model.log_event(
                             event_type="Partial Settlement Aborted",
-                            object_ids=[self.transactionID],
+                            object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                             attributes={"status": self.status}
                         )
                         return
