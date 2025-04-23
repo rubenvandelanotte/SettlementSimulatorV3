@@ -28,7 +28,7 @@ class SettlementModel(Model):
         self.num_institutions = 10
         self.min_total_accounts = 4
         self.max_total_accounts = 10
-        self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
+        self.simulation_duration_days = 5 #number of measured days (so simulation is longer)
         self.min_settlement_percentage = 0.05
         self.max_child_depth = 15
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
@@ -474,7 +474,7 @@ class SettlementModel(Model):
             elif (pair[0].get_status() == "Cancelled due to partial settlement" and
                   pair[1].get_status() == "Cancelled due to partial settlement"):
                 # Recursively sum settled amounts from child instructions (and their descendants).
-                settled_child_value = (self.get_recursive_settled_amount(parent_instruction=pair[0],instruction_pool=relevant_instructions,depth=0))
+                settled_child_value = (self.get_recursive_settled_amount(parent_instruction=pair[0],instruction_pool=relevant_instructions))
                 # The effective settled amount is capped at the intended amount.
                 effective_settled = min(settled_child_value, intended_amount)
                 total_settled_value += effective_settled
