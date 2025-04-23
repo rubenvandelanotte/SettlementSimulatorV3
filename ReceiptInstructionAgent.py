@@ -104,13 +104,13 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                                 )
 
             # add children to fast lookup list
-            if receipt_child_1.linkcode not in self.model.validated_receipt_instructions:
-                self.model.validated_receipt_instructions[receipt_child_1.get_linkcode] = []
-            self.model.validated_receipt_instructions[receipt_child_1.get_linkcode].append(receipt_child_1)
+            if receipt_child_1.get_linkcode() not in self.model.validated_receipt_instructions:
+                self.model.validated_receipt_instructions[receipt_child_1.get_linkcode()] = []
+            self.model.validated_receipt_instructions[receipt_child_1.get_linkcode()].append(receipt_child_1)
 
-            if receipt_child_2.linkcode not in self.model.validated_receipt_instructions:
-                self.model.validated_receipt_instructions[receipt_child_2.get_linkcode] = []
-            self.model.validated_receipt_instructions[receipt_child_2.get_linkcode].append(receipt_child_2)
+            if receipt_child_2.get_linkcode() not in self.model.validated_receipt_instructions:
+                self.model.validated_receipt_instructions[receipt_child_2.get_linkcode()] = []
+            self.model.validated_receipt_instructions[receipt_child_2.get_linkcode()].append(receipt_child_2)
 
             #ensures that the intended_settlement_time of children = mother
             receipt_child_1.set_intended_settlement_date(self.get_intended_settlement_date())
