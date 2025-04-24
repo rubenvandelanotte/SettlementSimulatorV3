@@ -75,6 +75,9 @@ class InstructionAgent (Agent):
         """Returns the amount of securities or cash involved in the instruction."""
         return self.amount
 
+    def set_amount(self, new_amount:str):
+        self.amount = new_amount
+
     def get_isChild(self):
         """Returns whether the instruction is a child instruction."""
         return self.isChild

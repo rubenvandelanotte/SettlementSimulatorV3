@@ -72,7 +72,12 @@ class TransactionAgent(Agent):
                     delivery_children = self.deliverer.createDeliveryChildren()
                     receipt_children = self.receiver.createReceiptChildren()
 
-                    if delivery_children == (None, None) or receipt_children == (None, None):
+
+
+                    delivery_child_1, delivery_child_2 = delivery_children
+                    receipt_child_1, receipt_child_2 = receipt_children
+
+                    if None in (delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2):
                         self.model.log_event(
                             event_type="Partial Settlement Aborted",
                             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
@@ -80,17 +85,17 @@ class TransactionAgent(Agent):
                         )
                         return
 
-                    delivery_child_1, delivery_child_2 = delivery_children
-                    receipt_child_1, receipt_child_2 = receipt_children
 
                     # ✨ Sync child amounts to prevent mismatch
                     min_amount_1 = min(delivery_child_1.get_amount(), receipt_child_1.get_amount())
-                    delivery_child_1.amount = min_amount_1
-                    receipt_child_1.amount = min_amount_1
+                    delivery_child_1.set_amount(min_amount_1)
+                    receipt_child_1.set_amount(min_amount_1)
 
-                    min_amount_2 = min(delivery_child_2.get_amount(), receipt_child_2.get_amount())
-                    delivery_child_2.amount = min_amount_2
-                    receipt_child_2.amount = min_amount_2
+                    #ensure that sum of amounts of 2 child transactions equals parent that will be cancelled
+
+                    min_amount_2 = self.deliverer.get_amount() - min_amount_1
+                    delivery_child_2.set_amount(min_amount_2)
+                    receipt_child_2.set_amount(min_amount_2)
 
                     # ✨ Recursively create and settle children
                     child_transaction_1 = TransactionAgent(
@@ -126,6 +131,8 @@ class TransactionAgent(Agent):
 
                     self.cancel_partial()
                     return
+
+
 
                 # ✨ Fallback to retry if not enough funds
                 self.status = "Settlement Failed: Insufficient Funds"
