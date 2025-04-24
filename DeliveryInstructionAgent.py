@@ -96,8 +96,8 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
 
             #add children to fast lookup list
             if delivery_child_1.get_linkcode() not in self.model.validated_delivery_instructions:
-                self.model.validated_delivery_instructions[delivery_child_1.get_linkcode] = []
-            self.model.validated_delivery_instructions[delivery_child_1.get_linkcode].append(delivery_child_1)
+                self.model.validated_delivery_instructions[delivery_child_1.get_linkcode()] = []
+            self.model.validated_delivery_instructions[delivery_child_1.get_linkcode()].append(delivery_child_1)
 
             if delivery_child_2.get_linkcode() not in self.model.validated_delivery_instructions:
                 self.model.validated_delivery_instructions[delivery_child_2.get_linkcode()] = []
