@@ -79,16 +79,30 @@ class TransactionAgent(Agent):
 
                     if None in (delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2):
 
+                        # Clean up created children
+                        for child in [delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2]:
+                            if child is not None:
+                                # Remove from model agent list and instruction list
+                                self.model.agents.remove(child)
+                                if child in self.model.instructions:
+                                    self.model.instructions.remove(child)
+
+                                # Remove from validated instruction dict
+                                linkcode_dict = (
+                                    self.model.validated_delivery_instructions
+                                    if isinstance(child, DeliveryInstructionAgent.DeliveryInstructionAgent)
+                                    else self.model.validated_receipt_instructions
+                                )
+                                if child.get_linkcode() in linkcode_dict:
+                                    if child in linkcode_dict[child.get_linkcode()]:
+                                        linkcode_dict[child.get_linkcode()].remove(child)
 
                         self.model.log_event(
                             event_type="Partial Settlement Aborted",
                             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                             attributes={"status": self.status}
                         )
-                        self.model.agents.remove(delivery_child_1)
-                        self.model.agents.remove(delivery_child_2)
-                        self.model.agents.remove(receipt_child_1)
-                        self.model.agents.remove(receipt_child_2)
+
                         return
 
 
