@@ -47,12 +47,12 @@ class Account:
         #if cash account
         if self.accountType == securityType and self.accountType == "Cash":
             #check whether this account used credit already: condition only satisfies if usedCredit ==0
-            if self.creditLimit == (self.creditLimit - self.usedCredit):
+            if self.usedCredit == 0:
                 self.balance = self.balance + amount
                 self.set_newSecurities(True)
                 return amount
 
-            elif self.creditLimit != self.creditLimit - self.usedCredit:
+            elif self.usedCredit != 0:
                 #credit used so far, meaning balance should be 0 and credit used for self.usedCredit
                 if self.usedCredit >= amount:
                     #reset the used credit with the amount
