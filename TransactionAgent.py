@@ -79,7 +79,7 @@ class TransactionAgent(Agent):
 
                     if None in (delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2):
 
-                        # Clean up created children
+                        # Clean up created children in case that not all children where created successfully
                         for child in [delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2]:
                             if child is not None:
                                 # Remove from model agent list and instruction list
