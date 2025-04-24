@@ -83,7 +83,8 @@ class TransactionAgent(Agent):
                         for child in [delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2]:
                             if child is not None:
                                 # Remove from model agent list and instruction list
-                                self.model.agents.remove(child)
+                                if child in self.model.agents:
+                                    self.model.agents.remove(child)
                                 if child in self.model.instructions:
                                     self.model.instructions.remove(child)
 
