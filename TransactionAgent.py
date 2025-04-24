@@ -78,11 +78,17 @@ class TransactionAgent(Agent):
                     receipt_child_1, receipt_child_2 = receipt_children
 
                     if None in (delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2):
+
+
                         self.model.log_event(
                             event_type="Partial Settlement Aborted",
                             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                             attributes={"status": self.status}
                         )
+                        self.model.agents.remove(delivery_child_1)
+                        self.model.agents.remove(delivery_child_2)
+                        self.model.agents.remove(receipt_child_1)
+                        self.model.agents.remove(receipt_child_2)
                         return
 
 
