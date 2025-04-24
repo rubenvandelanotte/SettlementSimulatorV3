@@ -28,7 +28,7 @@ class SettlementModel(Model):
         self.num_institutions = 10
         self.min_total_accounts = 4
         self.max_total_accounts = 10
-        self.simulation_duration_days = 5 #number of measured days (so simulation is longer)
+        self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
         self.min_settlement_percentage = 0.05
         self.max_child_depth = 15
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
@@ -612,7 +612,7 @@ class SettlementModel(Model):
         Returns:
             int: The total count of settled instructions, includes mothers & children
         """
-        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         return sum(1 for inst in relevant_instructions if inst.get_status() in ["Settled on time", "Settled late"])
 
     def get_total_settled_amount(self):
@@ -624,7 +624,7 @@ class SettlementModel(Model):
         Returns:
             int: The total settled amount
         """
-        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         total_settled_amount = 0
 
         # First, add amounts from directly settled instructions
@@ -636,51 +636,51 @@ class SettlementModel(Model):
 
 
 
-    def print_settlement_efficiency(self):
-        """
-        Quickly prints the settlement efficiency metrics.
-        """
-        instruction_eff, value_eff = self.calculate_settlement_efficiency()
-        print("Settlement Efficiency:")
-        print("  Instruction Efficiency: {:.2f}%".format(instruction_eff))
-        print("  Value Efficiency: {:.2f}%".format(value_eff))
+    #def print_settlement_efficiency(self):
+    #    """
+    #    Quickly prints the settlement efficiency metrics.
+    #    """
+    #    instruction_eff, value_eff = self.calculate_settlement_efficiency()
+    #    print("Settlement Efficiency:")
+    #    print("  Instruction Efficiency: {:.2f}%".format(instruction_eff))
+    #    print("  Value Efficiency: {:.2f}%".format(value_eff))
 
-    def save_settlement_efficiency_to_csv(self, filename="settlement_efficiency.csv"):
-        """
-        Saves the settlement efficiency metrics to a CSV file.
-        """
-        instruction_eff, value_eff = self.calculate_settlement_efficiency()
-        data = [
-            {"Metric": "Instruction Efficiency (%)", "Value": round(instruction_eff, 2)},
-            {"Metric": "Value Efficiency (%)", "Value": round(value_eff, 2)}
-        ]
-        df = pd.DataFrame(data)
-        df.to_csv(filename, index=False)
-        print(f"Settlement efficiency metrics saved to {filename}")
+    #def save_settlement_efficiency_to_csv(self, filename="settlement_efficiency.csv"):
+    #    """
+    #    Saves the settlement efficiency metrics to a CSV file.
+    #    """
+    #    instruction_eff, value_eff = self.calculate_settlement_efficiency()
+    #    data = [
+    #        {"Metric": "Instruction Efficiency (%)", "Value": round(instruction_eff, 2)},
+    #        {"Metric": "Value Efficiency (%)", "Value": round(value_eff, 2)}
+    #    ]
+    #    df = pd.DataFrame(data)
+    #    df.to_csv(filename, index=False)
+    #    print(f"Settlement efficiency metrics saved to {filename}")
 
 
 
     def get_avg_instruction_age_before_settlement(self):
-        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         settled = [inst for inst in relevant_instructions if inst.get_status() in ["Settled on time", "Settled late"]]
         ages = [(self.simulated_time - inst.get_creation_time()).total_seconds() / 3600 for inst in settled]
         return round(sum(ages) / len(ages), 2) if ages else 0
 
     def get_original_pair_count(self):
-        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
         return len(mothers) // 2  # 2 instructions per pair
 
     def get_partial_settlement_count(self):
-        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         return sum(1 for inst in relevant_instructions if inst.get_status() == "Cancelled due to partial settlement")
 
     def get_error_cancellation_count(self):
-        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         return sum(1 for inst in relevant_instructions if inst.get_status() == "Cancelled due to error")
 
     def get_average_tree_depth(self):
-        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
 
         def get_depth(inst):
@@ -698,7 +698,7 @@ class SettlementModel(Model):
         Generate statistics about instruction depth distribution for process mining visualization.
         """
         # Dictionary to store counts by depth
-        relevant_instructions = self.get_main_period_mothers_and_descendants()
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         depth_counts = {}
         # Dictionary to store counts by depth and status
         depth_status_counts = {}
