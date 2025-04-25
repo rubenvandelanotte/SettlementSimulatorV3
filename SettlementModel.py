@@ -80,6 +80,10 @@ class SettlementModel(Model):
         self.event_counter = 1
         self.event_log = []  # List to store OCEL events => probably redudant
 
+        # Add a cache for relevant instructions
+        self.relevant_instructions_cache = None
+        self.relevant_instructions_id_set = None
+        self.last_cache_update = None
 
         self.partial_cancelled_count = 0
 
@@ -103,24 +107,34 @@ class SettlementModel(Model):
                         for k, v in attributes.items()]
         self.logger.log_object(oid=object_id, otype=object_type, attributes=attributes_list)
 
+    def get_relevant_instructions(self):
+        """
+        Returns the cached set of relevant instructions, refreshing every step.
+        This includes instructions created in the main period and their descendants.
+        """
+        current_step = self.steps if hasattr(self, 'steps') else 0
+
+        # Refresh cache every step for maximum accuracy
+        if (self.relevant_instructions_cache is None or
+                self.last_cache_update is None or
+                current_step != self.last_cache_update):
+            # Use the existing optimized method
+            self.relevant_instructions_cache = self.get_main_period_mothers_and_descendants_optimized()
+
+            # Create a set of IDs for O(1) lookups
+            self.relevant_instructions_id_set = {inst.get_uniqueID() for inst in self.relevant_instructions_cache}
+
+            # Update the timestamp
+            self.last_cache_update = current_step
+
+        return self.relevant_instructions_cache, self.relevant_instructions_id_set
+
     def should_log_event(self, object_ids=None, creation_time=None):
         """
-        Determines if an event should be logged based on:
-        1. If log_only_main_events is False, never log
-        2. If the current time is in the main period, log
-        3. If any of the objects (instructions) were created in the main period, log
-        4. If the instruction was created in warmup but finishes in the main period
-        5. If the instruction was created in the main period and finishes in the cooldown period
-p
-        Args:
-            object_ids: List of object IDs involved in the event
-            creation_time: Optional creation time if not using object IDs
-
-        Returns:
-            Boolean indicating whether the event should be logged
+        Uses the cached relevant instructions for efficient checking.
         """
         if not self.log_only_main_events:
-            return False
+            return True
 
         # Define period boundaries
         main_start = self.simulation_start + self.warm_up_period
@@ -132,27 +146,15 @@ p
 
         # If we have a specific creation time to check
         if creation_time is not None:
-            # Created in main period
-            if main_start <= creation_time <= main_end:
-                return True
+            return main_start <= creation_time <= main_end
 
-        # For events related to instructions
+        # Get the cached set of relevant instruction IDs (O(1) lookups)
+        _, relevant_ids = self.get_relevant_instructions()
+
+        # Check if any of the object IDs are in our relevant set
         if object_ids:
-            for obj_id in object_ids:
-                # Check if this is an instruction ID
-                for inst in self.instructions:
-                    if inst.get_uniqueID() == obj_id:
-                        # Case 1: Created in main period (finishes any time)
-                        if main_start <= inst.get_creation_time() <= main_end:
-                            return True
-
-                        # Case 2: Created in warmup, but current time (finishing) is in main period
-                        if inst.get_creation_time() < main_start and main_start <= self.simulated_time <= main_end:
-                            return True
-
-                        # Case 3: Created in main period, but current time (finishing) is in cooldown
-                        if main_start <= inst.get_creation_time() <= main_end and self.simulated_time > main_end:
-                            return True
+            # Fast set intersection check
+            return any(obj_id in relevant_ids for obj_id in object_ids)
 
         return False
 
