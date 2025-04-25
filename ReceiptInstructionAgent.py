@@ -207,7 +207,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
 
     def cancel_timeout(self):
         if self.status == "Exists" or self.status == "Pending" or self.status == "Validated":
-            self.status = "Cancelled due to timeout"
+            self.set_status("Cancelled due to timeout")
             self.model.agents.remove(self)
 
             #new logging
@@ -218,7 +218,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             )
 
         if self.status == "Matched":
-            self.status = "Cancelled due to timeout"
+            self.set_status("Cancelled due to timeout")
             self.linkedTransaction.deliverer.set_status("Cancelled due to timeout")
             self.linkedTransaction.set_status("Cancelled due to timeout")
             #new logging
