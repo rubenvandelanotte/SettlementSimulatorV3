@@ -66,7 +66,7 @@ class TransactionAgent(Agent):
             attributes={"status": self.status, "retry": self.retry_count}  # ✨ Log retry count
         )
 
-        if self.deliverer.get_status() in ["Matched", "Settlement Failed: Insufficient Funds"] and self.receiver.get_status() in ["Matched", "Settlement Failed: Insufficient Funds"] and self.status in ["Matched", "Settlement Failed: Insufficient Funds"]:
+        if self.deliverer.get_status() in ["Matched"] and self.receiver.get_status() in ["Matched"] and self.status in ["Matched"]:
 
             # ✨ Pre-transfer check to avoid partial mutations
             if not (
@@ -156,9 +156,7 @@ class TransactionAgent(Agent):
                     return
 
                 # ✨ Fallback to retry if not enough funds
-                self.status = "Settlement Failed: Insufficient Funds"
-                self.deliverer.set_status(self.status)
-                self.receiver.set_status(self.status)
+
 
                 self.deliverer.get_securitiesAccount().set_newSecurities(False)
                 self.receiver.get_cashAccount().set_newSecurities(False)
@@ -182,9 +180,7 @@ class TransactionAgent(Agent):
                 self.deliverer.get_amount(), "Cash")
 
             if not (delivered_securities == received_securities == delivered_cash == received_cash == self.deliverer.get_amount()):
-                self.deliverer.set_status("Settlement Failed: Insufficient Funds")
-                self.receiver.set_status("Settlement Failed: Insufficient Funds")
-                self.status = "Settlement Failed: Insufficient Funds"
+
                 self.model.log_event(
                     event_type="Settlement Failed: Insufficient Funds",
                     object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
@@ -222,7 +218,7 @@ class TransactionAgent(Agent):
 
     def step(self):
         # ✨ Retry settlement on every step if allowed
-        if self.status in ["Matched", "Settlement Failed: Insufficient Funds"]:
+        if self.status in ["Matched"]:
             self.settle()
         elif self.deliverer.is_instruction_time_out():
             self.deliverer.cancel_timeout()
