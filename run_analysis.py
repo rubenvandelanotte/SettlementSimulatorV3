@@ -83,6 +83,17 @@ def run_analysis(label: str, config_generator: callable, runs_per_config: int, o
                 except Exception as e:
                     print(f"[ERROR] Could not export: {e}")
 
+
+                try:
+                    log_filename = os.path.join(
+                        log_dir,
+                        f"simulation_config{config_id + 1}_run{run}.jsonocel"
+                    )
+                    model.save_ocel_log(filename=log_filename)
+                    print(f"[✓] Saved event log: {log_filename}")
+                except Exception as e:
+                    print(f"[ERROR] Could not save event log: {e}")
+
                 deep_cleanup()
                 time.sleep(1)
 
