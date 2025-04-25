@@ -107,60 +107,9 @@ class SettlementModel(Model):
                         for k, v in attributes.items()]
         self.logger.log_object(oid=object_id, otype=object_type, attributes=attributes_list)
 
-    def get_relevant_instructions(self):
-        """
-        Returns the cached set of relevant instructions, refreshing every step.
-        This includes instructions created in the main period and their descendants.
-        """
-        current_step = self.steps if hasattr(self, 'steps') else 0
-
-        # Refresh cache every step for maximum accuracy
-        if (self.relevant_instructions_cache is None or
-                self.last_cache_update is None or
-                current_step != self.last_cache_update):
-            # Use the existing optimized method
-            self.relevant_instructions_cache = self.get_main_period_mothers_and_descendants_optimized()
-
-            # Create a set of IDs for O(1) lookups
-            self.relevant_instructions_id_set = {inst.get_uniqueID() for inst in self.relevant_instructions_cache}
-
-            # Update the timestamp
-            self.last_cache_update = current_step
-
-        return self.relevant_instructions_cache, self.relevant_instructions_id_set
-
-    def should_log_event(self, object_ids=None, creation_time=None):
-        """
-        Uses the cached relevant instructions for efficient checking.
-        """
-        if not self.log_only_main_events:
-            return True
-
-        # Define period boundaries
-        main_start = self.simulation_start + self.warm_up_period
-        main_end = self.simulation_end - self.cool_down_period
-
-        # If we're currently in the main period
-        if main_start <= self.simulated_time <= main_end:
-            return True
-
-        # If we have a specific creation time to check
-        if creation_time is not None:
-            return main_start <= creation_time <= main_end
-
-        # Get the cached set of relevant instruction IDs (O(1) lookups)
-        _, relevant_ids = self.get_relevant_instructions()
-
-        # Check if any of the object IDs are in our relevant set
-        if object_ids:
-            # Fast set intersection check
-            return any(obj_id in relevant_ids for obj_id in object_ids)
-
-        return False
-
     def log_event(self, event_type: str, object_ids: list, attributes: dict = None):
         #allow for logging only in the main period (no warm-up / cooldown
-        if not self.should_log_event(object_ids):
+        if not self.log_only_main_events:
             return
 
         if attributes is None:
@@ -375,8 +324,16 @@ class SettlementModel(Model):
             if inst.get_motherID() == "mother" and main_start <= inst.get_creation_time() <= main_end
         ]
 
+        warmup_mothers = [
+            inst for inst in self.instructions
+            if (inst.get_motherID() == "mother" and
+                inst.get_creation_time() < main_start and
+                inst.get_status() in ["Settled on time", "Settled late", "Cancelled due to partial settlement",
+                                      "Cancelled due to timeout", "Cancelled due to error"] and
+                main_start <= inst.last_modified_time <= main_end)
+        ]
         # Use a set for faster membership testing
-        descendants = set(mother_instructions)
+        descendants = set(mother_instructions + warmup_mothers)
 
         # Create a mapping from parent ID to children for faster lookup
         parent_to_children = {}

@@ -26,9 +26,10 @@ class InstructionAgent (Agent):
         self.linkcode = linkcode
         self.creation_time = creation_time # track creation time for timeout
         self.linkedTransaction = linkedTransaction
-        self.last_matched = creation_time   #why not in declaration?
-        self.intended_settlement_date = None    #why not in declaration?
+        self.last_matched = creation_time
+        self.intended_settlement_date = None
         self.depth = depth
+        self.last_modified_time = creation_time
 
         # Set original_mother_amount
         if original_mother_amount is None and not isChild:
@@ -104,6 +105,8 @@ class InstructionAgent (Agent):
     def set_status(self, new_status: str):
         old_status = self.status
         self.status = new_status
+
+        self.last_modified_time = self.model.simulated_time
 
         # Clean up from indices when status changes from "Validated"
         if old_status == "Validated" and new_status != "Validated":
