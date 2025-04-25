@@ -46,7 +46,7 @@ class SettlementAnalyzer:
         self.configs = {}
         self.config_runs = defaultdict(dict)  # Store runs for each configuration
 
-        depth_stats_dir = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_depth"
+        depth_stats_dir = r"C:\Users\ruben\thesis\SettlementSimulatorV3.16\partial_allowance_depth"
 
         # Check if directory exists
         if not os.path.exists(depth_stats_dir):
@@ -398,7 +398,7 @@ class SettlementAnalyzer:
         df.to_csv(output_file, index=False)
         print(f"Summary table saved to {output_file}")
 
-    def analyze_all(self, output_base="partial_allowance_visualisations/", ci_log_path=r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_files\true_count_confidence_intervals.csv"):
+    def analyze_all(self, output_base="partial_allowance_visualisations/", ci_log_path=r"C:\Users\ruben\thesis\SettlementSimulatorV3.16\partial_allowance_files\true_count_confidence_intervals.csv"):
         """
         Analyze all configurations individually and comparatively
 
@@ -716,7 +716,8 @@ class SettlementAnalyzer:
 
         # Sort by total instructions
         sorted_indices = np.argsort(
-            [int(config_names[i].split()[1]) for i in range(len(config_names))])  # Sort by config number
+            [int(config_names[i].split()[1]) if len(config_names[i].split()) > 1 else 0 for i in range(len(config_names))])
+  # Sort by config number
 
         sorted_configs = [config_names[i] for i in sorted_indices]
         sorted_counts = [total_counts[i] for i in sorted_indices]
@@ -2433,7 +2434,7 @@ class SettlementAnalyzer:
         # Primary axis: Efficiency percentage
         ax1.set_xlabel("Configuration (Number of True Values in Partial)")
         ax1.set_ylabel("Value Efficiency (%)", color=color)
-        ax1.set_ylim(50, 100)  # Adjusted to focus on the relevant range
+        ax1.set_ylim(30, 60)  # Adjusted to focus on the relevant range
 
         # Plot means with error bars
         ax1.errorbar(configs, means, yerr=[lower_errors, upper_errors], fmt='o', color=color,
@@ -2605,7 +2606,7 @@ class SettlementAnalyzer:
         ax2.errorbar(configs, means_value, yerr=[lower_errors_value, upper_errors_value],
                      fmt='o', color='salmon', capsize=5, label='Value Efficiency', markersize=8)
         ax2.plot(configs, means_value, 'o', color='salmon', markersize=8)
-        ax2.set_ylim(50, 100)  # Adjusted to focus on the relevant range
+        ax2.set_ylim(30, 100)  # Adjusted to focus on the relevant range
         ax2.tick_params(axis='y', labelcolor='salmon')
 
         ax2b = ax2.twinx()
