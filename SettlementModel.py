@@ -629,6 +629,67 @@ class SettlementModel(Model):
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         return sum(1 for inst in relevant_instructions if inst.get_status() in ["Settled on time", "Settled late"])
 
+    def count_effectively_settled_mother_instructions(self):
+        """
+         Counts the number of mother instructions that were effectively settled,
+        either directly or via child settlements, using pre-cached relationships.
+
+        Returns:
+            int: Number of effectively settled mother instructions
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+
+        # Pre-build maps and caches
+        child_map = {}
+        status_cache = {}
+        amount_cache = {}
+
+        for inst in relevant_instructions:
+            inst_id = inst.get_uniqueID()
+            status_cache[inst_id] = inst.get_status()
+            amount_cache[inst_id] = inst.get_amount()
+            if inst.isChild:
+                parent_id = inst.get_motherID()
+                if parent_id not in child_map:
+                    child_map[parent_id] = []
+                child_map[parent_id].append(inst_id)
+
+        # Identify mothers
+        mothers = [
+            inst for inst in relevant_instructions
+            if inst.get_motherID() == "mother"
+        ]
+
+        # Pre-compute settled child values for mothers with partial cancellations
+        cached_settled_amounts = {}
+        for mother in mothers:
+            mother_id = mother.get_uniqueID()
+            if status_cache.get(mother_id) == "Cancelled due to partial settlement":
+                settled = self.get_settled_amount_iterative(
+                    parent_id=mother_id,
+                    child_map=child_map,
+                    status_cache=status_cache,
+                    amount_cache=amount_cache
+                )
+                cached_settled_amounts[mother_id] = settled
+
+        # Now count effectively settled mothers
+        effectively_settled_count = 0
+
+        for mother in mothers:
+            mother_id = mother.get_uniqueID()
+            status = status_cache.get(mother_id, "")
+            intended_amount = amount_cache.get(mother_id, 0)
+
+            if status in ["Settled on time", "Settled late"]:
+                effectively_settled_count += 1
+            elif status == "Cancelled due to partial settlement":
+                settled_child_amount = cached_settled_amounts.get(mother_id, 0)
+                if settled_child_amount >= intended_amount:
+                    effectively_settled_count += 1
+
+        return effectively_settled_count
+
     def get_total_settled_amount(self):
         """
         Calculates the total amount that was settled during the main simulation period.

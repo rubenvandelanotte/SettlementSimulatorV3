@@ -472,7 +472,7 @@ def run_max_child_depth_analysis(depths_to_test=[3,5, 7, 10, 15], runs_per_confi
                     else:
                         new_ins_eff, new_val_eff = model.calculate_settlement_efficiency()
 
-                    settled_count = model.count_settled_instructions()
+                    settled_count = model.count_effectively_settled_mother_instructions()
                     total_settled_amount = model.get_total_settled_amount()
                     avg_tree_depth = model.get_average_tree_depth() if hasattr(model, 'get_average_tree_depth') else 0
                     partial_settlements = model.get_partial_settlement_count() if hasattr(model,
