@@ -285,8 +285,8 @@ class SettlementModel(Model):
         print(f"[INFO] Running mini-batch settlement at {self.simulated_time}")
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
-                if (transaction.get_deliverer.get_securitiesAccount().get_newSecurities(True) or
-                transaction.get_receiver.get_cashAccount().get_newSecurities(True)):
+                if (transaction.get_deliver().get_securitiesAccount().get_newSecurities(True) or
+                transaction.get_receiver().get_cashAccount().get_newSecurities(True)):
                     transaction.settle()
 
     def get_main_period_mothers_and_descendants(self):
@@ -733,7 +733,39 @@ class SettlementModel(Model):
     #    df.to_csv(filename, index=False)
     #    print(f"Settlement efficiency metrics saved to {filename}")
 
+    def get_settled_on_time_amount(self):
+        """
+        Calculates the total amount settled on time during the main simulation period.
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+        total = sum(inst.get_amount() for inst in relevant_instructions if inst.get_status() == "Settled on time")
+        return total
 
+    def get_settled_late_amount(self):
+        """
+        Calculates the total amount settled late during the main simulation period.
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+        total = sum(inst.get_amount() for inst in relevant_instructions if inst.get_status() == "Settled late")
+        return total
+
+    def get_cancelled_partial_amount(self):
+        """
+        Calculates the total amount of instructions cancelled due to partial settlement during the main simulation period.
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+        total = sum(inst.get_amount() for inst in relevant_instructions if
+                    inst.get_status() == "Cancelled due to partial settlement")
+        return total
+
+    def get_cancelled_error_amount(self):
+        """
+        Calculates the total amount of instructions cancelled due to error during the main simulation period.
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+        total = sum(
+            inst.get_amount() for inst in relevant_instructions if inst.get_status() == "Cancelled due to error")
+        return total
 
     def get_avg_instruction_age_before_settlement(self):
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
@@ -810,4 +842,78 @@ class SettlementModel(Model):
             json.dump(stats, f, indent=2)
 
         print(f"Depth statistics saved to {filename}")
+
+    def generate_depth_counts_and_depth_status_counts(self):
+        """
+        Generate statistics about instruction depth distribution for process mining visualization.
+        """
+        # Dictionary to store counts by depth
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+        depth_counts = {}
+        # Dictionary to store counts by depth and status
+        depth_status_counts = {}
+        # Dictionary to store parent-child relationships for tree building
+        parent_child_map = {}
+
+        for inst in relevant_instructions:
+            depth = inst.get_depth()
+            status = inst.get_status()
+
+            # Count by depth
+            depth_counts[depth] = depth_counts.get(depth, 0) + 1
+
+            # Count by depth and status
+            if depth not in depth_status_counts:
+                depth_status_counts[depth] = {}
+            depth_status_counts[depth][status] = depth_status_counts[depth].get(status, 0) + 1
+
+        return  depth_counts,depth_status_counts
+
+    def export_all_statistics(self, filename: str, config_metadata: dict = None):
+        """
+        Unified export method for all analyses.
+        Exports flat JSON with all important simulation metrics.
+        Accepts optional metadata (e.g., seed, runtime, memory) to include in output.
+        """
+        import json
+        depth_counts, depth_status_counts = self.generate_depth_counts_and_depth_status_counts()
+
+        result = {
+            # Efficiency & core metrics
+            "instruction_efficiency": self.calculate_settlement_efficiency_optimized()[0],
+            "value_efficiency": self.calculate_settlement_efficiency_optimized()[1],
+            "original_pairs": self.get_original_pair_count(),
+            "mothers_effectively_settled": self.count_effectively_settled_mother_instructions(),
+
+            # Cancellations
+            "partial_settlements": self.get_partial_settlement_count(),
+            "cancellations_due_to_error": self.get_error_cancellation_count(),
+            "cancelled_due_to_partial_settlement_amount": self.get_cancelled_partial_amount(),
+            "cancelled_due_to_error_amount": self.get_cancelled_error_amount(),
+
+            # Amounts settled
+            "settled_on_time_amount": self.get_settled_on_time_amount(),
+            "settled_late_amount": self.get_settled_late_amount(),
+
+            # Volume & dynamics
+            "instructions_settled_total": self.count_settled_instructions(),
+            "avg_instruction_age_hours": self.get_avg_instruction_age_before_settlement(),
+            "avg_tree_depth": self.get_average_tree_depth(),
+
+            # Depth distributions
+            "depth_counts": depth_counts,
+            "depth_status_counts": depth_status_counts,
+        }
+
+        # Optional metadata: seed, runtime, memory, config info
+        if config_metadata:
+            result.update(config_metadata)
+
+        with open(filename, 'w') as f:
+            json.dump(result, f, indent=2)
+
+
+
+
+
 
