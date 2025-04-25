@@ -51,6 +51,12 @@ class TransactionAgent(Agent):
     def set_status(self, new_status: str):
         self.status = new_status
 
+    def get_deliverer(self):
+        return self.deliverer
+
+    def get_receiver(self):
+        return self.receiver
+
     def settle(self):
         self.retry_count += 1  # ✨ Count each attempt
 
@@ -71,8 +77,6 @@ class TransactionAgent(Agent):
                 if self.deliverer.get_institution().check_partial_allowed() and self.receiver.get_institution().check_partial_allowed():
                     delivery_children = self.deliverer.createDeliveryChildren()
                     receipt_children = self.receiver.createReceiptChildren()
-
-
 
                     delivery_child_1, delivery_child_2 = delivery_children
                     receipt_child_1, receipt_child_2 = receipt_children
@@ -147,20 +151,20 @@ class TransactionAgent(Agent):
 
                     if child_transaction_1:
                         child_transaction_1.settle()
-                    if child_transaction_2:
-                        child_transaction_2.settle()
 
                     self.cancel_partial()
                     return
-
-
 
                 # ✨ Fallback to retry if not enough funds
                 self.status = "Settlement Failed: Insufficient Funds"
                 self.deliverer.set_status(self.status)
                 self.receiver.set_status(self.status)
+
+                self.deliverer.get_securitiesAccount().set_newSecurities(False)
+                self.receiver.get_cashAccount().set_newSecurities(False)
+
                 self.model.log_event(
-                    event_type="Settlement Delayed: Awaiting Funds",
+                    event_type= "Settlement Failed: Insufficient Funds",
                     object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                     attributes={"status": self.status, "retry": self.retry_count}
                 )
@@ -182,7 +186,7 @@ class TransactionAgent(Agent):
                 self.receiver.set_status("Settlement Failed: Insufficient Funds")
                 self.status = "Settlement Failed: Insufficient Funds"
                 self.model.log_event(
-                    event_type="Settlement Delayed: Awaiting Funds",
+                    event_type="Settlement Failed: Insufficient Funds",
                     object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                     attributes={"status": self.status, "retry": self.retry_count}
                 )
@@ -213,8 +217,8 @@ class TransactionAgent(Agent):
             self.model.agents.remove(self.receiver)
             self.model.agents.remove(self)
 
-        self.deliverer.get_securitiesAccount().set_newSecurities(False)
-        self.receiver.get_cashAccount().set_newSecurities(False)
+            self.deliverer.get_cashAccount().set_newSecurities(True)
+            self.receiver.get_securitiesAccount().set_newSecurities(True)
 
     def step(self):
         # ✨ Retry settlement on every step if allowed

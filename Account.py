@@ -28,6 +28,7 @@ class Account:
         return self.newSecurities
 
     def set_newSecurities(self, new:bool):
+        #gets set to true if new securities arrive, gets set to false if settlement fails.
         self.newSecurities = new
 
     def checkBalance(self, amount : int, securityType: str):
