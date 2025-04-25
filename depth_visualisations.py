@@ -277,6 +277,7 @@ class SettlementAnalyzer:
             print("Need at least 2 configurations for comparison")
             return
 
+
         os.makedirs(output_dir, exist_ok=True)
 
         # Compare success rates across configurations
@@ -335,7 +336,12 @@ class SettlementAnalyzer:
         bar_width = 0.8 / len(self.configs)
         depths = list(range(max_depth + 1))
 
-        for i, (config_name, data) in enumerate(self.configs.items()):
+        # Sort configurations by number
+        sorted_configs = sorted(self.configs.items(),
+                                key=lambda x: int(x[0].split()[1]) if len(x[0].split()) > 1 and x[0].split()[
+                                    1].isdigit() else 0)
+
+        for i, (config_name, data) in enumerate(sorted_configs):
             depth_counts = data["depth_counts"]
 
             # Get counts for each depth (0 if not present)
@@ -450,12 +456,18 @@ class SettlementAnalyzer:
         """
         Compare the proportion of on-time vs late settlements across configurations
         """
+
+        # Sort configurations by number
+        sorted_configs = sorted(self.configs.keys(),
+                                key=lambda x: int(x.split()[1]) if len(x.split()) > 1 and x.split()[1].isdigit() else 0)
+
         # Prepare data
         config_names = []
         on_time_percentages = []
         late_percentages = []
 
-        for config_name, data in self.configs.items():
+        for config_name in sorted_configs:
+            data = self.configs[config_name]
             depth_status = data["depth_status_counts"]
 
             total_settlements = 0
@@ -567,11 +579,17 @@ class SettlementAnalyzer:
         """
         Compare the overall status distribution across configurations
         """
+
+        # Sort configurations by number
+        sorted_configs = sorted(self.configs.keys(),
+                                key=lambda x: int(x.split()[1]) if len(x.split()) > 1 and x.split()[1].isdigit() else 0)
+
         # Prepare data
         config_names = []
         status_data = {status_group: [] for status_group in self.status_groups.keys()}
 
-        for config_name, data in self.configs.items():
+        for config_name in sorted_configs:
+            data = self.configs[config_name]
             config_names.append(config_name)
             depth_status = data["depth_status_counts"]
 
@@ -697,7 +715,9 @@ class SettlementAnalyzer:
             total_counts.append(total)
 
         # Sort by total instructions
-        sorted_indices = np.argsort(total_counts)[::-1]  # Sort descending
+        sorted_indices = np.argsort(
+            [int(config_names[i].split()[1]) for i in range(len(config_names))])  # Sort by config number
+
         sorted_configs = [config_names[i] for i in sorted_indices]
         sorted_counts = [total_counts[i] for i in sorted_indices]
 
