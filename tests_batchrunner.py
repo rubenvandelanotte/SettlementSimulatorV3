@@ -84,6 +84,7 @@ def run_partial_allowance_analysis(runs_per_config=10, base_seed=42):
     tracker = RuntimeTracker(os.path.join(folder, "runtime_partial_allowance.json"))
 
     num_institutions = 10  # Number of institutions in the simulation
+    base_seed =base_seed
     seed_list = [base_seed + i for i in range(runs_per_config)]
 
     efficiencies = []
