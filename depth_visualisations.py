@@ -2224,7 +2224,6 @@ class SettlementAnalyzer:
             Tuple of dictionaries containing data for different metrics
         """
         import pandas as pd
-        import numpy as np
 
         # Initialize data dictionaries
         instruction_data = {}
