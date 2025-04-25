@@ -43,7 +43,7 @@ class SettlementModel(Model):
 
         self.simulation_start = datetime(2025, 4, 1, 1, 30)
         self.warm_up_period = timedelta(days=5)
-        self.cool_down_period = timedelta(days=14)
+        self.cool_down_period = timedelta(days=5)
 
         self.simulation_main_duration = timedelta(days=self.simulation_duration_days)
         self.simulation_total_duration = self.warm_up_period + self.simulation_main_duration + self.cool_down_period
