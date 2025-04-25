@@ -2192,55 +2192,75 @@ class SettlementAnalyzer:
 
         print(f"Lateness hours analysis visualizations created in {output_dir}")
 
-    def parse_confidence_intervals(self, log_path):
+    def parse_confidence_intervals(self, csv_path):
         """
-        Parse confidence interval log file and extract data for visualization
+        Parse confidence interval CSV file and extract data for visualization
 
         Args:
-            log_path: Path to the confidence intervals log file
+            csv_path: Path to the confidence intervals CSV file
 
         Returns:
             Tuple of dictionaries containing data for different metrics
         """
+        import pandas as pd
+        import numpy as np
+
+        # Initialize data dictionaries
         instruction_data = {}
         value_data = {}
         settled_count_data = {}
         settled_amount_data = {}
 
-        # Regex pattern to match the log entries, handling potential nan values
-        pattern = r"(INSTRUCTION_CI|VALUE_CI|SETTLED_COUNT|SETTLED_AMOUNT),Partial=\((.*?)\),Mean=([0-9.]+|nan),Lower=([0-9.]+|nan),Upper=([0-9.]+|nan)"
+        print(f"Parsing confidence interval CSV file: {csv_path}")
 
-        with open(log_path, "r") as f:
-            for line in f:
-                match = re.search(pattern, line)
-                if match:
-                    entry_type, partial_str, mean, lower, upper = match.groups()
+        try:
+            # Read the CSV file using pandas
+            df = pd.read_csv(csv_path)
 
-                    # Extract the boolean values from the partial string
-                    bool_values = [val.strip() == "True" for val in partial_str.split(',')]
+            print(f"CSV file loaded with {len(df)} rows")
 
-                    # Count True values to determine configuration number (1-10)
-                    config_num = sum(bool_values)
+            # Check if we have the required columns
+            required_columns = ['metric', 'true_count', 'mean', 'ci_lower', 'ci_upper']
+            if not all(col in df.columns for col in required_columns):
+                print(f"Missing required columns in CSV. Found: {df.columns.tolist()}")
+                return {}, {}, {}, {}
 
-                    # Handle 'nan' values
-                    mean_val = float(mean) if mean != 'nan' else np.nan
-                    lower_val = float(lower) if lower != 'nan' else mean_val  # Use mean if lower is nan
-                    upper_val = float(upper) if upper != 'nan' else mean_val  # Use mean if upper is nan
+            # Process each row in the dataframe
+            for _, row in df.iterrows():
+                metric = row['metric'].lower()
+                config_num = int(row['true_count'])
+                mean_val = float(row['mean'])
+                lower_val = float(row['ci_lower'])
+                upper_val = float(row['ci_upper'])
 
-                    entry = {
-                        "mean": mean_val,
-                        "CI lower": lower_val,
-                        "CI upper": upper_val
-                    }
+                # Create the data entry
+                entry = {
+                    "mean": mean_val,
+                    "CI lower": lower_val,
+                    "CI upper": upper_val
+                }
 
-                    if entry_type == "INSTRUCTION_CI":
-                        instruction_data[config_num] = entry
-                    elif entry_type == "VALUE_CI":
-                        value_data[config_num] = entry
-                    elif entry_type == "SETTLED_COUNT":
-                        settled_count_data[config_num] = entry
-                    elif entry_type == "SETTLED_AMOUNT":
-                        settled_amount_data[config_num] = entry
+                # Add to the appropriate dictionary based on metric
+                if metric == 'instruction_efficiency':
+                    instruction_data[config_num] = entry
+                elif metric == 'value_efficiency':
+                    value_data[config_num] = entry
+                elif metric == 'settled_count':
+                    settled_count_data[config_num] = entry
+                elif metric == 'settled_amount':
+                    settled_amount_data[config_num] = entry
+
+            print(f"Processed data for metrics:")
+            print(f"  - instruction_efficiency: {len(instruction_data)} configurations")
+            print(f"  - value_efficiency: {len(value_data)} configurations")
+            print(f"  - settled_count: {len(settled_count_data)} configurations")
+            print(f"  - settled_amount: {len(settled_amount_data)} configurations")
+
+        except Exception as e:
+            import traceback
+            print(f"Error parsing confidence interval CSV file: {e}")
+            print(traceback.format_exc())
+            return {}, {}, {}, {}
 
         return instruction_data, value_data, settled_count_data, settled_amount_data
 
