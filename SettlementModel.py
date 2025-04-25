@@ -103,9 +103,62 @@ class SettlementModel(Model):
                         for k, v in attributes.items()]
         self.logger.log_object(oid=object_id, otype=object_type, attributes=attributes_list)
 
+    def should_log_event(self, object_ids=None, creation_time=None):
+        """
+        Determines if an event should be logged based on:
+        1. If log_only_main_events is False, never log
+        2. If the current time is in the main period, log
+        3. If any of the objects (instructions) were created in the main period, log
+        4. If the instruction was created in warmup but finishes in the main period
+        5. If the instruction was created in the main period and finishes in the cooldown period
+p
+        Args:
+            object_ids: List of object IDs involved in the event
+            creation_time: Optional creation time if not using object IDs
+
+        Returns:
+            Boolean indicating whether the event should be logged
+        """
+        if not self.log_only_main_events:
+            return False
+
+        # Define period boundaries
+        main_start = self.simulation_start + self.warm_up_period
+        main_end = self.simulation_end - self.cool_down_period
+
+        # If we're currently in the main period
+        if main_start <= self.simulated_time <= main_end:
+            return True
+
+        # If we have a specific creation time to check
+        if creation_time is not None:
+            # Created in main period
+            if main_start <= creation_time <= main_end:
+                return True
+
+        # For events related to instructions
+        if object_ids:
+            for obj_id in object_ids:
+                # Check if this is an instruction ID
+                for inst in self.instructions:
+                    if inst.get_uniqueID() == obj_id:
+                        # Case 1: Created in main period (finishes any time)
+                        if main_start <= inst.get_creation_time() <= main_end:
+                            return True
+
+                        # Case 2: Created in warmup, but current time (finishing) is in main period
+                        if inst.get_creation_time() < main_start and main_start <= self.simulated_time <= main_end:
+                            return True
+
+                        # Case 3: Created in main period, but current time (finishing) is in cooldown
+                        if main_start <= inst.get_creation_time() <= main_end and self.simulated_time > main_end:
+                            return True
+
+        return False
+
     def log_event(self, event_type: str, object_ids: list, attributes: dict = None):
         #allow for logging only in the main period (no warm-up / cooldown
-        if self.log_only_main_events and not self.in_main_period():
+        if not self.should_log_event(object_ids):
             return
 
         if attributes is None:
