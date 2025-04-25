@@ -285,8 +285,8 @@ class SettlementModel(Model):
         print(f"[INFO] Running mini-batch settlement at {self.simulated_time}")
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
-                if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities(True) or
-                transaction.get_receiver().get_cashAccount().get_newSecurities(True)):
+                if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities() or
+                transaction.get_receiver().get_cashAccount().get_newSecurities()):
                     transaction.settle()
 
     def get_main_period_mothers_and_descendants(self):
