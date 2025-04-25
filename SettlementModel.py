@@ -285,7 +285,7 @@ class SettlementModel(Model):
         print(f"[INFO] Running mini-batch settlement at {self.simulated_time}")
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
-                if (transaction.get_deliver().get_securitiesAccount().get_newSecurities(True) or
+                if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities(True) or
                 transaction.get_receiver().get_cashAccount().get_newSecurities(True)):
                     transaction.settle()
 
