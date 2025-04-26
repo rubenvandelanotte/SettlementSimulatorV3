@@ -72,7 +72,7 @@ class SettlementAnalysisSuite:
             print(f"[WARNING] Logs directory not found at {logs_dir}")
 
     def _load_runtime_results(self):
-        runtime_file = os.path.join(self.input_dir, "runtime_results.json")
+        runtime_file = os.path.join(self.input_dir, "runtime_partial.json")
         if os.path.exists(runtime_file):
             with open(runtime_file, "r") as f:
                 self.runtime_data = json.load(f)
@@ -80,3 +80,6 @@ class SettlementAnalysisSuite:
         else:
             self.runtime_data = []
             print(f"[WARNING] No runtime_results.json found at {runtime_file}")
+
+
+

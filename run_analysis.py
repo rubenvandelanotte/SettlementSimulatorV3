@@ -1,9 +1,7 @@
 import os
-import json
 import gc
 import sys
 import time
-import pandas as pd
 import argparse
 
 from SettlementModel import SettlementModel
@@ -26,6 +24,26 @@ def deep_cleanup():
                 ctypes.windll.kernel32.GetCurrentProcess(), -1, -1)
         except Exception as e:
             print(f"[WARNING] Memory release failed: {e}")
+
+def finalize_visualizations(output_dir, label):
+    if label == "partial":
+        suite = SettlementAnalysisSuite(
+            input_dir=output_dir,
+            output_dir=os.path.join(output_dir, "visualizations", "partial")
+        )
+        suite.analyze_all()
+    elif label == "depth":
+        visualizer = MaxDepthVisualizer(
+            results_csv=os.path.join(output_dir, "max_child_depth_final_results.csv"),
+            output_dir=os.path.join(output_dir, "visualizations", "depth")
+        )
+        visualizer.generate_all_visualizations()
+    elif label == "amount":
+        visualizer = MinSettlementAmountVisualizer(
+            results_csv=os.path.join(output_dir, "min_settlement_amount_final_results.csv"),
+            output_dir=os.path.join(output_dir, "visualizations", "amount")
+        )
+        visualizer.generate_all_visualizations()
 
 def generate_partial_configs(base_seed, runs_per_config):
     for true_count in range(1, 11):
@@ -65,75 +83,7 @@ def generate_amount_configs(base_seed, runs_per_config):
                 "run_number": run_number
             }
 
-def aggregate_statistics_to_csv(results_dir, output_csv, analysis_type):
-    records = []
-    for file in os.listdir(results_dir):
-        if file.endswith(".json") and "CRASH" not in file:
-            with open(os.path.join(results_dir, file)) as f:
-                data = json.load(f)
-
-            meta = data.get("config_metadata", {})
-            stats = {
-                "instruction_efficiency": data.get("instruction_efficiency"),
-                "value_efficiency": data.get("value_efficiency"),
-                "runtime_seconds": data.get("execution_info", {}).get("execution_time_seconds"),
-                "settled_count": data.get("settled_on_time_count", 0) + data.get("settled_late_count", 0),
-                "settled_amount": data.get("settled_on_time_amount", 0) + data.get("settled_late_amount", 0),
-                "memory_usage_mb": data.get("execution_info", {}).get("memory_usage_mb", 0),
-                "partial_settlements": data.get("partial_cancelled_count", 0)
-            }
-
-            if analysis_type == "depth":
-                stats["max_child_depth"] = meta.get("max_child_depth")
-            elif analysis_type == "amount":
-                stats["min_settlement_percentage"] = meta.get("min_settlement_percentage")
-
-            records.append(stats)
-
-    if records:
-        df = pd.DataFrame(records)
-        df.to_csv(output_csv, index=False)
-        print(f"[✓] Aggregated statistics to {output_csv}")
-
-def finalize_visualizations(output_dir, analysis_label):
-    if analysis_label == "partial":
-        try:
-            suite = SettlementAnalysisSuite(
-                input_dir=output_dir,
-                output_dir=os.path.join(output_dir, "visualizations", "partial")
-            )
-            suite.analyze_all()
-            print("[✓] Partial allowance visualizations created.")
-        except Exception as e:
-            print(f"[!] Could not generate partial visualizations: {e}")
-
-    elif analysis_label == "depth":
-        try:
-            depth_csv = os.path.join(output_dir, "max_child_depth_final_results.csv")
-            if os.path.exists(depth_csv):
-                visualizer = MaxDepthVisualizer(
-                    results_csv=depth_csv,
-                    output_dir=os.path.join(output_dir, "visualizations", "depth")
-                )
-                visualizer.generate_all_visualizations()
-                print("[✓] Depth visualizations created.")
-        except Exception as e:
-            print(f"[!] Could not generate depth visualizations: {e}")
-
-    elif analysis_label == "amount":
-        try:
-            amount_csv = os.path.join(output_dir, "min_settlement_amount_final_results.csv")
-            if os.path.exists(amount_csv):
-                visualizer = MinSettlementAmountVisualizer(
-                    results_csv=amount_csv,
-                    output_dir=os.path.join(output_dir, "visualizations", "amount")
-                )
-                visualizer.generate_all_visualizations()
-                print("[✓] Min settlement amount visualizations created.")
-        except Exception as e:
-            print(f"[!] Could not generate amount visualizations: {e}")
-
-def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed):
+def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed, visualize_only=False):
     print(f"\n=== RUNNING ANALYSIS: {label.upper()} ===\n")
 
     results_dir = os.path.join(output_dir, "results_all_analysis")
@@ -141,9 +91,14 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
     ensure_directory(results_dir)
     ensure_directory(log_dir)
 
+    if visualize_only:
+        print("[INFO] Skipping simulation. Only running visualizations.")
+        finalize_visualizations(output_dir, label)
+        return
+
     tracker = RuntimeTracker(os.path.join(output_dir, f"runtime_{label}.json"))
 
-    for config in config_generator(base_seed):
+    for config in config_generator(base_seed, runs_per_config):
         true_count = config.get("true_count", config.get("depth", config.get("percentage", "-")))
         run_number = config.get("run_number", 0)
 
@@ -178,11 +133,6 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
     tracker.save_results()
     print("\n[✓] Simulation runs complete.")
 
-    if label == "depth":
-        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "max_child_depth_final_results.csv"), analysis_type="depth")
-    elif label == "amount":
-        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "min_settlement_amount_final_results.csv"), analysis_type="amount")
-
     finalize_visualizations(output_dir, label)
 
 if __name__ == "__main__":
@@ -190,11 +140,12 @@ if __name__ == "__main__":
     parser.add_argument("--analysis", choices=["partial", "depth", "amount"], required=True, help="Which analysis to run")
     parser.add_argument("--runs", type=int, default=10, help="Number of runs per configuration")
     parser.add_argument("--seed", type=int, default=42, help="Base random seed")
+    parser.add_argument("--visualize_only", action="store_true", help="Skip simulation and only run visualization")
     args = parser.parse_args()
 
     if args.analysis == "partial":
-        run_analysis("partial", lambda base_seed: generate_partial_configs(base_seed, args.runs), args.runs, "partial_allowance_files", args.seed)
+        run_analysis("partial", lambda base_seed, runs: generate_partial_configs(base_seed, runs), args.runs, "partial_allowance_files", args.seed, visualize_only=args.visualize_only)
     elif args.analysis == "depth":
-        run_analysis("depth", lambda base_seed: generate_depth_configs(base_seed, args.runs), args.runs, "max_depth_files", args.seed)
+        run_analysis("depth", lambda base_seed, runs: generate_depth_configs(base_seed, runs), args.runs, "max_depth_files", args.seed, visualize_only=args.visualize_only)
     elif args.analysis == "amount":
-        run_analysis("amount", lambda base_seed: generate_amount_configs(base_seed, args.runs), args.runs, "min_amount_files", args.seed)
+        run_analysis("amount", lambda base_seed, runs: generate_amount_configs(base_seed, runs), args.runs, "min_amount_files", args.seed, visualize_only=args.visualize_only)
