@@ -776,7 +776,26 @@ class SettlementModel(Model):
     def get_original_pair_count(self):
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
-        return len(mothers) // 2  # 2 instructions per pair
+        linkcodes = set(inst.get_linkcode() for inst in mothers)
+        return len(linkcodes)
+
+    def get_original_instruction_count(self):
+        """
+        Returns the number of original mother instructions
+        created during the main simulation period.
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+        mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
+        return len(mothers)
+
+    def get_child_instruction_count(self):
+        """
+        Returns the number of child instructions created
+        during the main simulation period.
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+        children = [inst for inst in relevant_instructions if inst.isChild]
+        return len(children)
 
     def get_partial_settlement_count(self):
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
@@ -883,6 +902,8 @@ class SettlementModel(Model):
             "instruction_efficiency": self.calculate_settlement_efficiency_optimized()[0],
             "value_efficiency": self.calculate_settlement_efficiency_optimized()[1],
             "original_pairs": self.get_original_pair_count(),
+            "original_instructions_count": self.get_original_instruction_count(),
+            "child_instruction_count": self.get_child_instruction_count(),
             "mothers_effectively_settled": self.count_effectively_settled_mother_instructions(),
 
             # Cancellations
