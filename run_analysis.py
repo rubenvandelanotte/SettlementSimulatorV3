@@ -1,29 +1,20 @@
-# UNIVERSAL BATCHRUNNER FOR ALL ANALYSES
 import os
-import time
 import json
-import pandas as pd
-from SettlementModel import SettlementModel
-from RuntimeTracker import RuntimeTracker
 import gc
 import sys
+import time
+import pandas as pd
 import argparse
 
-# Import visualizers dynamically
-from PartialAnalysis import SettlementAnalyzer
+from SettlementModel import SettlementModel
+from RuntimeTracker import RuntimeTracker
+from settlement_analysis.run_partial_analysis import SettlementAnalysisSuite
 from MaxDepthVisualizer import MaxDepthVisualizer
 from MinSettlementAmountVisualizer import MinSettlementAmountVisualizer
 
 def ensure_directory(path):
     if not os.path.exists(path):
         os.makedirs(path)
-
-def log_memory_usage(label):
-    import psutil
-    process = psutil.Process(os.getpid())
-    mem = process.memory_info().rss / (1024 * 1024)
-    print(f"[MEM] {label}: {mem:.2f} MB")
-    return mem
 
 def deep_cleanup():
     for _ in range(3):
@@ -36,7 +27,113 @@ def deep_cleanup():
         except Exception as e:
             print(f"[WARNING] Memory release failed: {e}")
 
-def run_analysis(label: str, config_generator: callable, runs_per_config: int, output_dir: str, base_seed: int):
+def generate_partial_configs(base_seed, runs_per_config):
+    for true_count in range(1, 11):
+        for run_number in range(1, runs_per_config + 1):
+            partialsallowed = tuple([True] * true_count + [False] * (10 - true_count))
+            seed = base_seed + (run_number - 1)
+            yield {
+                "partialsallowed": partialsallowed,
+                "seed": seed,
+                "true_count": true_count,
+                "run_number": run_number
+            }
+
+def generate_depth_configs(base_seed, runs_per_config):
+    partialsallowed = tuple([True] * 8 + [False] * 2)
+    for depth in [3, 5, 7, 10, 15]:
+        for run_number in range(1, runs_per_config + 1):
+            seed = base_seed + (run_number - 1)
+            yield {
+                "partialsallowed": partialsallowed,
+                "seed": seed,
+                "max_child_depth": depth,
+                "depth": depth,
+                "run_number": run_number
+            }
+
+def generate_amount_configs(base_seed, runs_per_config):
+    partialsallowed = tuple([True] * 8 + [False] * 2)
+    for pct in [0.02, 0.035, 0.05, 0.075, 0.1]:
+        for run_number in range(1, runs_per_config + 1):
+            seed = base_seed + (run_number - 1)
+            yield {
+                "partialsallowed": partialsallowed,
+                "seed": seed,
+                "min_settlement_percentage": pct,
+                "percentage": pct,
+                "run_number": run_number
+            }
+
+def aggregate_statistics_to_csv(results_dir, output_csv, analysis_type):
+    records = []
+    for file in os.listdir(results_dir):
+        if file.endswith(".json") and "CRASH" not in file:
+            with open(os.path.join(results_dir, file)) as f:
+                data = json.load(f)
+
+            meta = data.get("config_metadata", {})
+            stats = {
+                "instruction_efficiency": data.get("instruction_efficiency"),
+                "value_efficiency": data.get("value_efficiency"),
+                "runtime_seconds": data.get("execution_info", {}).get("execution_time_seconds"),
+                "settled_count": data.get("settled_on_time_count", 0) + data.get("settled_late_count", 0),
+                "settled_amount": data.get("settled_on_time_amount", 0) + data.get("settled_late_amount", 0),
+                "memory_usage_mb": data.get("execution_info", {}).get("memory_usage_mb", 0),
+                "partial_settlements": data.get("partial_cancelled_count", 0)
+            }
+
+            if analysis_type == "depth":
+                stats["max_child_depth"] = meta.get("max_child_depth")
+            elif analysis_type == "amount":
+                stats["min_settlement_percentage"] = meta.get("min_settlement_percentage")
+
+            records.append(stats)
+
+    if records:
+        df = pd.DataFrame(records)
+        df.to_csv(output_csv, index=False)
+        print(f"[✓] Aggregated statistics to {output_csv}")
+
+def finalize_visualizations(output_dir, analysis_label):
+    if analysis_label == "partial":
+        try:
+            suite = SettlementAnalysisSuite(
+                input_dir=output_dir,
+                output_dir=os.path.join(output_dir, "visualizations", "partial")
+            )
+            suite.analyze_all()
+            print("[✓] Partial allowance visualizations created.")
+        except Exception as e:
+            print(f"[!] Could not generate partial visualizations: {e}")
+
+    elif analysis_label == "depth":
+        try:
+            depth_csv = os.path.join(output_dir, "max_child_depth_final_results.csv")
+            if os.path.exists(depth_csv):
+                visualizer = MaxDepthVisualizer(
+                    results_csv=depth_csv,
+                    output_dir=os.path.join(output_dir, "visualizations", "depth")
+                )
+                visualizer.generate_all_visualizations()
+                print("[✓] Depth visualizations created.")
+        except Exception as e:
+            print(f"[!] Could not generate depth visualizations: {e}")
+
+    elif analysis_label == "amount":
+        try:
+            amount_csv = os.path.join(output_dir, "min_settlement_amount_final_results.csv")
+            if os.path.exists(amount_csv):
+                visualizer = MinSettlementAmountVisualizer(
+                    results_csv=amount_csv,
+                    output_dir=os.path.join(output_dir, "visualizations", "amount")
+                )
+                visualizer.generate_all_visualizations()
+                print("[✓] Min settlement amount visualizations created.")
+        except Exception as e:
+            print(f"[!] Could not generate amount visualizations: {e}")
+
+def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed):
     print(f"\n=== RUNNING ANALYSIS: {label.upper()} ===\n")
 
     results_dir = os.path.join(output_dir, "results_all_analysis")
@@ -47,7 +144,7 @@ def run_analysis(label: str, config_generator: callable, runs_per_config: int, o
     tracker = RuntimeTracker(os.path.join(output_dir, f"runtime_{label}.json"))
 
     for config in config_generator(base_seed):
-        true_count = config.get("true_count", 0)
+        true_count = config.get("true_count", config.get("depth", config.get("percentage", "-")))
         run_number = config.get("run_number", 0)
 
         print(f"[INFO] {label} | Config {true_count}, Run {run_number}")
@@ -65,49 +162,13 @@ def run_analysis(label: str, config_generator: callable, runs_per_config: int, o
                     model.step()
             except (RecursionError, MemoryError) as e:
                 print(f"[ERROR] Simulation crashed: {e}")
-                crash_filename = os.path.join(
-                    results_dir,
-                    f"results_{label}_config{config['true_count']}_run{config['run_number']}_CRASH.json"
-                )
-                with open(crash_filename, "w") as f:
-                    json.dump({
-                        "error": str(e),
-                        "seed": config["seed"],
-                        "true_count": config["true_count"],
-                        "run_number": config["run_number"],
-                        "label": label
-                    }, f, indent=2)
                 return
 
-            mem = log_memory_usage("after simulation")
+            ocel_log_filename = os.path.join(log_dir, f"log_{label}_config{true_count}_run{run_number}.jsonocel")
+            model.save_ocel_log(filename=ocel_log_filename)
 
-            metadata = {
-                "seed": config["seed"],
-                "config_id": config["true_count"],
-                "run": config["run_number"],
-                "label": label,
-                "memory_usage_mb": mem
-            }
-
-            ocel_log_filename = os.path.join(
-                log_dir,
-                f"log_{label}_config{config['true_count']}_run{config['run_number']}.jsonocel"
-            )
-            try:
-                model.save_ocel_log(filename=ocel_log_filename)
-                print(f"[✓] OCEL log saved: {ocel_log_filename}")
-            except Exception as e:
-                print(f"[ERROR] Could not save OCEL log: {e}")
-
-            results_filename = os.path.join(
-                results_dir,
-                f"results_{label}_config{config['true_count']}_run{config['run_number']}.json"
-            )
-            try:
-                model.export_all_statistics(filename=results_filename, config_metadata=metadata)
-                print(f"[✓] Statistics saved: {results_filename}")
-            except Exception as e:
-                print(f"[ERROR] Could not export statistics: {e}")
+            results_filename = os.path.join(results_dir, f"results_{label}_config{true_count}_run{run_number}.json")
+            model.export_all_statistics(filename=results_filename, config_metadata=config)
 
             deep_cleanup()
             time.sleep(1)
@@ -117,64 +178,23 @@ def run_analysis(label: str, config_generator: callable, runs_per_config: int, o
     tracker.save_results()
     print("\n[✓] Simulation runs complete.")
 
-def generate_partial_configs(base_seed, runs_per_config):
-    for true_count in range(1, 11):
-        for run_number in range(1, runs_per_config + 1):
-            partialsallowed = tuple([True] * true_count + [False] * (10 - true_count))
-            seed = base_seed + (run_number - 1)
-            yield {
-                "partialsallowed": partialsallowed,
-                "seed": seed,
-                "true_count": true_count,
-                "run_number": run_number
-            }
+    if label == "depth":
+        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "max_child_depth_final_results.csv"), analysis_type="depth")
+    elif label == "amount":
+        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "min_settlement_amount_final_results.csv"), analysis_type="amount")
 
-def generate_depth_configs(base_seed, runs_per_config):
-    partialsallowed = tuple([True] * 8 + [False] * 2)
-    for depth in [3, 8, 15]:
-        for run_number in range(1, runs_per_config + 1):
-            seed = base_seed + (run_number - 1)
-            yield {
-                "partialsallowed": partialsallowed,
-                "seed": seed,
-                "max_child_depth": depth,
-                "depth": depth,
-                "run_number": run_number
-            }
-
-def generate_amount_configs(base_seed, runs_per_config):
-    partialsallowed = tuple([True] * 8 + [False] * 2)
-    for pct in [0.025, 0.05, 0.1]:
-        for run_number in range(1, runs_per_config + 1):
-            seed = base_seed + (run_number - 1)
-            yield {
-                "partialsallowed": partialsallowed,
-                "seed": seed,
-                "min_settlement_percentage": pct,
-                "percentage": pct,
-                "run_number": run_number
-            }
+    finalize_visualizations(output_dir, label)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run settlement model analysis.")
-    parser.add_argument("--analysis", choices=["partial", "depth", "amount"], required=True,
-                        help="Which analysis to run")
+    parser.add_argument("--analysis", choices=["partial", "depth", "amount"], required=True, help="Which analysis to run")
     parser.add_argument("--runs", type=int, default=10, help="Number of runs per configuration")
     parser.add_argument("--seed", type=int, default=42, help="Base random seed")
-
     args = parser.parse_args()
 
     if args.analysis == "partial":
         run_analysis("partial", lambda base_seed: generate_partial_configs(base_seed, args.runs), args.runs, "partial_allowance_files", args.seed)
-        SettlementAnalyzer(results_dir="partial_allowance_files/results_all_analysis").analyze_all(
-            output_base="partial_allowance_files/visualizations")
-
     elif args.analysis == "depth":
         run_analysis("depth", lambda base_seed: generate_depth_configs(base_seed, args.runs), args.runs, "max_depth_files", args.seed)
-        MaxDepthVisualizer(results_csv="max_depth_files/max_child_depth_final_results.csv",
-                           output_dir="max_depth_files/visualizations")
-
     elif args.analysis == "amount":
         run_analysis("amount", lambda base_seed: generate_amount_configs(base_seed, args.runs), args.runs, "min_amount_files", args.seed)
-        MinSettlementAmountVisualizer(results_csv="min_amount_files/min_settlement_amount_final_results.csv",
-                                       output_dir="min_amount_files/visualizations")
