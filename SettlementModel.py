@@ -788,6 +788,30 @@ class SettlementModel(Model):
         mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
         return len(mothers)
 
+    def get_total_intended_amount_from_pairs(self):
+        """
+        Returns the total intended settlement amount
+        based on original instruction pairs.
+        Only one side of each pair is counted.
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+        mothers = [inst for inst in relevant_instructions if inst.get_motherID() == "mother"]
+
+        # Group mothers by linkcode
+        linkcode_to_mothers = {}
+        for inst in mothers:
+            linkcode = inst.get_linkcode()
+            if linkcode not in linkcode_to_mothers:
+                linkcode_to_mothers[linkcode] = []
+            linkcode_to_mothers[linkcode].append(inst)
+
+        total_amount = 0
+        for pair in linkcode_to_mothers.values():
+            total_amount += pair[0].get_amount()
+
+
+        return total_amount
+
     def get_child_instruction_count(self):
         """
         Returns the number of child instructions created
@@ -905,6 +929,7 @@ class SettlementModel(Model):
             "original_instructions_count": self.get_original_instruction_count(),
             "child_instruction_count": self.get_child_instruction_count(),
             "mothers_effectively_settled": self.count_effectively_settled_mother_instructions(),
+            "intended_amount": self.get_total_intended_amount_from_pairs(),
 
             # Cancellations
             "partial_settlements": self.get_partial_settlement_count(),
