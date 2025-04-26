@@ -1,12 +1,13 @@
 # UNIVERSAL BATCHRUNNER FOR ALL ANALYSES
 import os
 import time
+import json
+import pandas as pd
 from SettlementModel import SettlementModel
 from RuntimeTracker import RuntimeTracker
 import gc
 import sys
 import argparse
-
 
 # Import visualizers dynamically
 from PartialAnalysis import SettlementAnalyzer
@@ -45,81 +46,92 @@ def run_analysis(label: str, config_generator: callable, runs_per_config: int, o
 
     tracker = RuntimeTracker(os.path.join(output_dir, f"runtime_{label}.json"))
 
-    for config_id, config in enumerate(config_generator(base_seed)):
-        for run in range(1, runs_per_config + 1):
-            print(f"[INFO] {label} | Config {config_id + 1}, Run {run}")
+    for config in config_generator(base_seed):
+        true_count = config.get("true_count", 0)
+        run_number = config.get("run_number", 0)
 
-            def run_simulation(config):
-                model = SettlementModel(partialsallowed=config["partialsallowed"], seed=config["seed"])
+        print(f"[INFO] {label} | Config {true_count}, Run {run_number}")
 
-                try:
-                    while model.simulated_time < model.simulation_end:
-                        model.step()
-                except (RecursionError, MemoryError) as e:
-                    print(f"[ERROR] Simulation crashed: {e}")
-                    return
+        def run_simulation(config):
+            model = SettlementModel(partialsallowed=config["partialsallowed"], seed=config["seed"])
 
-                filename = os.path.join(
-                    results_dir,
-                    f"results_{label}_config{config_id + 1}_run{run}.json"
-                )
+            try:
+                while model.simulated_time < model.simulation_end:
+                    model.step()
+            except (RecursionError, MemoryError) as e:
+                print(f"[ERROR] Simulation crashed: {e}")
+                return
 
-                mem = log_memory_usage("after simulation")
+            filename = os.path.join(
+                results_dir,
+                f"results_{label}_config{true_count}_run{run_number}.json"
+            )
 
-                metadata = {
-                    "seed": config["seed"],
-                    "config_id": config_id + 1,
-                    "run": run,
-                    "label": label,
-                    "memory_usage_mb": mem
-                }
+            mem = log_memory_usage("after simulation")
 
-                try:
-                    model.export_all_statistics(filename=filename, config_metadata=metadata)
-                    print(f"[✓] Exported: {filename}")
-                except Exception as e:
-                    print(f"[ERROR] Could not export: {e}")
+            metadata = {
+                "seed": config["seed"],
+                "config_id": true_count,
+                "run": run_number,
+                "label": label,
+                "memory_usage_mb": mem
+            }
 
+            try:
+                model.export_all_statistics(filename=filename, config_metadata=metadata)
+                print(f"[\u2713] Exported: {filename}")
+            except Exception as e:
+                print(f"[ERROR] Could not export: {e}")
 
-                try:
-                    log_filename = os.path.join(
-                        log_dir,
-                        f"simulation_config{config_id + 1}_run{run}.jsonocel"
-                    )
-                    model.save_ocel_log(filename=log_filename)
-                    print(f"[✓] Saved event log: {log_filename}")
-                except Exception as e:
-                    print(f"[ERROR] Could not save event log: {e}")
+            deep_cleanup()
+            time.sleep(1)
 
-                deep_cleanup()
-                time.sleep(1)
-
-            tracker.track_runtime(run_simulation, config, f"{label}_Config{config_id + 1}_Run{run}")
+        tracker.track_runtime(run_simulation, config, f"{label}_Config{true_count}_Run{run_number}")
 
     tracker.save_results()
-    print("\n[✓] Simulation runs complete.")
+    print("\n[\u2713] Simulation runs complete.")
 
-# === EXAMPLE CONFIG GENERATORS ===
+# === CONFIG GENERATORS ===
 
-def generate_partial_configs(base_seed):
+def generate_partial_configs(base_seed, runs_per_config):
     for true_count in range(1, 11):
-        partialsallowed = tuple([True] * true_count + [False] * (10 - true_count))
-        for seed_offset in range(10):
-            yield {"partialsallowed": partialsallowed, "seed": base_seed + seed_offset}
+        for run_number in range(1, runs_per_config + 1):
+            partialsallowed = tuple([True] * true_count + [False] * (10 - true_count))
+            seed = base_seed + (run_number - 1)
+            yield {
+                "partialsallowed": partialsallowed,
+                "seed": seed,
+                "true_count": true_count,
+                "run_number": run_number
+            }
 
-def generate_depth_configs(base_seed):
+def generate_depth_configs(base_seed, runs_per_config):
     partialsallowed = tuple([True] * 8 + [False] * 2)
     for depth in [3, 8, 15]:
-        for seed_offset in range(10):
-            yield {"partialsallowed": partialsallowed, "seed": base_seed + seed_offset, "max_child_depth": depth}
+        for run_number in range(1, runs_per_config + 1):
+            seed = base_seed + (run_number - 1)
+            yield {
+                "partialsallowed": partialsallowed,
+                "seed": seed,
+                "max_child_depth": depth,
+                "depth": depth,
+                "run_number": run_number
+            }
 
-def generate_amount_configs(base_seed):
+def generate_amount_configs(base_seed, runs_per_config):
     partialsallowed = tuple([True] * 8 + [False] * 2)
     for pct in [0.025, 0.05, 0.1]:
-        for seed_offset in range(10):
-            yield {"partialsallowed": partialsallowed, "seed": base_seed + seed_offset, "min_settlement_percentage": pct}
+        for run_number in range(1, runs_per_config + 1):
+            seed = base_seed + (run_number - 1)
+            yield {
+                "partialsallowed": partialsallowed,
+                "seed": seed,
+                "min_settlement_percentage": pct,
+                "percentage": pct,
+                "run_number": run_number
+            }
 
-# === ENTRYPOINT WITH ARGUMENT PARSING ===
+# === ENTRYPOINT ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run settlement model analysis.")
     parser.add_argument("--analysis", choices=["partial", "depth", "amount"], required=True,
@@ -130,16 +142,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.analysis == "partial":
-        run_analysis("partial", generate_partial_configs, args.runs, "partial_allowance_files", args.seed)
+        run_analysis("partial", lambda base_seed: generate_partial_configs(base_seed, args.runs), args.runs, "partial_allowance_files", args.seed)
         SettlementAnalyzer(results_dir="partial_allowance_files/results_all_analysis").analyze_all(
             output_base="partial_allowance_files/visualizations")
 
     elif args.analysis == "depth":
-        run_analysis("depth", generate_depth_configs, args.runs, "max_depth_files", args.seed)
+        run_analysis("depth", lambda base_seed: generate_depth_configs(base_seed, args.runs), args.runs, "max_depth_files", args.seed)
         MaxDepthVisualizer(results_csv="max_depth_files/max_child_depth_final_results.csv",
                            output_dir="max_depth_files/visualizations")
 
     elif args.analysis == "amount":
-        run_analysis("amount", generate_amount_configs, args.runs, "min_amount_files", args.seed)
+        run_analysis("amount", lambda base_seed: generate_amount_configs(base_seed, args.runs), args.runs, "min_amount_files", args.seed)
         MinSettlementAmountVisualizer(results_csv="min_amount_files/min_settlement_amount_final_results.csv",
                                        output_dir="min_amount_files/visualizations")
