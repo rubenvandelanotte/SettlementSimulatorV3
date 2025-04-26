@@ -1,6 +1,8 @@
 # UNIVERSAL BATCHRUNNER FOR ALL ANALYSES
 import os
 import time
+import json
+import pandas as pd
 from SettlementModel import SettlementModel
 from RuntimeTracker import RuntimeTracker
 import gc
@@ -53,33 +55,59 @@ def run_analysis(label: str, config_generator: callable, runs_per_config: int, o
         def run_simulation(config):
             model = SettlementModel(partialsallowed=config["partialsallowed"], seed=config["seed"])
 
+            if "max_child_depth" in config:
+                model.max_child_depth = config["max_child_depth"]
+            if "min_settlement_percentage" in config:
+                model.min_settlement_percentage = config["min_settlement_percentage"]
+
             try:
                 while model.simulated_time < model.simulation_end:
                     model.step()
             except (RecursionError, MemoryError) as e:
                 print(f"[ERROR] Simulation crashed: {e}")
+                crash_filename = os.path.join(
+                    results_dir,
+                    f"results_{label}_config{config['true_count']}_run{config['run_number']}_CRASH.json"
+                )
+                with open(crash_filename, "w") as f:
+                    json.dump({
+                        "error": str(e),
+                        "seed": config["seed"],
+                        "true_count": config["true_count"],
+                        "run_number": config["run_number"],
+                        "label": label
+                    }, f, indent=2)
                 return
-
-            filename = os.path.join(
-                results_dir,
-                f"results_{label}_config{true_count}_run{run_number}.json"
-            )
 
             mem = log_memory_usage("after simulation")
 
             metadata = {
                 "seed": config["seed"],
-                "config_id": true_count,
-                "run": run_number,
+                "config_id": config["true_count"],
+                "run": config["run_number"],
                 "label": label,
                 "memory_usage_mb": mem
             }
 
+            ocel_log_filename = os.path.join(
+                log_dir,
+                f"log_{label}_config{config['true_count']}_run{config['run_number']}.jsonocel"
+            )
             try:
-                model.export_all_statistics(filename=filename, config_metadata=metadata)
-                print(f"[\u2713] Exported: {filename}")
+                model.save_ocel_log(filename=ocel_log_filename)
+                print(f"[✓] OCEL log saved: {ocel_log_filename}")
             except Exception as e:
-                print(f"[ERROR] Could not export: {e}")
+                print(f"[ERROR] Could not save OCEL log: {e}")
+
+            results_filename = os.path.join(
+                results_dir,
+                f"results_{label}_config{config['true_count']}_run{config['run_number']}.json"
+            )
+            try:
+                model.export_all_statistics(filename=results_filename, config_metadata=metadata)
+                print(f"[✓] Statistics saved: {results_filename}")
+            except Exception as e:
+                print(f"[ERROR] Could not export statistics: {e}")
 
             deep_cleanup()
             time.sleep(1)
@@ -87,9 +115,7 @@ def run_analysis(label: str, config_generator: callable, runs_per_config: int, o
         tracker.track_runtime(run_simulation, config, f"{label}_Config{true_count}_Run{run_number}")
 
     tracker.save_results()
-    print("\n[\u2713] Simulation runs complete.")
-
-# === CONFIG GENERATORS ===
+    print("\n[✓] Simulation runs complete.")
 
 def generate_partial_configs(base_seed, runs_per_config):
     for true_count in range(1, 11):
@@ -129,7 +155,6 @@ def generate_amount_configs(base_seed, runs_per_config):
                 "run_number": run_number
             }
 
-# === ENTRYPOINT ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run settlement model analysis.")
     parser.add_argument("--analysis", choices=["partial", "depth", "amount"], required=True,
