@@ -1,7 +1,9 @@
 import os
+import json
 import gc
 import sys
 import time
+import pandas as pd
 import argparse
 
 from SettlementModel import SettlementModel
@@ -24,6 +26,38 @@ def deep_cleanup():
                 ctypes.windll.kernel32.GetCurrentProcess(), -1, -1)
         except Exception as e:
             print(f"[WARNING] Memory release failed: {e}")
+
+def aggregate_statistics_to_csv(results_dir, output_csv, analysis_type):
+    records = []
+    for file in os.listdir(results_dir):
+        if file.endswith(".json") and "CRASH" not in file:
+            with open(os.path.join(results_dir, file)) as f:
+                data = json.load(f)
+
+            meta = data.get("config_metadata", {})
+            stats = {
+                "instruction_efficiency": data.get("instruction_efficiency"),
+                "value_efficiency": data.get("value_efficiency"),
+                "runtime_seconds": data.get("execution_info", {}).get("execution_time_seconds"),
+                "settled_count": data.get("settled_on_time_count", 0) + data.get("settled_late_count", 0),
+                "settled_amount": data.get("settled_on_time_amount", 0) + data.get("settled_late_amount", 0),
+                "memory_usage_mb": data.get("execution_info", {}).get("memory_usage_mb", 0),
+                "partial_settlements": data.get("partial_cancelled_count", 0)
+            }
+
+            if analysis_type == "depth":
+                stats["max_child_depth"] = meta.get("max_child_depth")
+            elif analysis_type == "amount":
+                stats["min_settlement_percentage"] = meta.get("min_settlement_percentage")
+            elif analysis_type == "partial":
+                stats["true_count"] = meta.get("true_count")
+
+            records.append(stats)
+
+    if records:
+        df = pd.DataFrame(records)
+        df.to_csv(output_csv, index=False)
+        print(f"[✓] Aggregated statistics to {output_csv}")
 
 def finalize_visualizations(output_dir, label):
     if label == "partial":
@@ -84,7 +118,7 @@ def generate_amount_configs(base_seed, runs_per_config):
             }
 
 def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed, visualize_only=False):
-    print(f"\n=== RUNNING ANALYSIS: {label.upper()} ===\n")
+    print(f"=== RUNNING ANALYSIS: {label.upper()} ===")
 
     results_dir = os.path.join(output_dir, "results_all_analysis")
     log_dir = os.path.join(output_dir, "logs")
@@ -112,12 +146,20 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
             if "min_settlement_percentage" in config:
                 model.min_settlement_percentage = config["min_settlement_percentage"]
 
-            try:
-                while model.simulated_time < model.simulation_end:
-                    model.step()
-            except (RecursionError, MemoryError) as e:
-                print(f"[ERROR] Simulation crashed: {e}")
-                return
+            max_retries = 3
+            retries = 0
+
+            while retries < max_retries:
+                try:
+                    while model.simulated_time < model.simulation_end:
+                        model.step()
+                    break
+                except (RecursionError, MemoryError) as e:
+                    retries += 1
+                    print(f"[ERROR] Simulation crashed (attempt {retries}/{max_retries}): {e}")
+                    if retries >= max_retries:
+                        print("[FATAL] Simulation failed after maximum retries.")
+                        return
 
             ocel_log_filename = os.path.join(log_dir, f"log_{label}_config{true_count}_run{run_number}.jsonocel")
             model.save_ocel_log(filename=ocel_log_filename)
@@ -131,13 +173,20 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
         tracker.track_runtime(run_simulation, config, f"{label}_Config{true_count}_Run{run_number}")
 
     tracker.save_results()
-    print("\n[✓] Simulation runs complete.")
+    print("[✓] Simulation runs complete.")
+
+    if label == "partial":
+        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "partial_allowance_final_results.csv"), analysis_type="partial")
+    elif label == "depth":
+        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "max_child_depth_final_results.csv"), analysis_type="depth")
+    elif label == "amount":
+        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "min_settlement_amount_final_results.csv"), analysis_type="amount")
 
     finalize_visualizations(output_dir, label)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run settlement model analysis.")
-    parser.add_argument("--analysis", choices=["partial", "depth", "amount"], required=True, help="Which analysis to run")
+    parser.add_argument("--analysis", choices=["partial", "depth", "amount", "all"], required=True, help="Which analysis to run")
     parser.add_argument("--runs", type=int, default=10, help="Number of runs per configuration")
     parser.add_argument("--seed", type=int, default=42, help="Base random seed")
     parser.add_argument("--visualize_only", action="store_true", help="Skip simulation and only run visualization")
@@ -148,4 +197,8 @@ if __name__ == "__main__":
     elif args.analysis == "depth":
         run_analysis("depth", lambda base_seed, runs: generate_depth_configs(base_seed, runs), args.runs, "max_depth_files", args.seed, visualize_only=args.visualize_only)
     elif args.analysis == "amount":
+        run_analysis("amount", lambda base_seed, runs: generate_amount_configs(base_seed, runs), args.runs, "min_amount_files", args.seed, visualize_only=args.visualize_only)
+    elif args.analysis == "all":
+        run_analysis("partial", lambda base_seed, runs: generate_partial_configs(base_seed, runs), args.runs, "partial_allowance_files", args.seed, visualize_only=args.visualize_only)
+        run_analysis("depth", lambda base_seed, runs: generate_depth_configs(base_seed, runs), args.runs, "max_depth_files", args.seed, visualize_only=args.visualize_only)
         run_analysis("amount", lambda base_seed, runs: generate_amount_configs(base_seed, runs), args.runs, "min_amount_files", args.seed, visualize_only=args.visualize_only)
