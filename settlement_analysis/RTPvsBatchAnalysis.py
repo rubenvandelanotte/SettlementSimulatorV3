@@ -21,7 +21,6 @@ class RTPvsBatchAnalyzer:
         self._plot_trend_lines(config_data)
 
     def _build_rtp_batch_data(self):
-        # Change: Track both SUM and COUNT
         config_data = defaultdict(lambda: {"rtp_sum": 0, "batch_sum": 0, "count": 0})
 
         for filename, stats in self.suite.statistics.items():
@@ -36,7 +35,6 @@ class RTPvsBatchAnalyzer:
             config_data[config]["batch_sum"] += batch_count
             config_data[config]["count"] += 1
 
-        # Now build the average counts
         averaged_data = {}
         for config, values in config_data.items():
             count = values["count"]
@@ -59,8 +57,7 @@ class RTPvsBatchAnalyzer:
         return "Unknown"
 
     def _plot_absolute_counts(self, config_data):
-        configs = sorted([c for c in config_data.keys() if isinstance(c, int)])
-
+        configs = sorted(config_data.keys())
         rtp_counts = [config_data[cfg]["rtp"] for cfg in configs]
         batch_counts = [config_data[cfg]["batch"] for cfg in configs]
 
@@ -70,10 +67,16 @@ class RTPvsBatchAnalyzer:
         plt.figure(figsize=(12, 8))
         plt.bar(x - width/2, rtp_counts, width, label='Real-Time Processing', color='skyblue')
         plt.bar(x + width/2, batch_counts, width, label='Batch Processing', color='salmon')
-        plt.xticks(x, configs)
+
+        # Add value labels
+        for idx, (rtp, batch) in enumerate(zip(rtp_counts, batch_counts)):
+            plt.text(x[idx] - width/2, rtp + 200, f"{int(rtp)}", ha='center', va='bottom', fontsize=8)
+            plt.text(x[idx] + width/2, batch + 200, f"{int(batch)}", ha='center', va='bottom', fontsize=8)
+
+        plt.xticks(x, [f"Config {cfg}" for cfg in configs])
         plt.xlabel('Configuration')
-        plt.ylabel('Number of Settled Instructions (Average)')
-        plt.title('RTP vs Batch Processing Settlements by Configuration (Average)')
+        plt.ylabel('Average Number of Settled Instructions')
+        plt.title('RTP vs Batch Processing Settlements by Configuration (Averaged)')
         plt.legend()
         plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
@@ -81,8 +84,7 @@ class RTPvsBatchAnalyzer:
         plt.close()
 
     def _plot_percentage_stack(self, config_data):
-        configs = sorted([c for c in config_data.keys() if isinstance(c, int)])
-
+        configs = sorted(config_data.keys())
         rtp_pct = []
         batch_pct = []
 
@@ -98,18 +100,23 @@ class RTPvsBatchAnalyzer:
         plt.figure(figsize=(12, 8))
         plt.bar(configs, rtp_pct, label='Real-Time Processing', color='skyblue')
         plt.bar(configs, batch_pct, bottom=rtp_pct, label='Batch Processing', color='salmon')
+
+        # Annotate the RTP percentage on the bars
+        for idx, rtp in enumerate(rtp_pct):
+            plt.text(configs[idx], rtp/2, f"{rtp:.1f}%", ha='center', va='center', fontsize=8, fontweight='bold')
+
         plt.xlabel('Configuration')
         plt.ylabel('Percentage of Settled Instructions')
-        plt.title('RTP vs Batch Processing Settlements by Configuration')
+        plt.title('RTP vs Batch Processing Settlements by Configuration (Percentage)')
         plt.legend()
+        plt.xticks(configs, [f"Config {cfg}" for cfg in configs])
         plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "rtp_vs_batch_percentage.png"))
         plt.close()
 
     def _plot_trend_lines(self, config_data):
-        configs = sorted([c for c in config_data.keys() if isinstance(c, int)])
-
+        configs = sorted(config_data.keys())
         rtp = [config_data[cfg]["rtp"] for cfg in configs]
         batch = [config_data[cfg]["batch"] for cfg in configs]
         total = [r + b for r, b in zip(rtp, batch)]
@@ -119,10 +126,14 @@ class RTPvsBatchAnalyzer:
         plt.plot(x, total, 'o-', color='purple', label='Total Settlements')
         plt.plot(x, rtp, 's--', color='deepskyblue', label='Real-Time Processing')
         plt.plot(x, batch, '^--', color='tomato', label='Batch Processing')
-        plt.xticks(x, configs)
+
+        for idx in x:
+            plt.text(idx, total[idx] + 200, f"{int(total[idx])}", ha='center', va='bottom', fontsize=8)
+
+        plt.xticks(x, [f"Config {cfg}" for cfg in configs])
         plt.xlabel('Configuration')
-        plt.ylabel('Number of Settled Instructions')
-        plt.title('Settlement Trends by Processing Type Across Configurations')
+        plt.ylabel('Average Number of Settled Instructions')
+        plt.title('Settlement Trends by Processing Type Across Configurations (Averaged)')
         plt.legend()
         plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
