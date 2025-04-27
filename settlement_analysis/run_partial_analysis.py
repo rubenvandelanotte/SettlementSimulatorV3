@@ -1,5 +1,6 @@
 import os
 import json
+
 from settlement_analysis.DepthAnalysis import DepthAnalyzer
 from settlement_analysis.LatenessAnalysis import LatenessAnalyzer
 from settlement_analysis.LatenessHoursAnalysis import LatenessHoursAnalyzer
@@ -7,13 +8,13 @@ from settlement_analysis.RuntimeAnalysis import RuntimeAnalyzer
 from settlement_analysis.ConfidenceIntervalAnalysis import ConfidenceIntervalAnalyzer
 from settlement_analysis.RTPvsBatchAnalysis import RTPvsBatchAnalyzer
 
+
 class SettlementAnalysisSuite:
     def __init__(self, input_dir="./", output_dir="./"):
         self.input_dir = input_dir
         self.output_dir = output_dir
 
         self.statistics = {}
-        self.logs = []
         self.runtime_data = []
 
         # Initialize analyzers
@@ -32,7 +33,6 @@ class SettlementAnalysisSuite:
 
         # Load all inputs
         self._load_statistics()
-        self._load_logs()
         self._load_runtime_results()
 
         # Dispatch analyzers
@@ -60,26 +60,21 @@ class SettlementAnalysisSuite:
         else:
             print(f"[WARNING] Statistics directory not found at {stats_dir}")
 
-    def _load_logs(self):
-        logs_dir = os.path.join(self.input_dir, "logs")
-        if os.path.exists(logs_dir):
-            for file in os.listdir(logs_dir):
-                if file.endswith(".jsonocel"):
-                    with open(os.path.join(logs_dir, file), "r") as f:
-                        self.logs.append(json.load(f))
-            print(f"[INFO] Loaded {len(self.logs)} logs from logs/")
-        else:
-            print(f"[WARNING] Logs directory not found at {logs_dir}")
-
     def _load_runtime_results(self):
-        runtime_file = os.path.join(self.input_dir, "runtime_partial.json")
-        if os.path.exists(runtime_file):
+        runtime_file = None
+
+        # Try to guess the correct runtime file dynamically
+        for filename in os.listdir(self.input_dir):
+            if filename.startswith("runtime_") and filename.endswith(".json"):
+                runtime_file = os.path.join(self.input_dir, filename)
+                break
+
+        if runtime_file and os.path.exists(runtime_file):
             with open(runtime_file, "r") as f:
                 self.runtime_data = json.load(f)
-            print(f"[INFO] Loaded {len(self.runtime_data)} runtime entries from runtime_results.json")
+            print(f"[INFO] Loaded {len(self.runtime_data)} runtime entries from {runtime_file}")
         else:
             self.runtime_data = []
-            print(f"[WARNING] No runtime_results.json found at {runtime_file}")
-
+            print(f"[WARNING] No runtime file found in {self.input_dir}")
 
 

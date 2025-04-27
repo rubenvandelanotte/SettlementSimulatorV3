@@ -1,7 +1,7 @@
 import os
-import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 class LatenessAnalyzer:
@@ -12,169 +12,110 @@ class LatenessAnalyzer:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def run(self):
-        df = self._build_dataframe()
+        df, total_intended_amounts = self._build_lateness_dataframe()
+        print(f"[DEBUG] LatenessAnalyzer DataFrame shape: {df.shape}")
+
         if df.empty:
-            print("[WARNING] No valid statistics data to analyze.")
+            print("[WARNING] No lateness data available.")
             return
 
-        total_intended_amounts = self._load_total_intended_amounts()
-
-        self._plot_ontime_vs_late_amounts_fixed(df)
-        self._plot_settlement_amount_trends_fixed(df, total_intended_amounts)
-        self._plot_late_percentage_per_config(df)
+        self._plot_late_percentage_by_config(df)
         self._plot_lateness_by_depth(df)
-        self._plot_lateness_heatmap(df)
+        self._plot_lateness_depth_config_heatmap(df)
+        self._plot_ontime_vs_late_amounts_fixed(df)
         self._plot_ontime_vs_late_counts(df)
+        self._plot_settlement_amount_trends_fixed(df, total_intended_amounts)
 
-    def _build_dataframe(self):
+    def _build_lateness_dataframe(self):
         records = []
-        for stat_file, stat_data in self.suite.statistics.items():
-            config_key = "Unknown"
-            if "_config" in stat_file:
-                config_key = stat_file.split("_config")[-1].split("_run")[0]
-            try:
-                config_key = int(config_key)
-            except ValueError:
-                pass
+        total_intended_amounts = {}
 
-            settled_on_time = stat_data.get("settled_on_time", 0)
-            settled_late = stat_data.get("settled_late", 0)
-            ontime_amount = stat_data.get("ontime_amount", 0)
-            late_amount = stat_data.get("late_amount", 0)
-            depth_records = stat_data.get("depth_status_counts", {})
+        for filename, stats in self.suite.statistics.items():
+            config = self._extract_config_name(filename)
 
-            records.append({
-                "config": config_key,
-                "settled_on_time": settled_on_time,
-                "settled_late": settled_late,
-                "ontime_amount": ontime_amount,
-                "late_amount": late_amount,
-                "depth_records": depth_records
-            })
+            # Safely fallback
+            ontime_count = stats.get("settled_ontime_rtp", 0) + stats.get("settled_ontime_batch", 0)
+            late_count = stats.get("settled_late_rtp", 0) + stats.get("settled_late_batch", 0)
 
-        return pd.DataFrame(records)
+            ontime_amount = stats.get("settled_on_time_amount", 0)
+            late_amount = stats.get("settled_late_amount", 0)
 
-    def _load_total_intended_amounts(self):
-        intended_amounts = {}
-        for stat_file, stat_data in self.suite.statistics.items():
-            config_key = "Unknown"
-            if "_config" in stat_file:
-                config_key = stat_file.split("_config")[-1].split("_run")[0]
-            try:
-                config_key = int(config_key)
-            except ValueError:
-                pass
+            depth_counts = stats.get("depth_counts", {})
 
-            if "intended_amount" in stat_data:
-                intended_amounts[config_key] = stat_data["intended_amount"]
+            for depth, count in depth_counts.items():
+                try:
+                    depth_int = int(depth)
+                except ValueError:
+                    continue
 
-        return intended_amounts
+                records.append({
+                    "config": config,
+                    "depth": depth_int,
+                    "total_count": count,  # How many instructions at this depth
+                    # Additional fields for later aggregation
+                    "ontime_count": ontime_count,
+                    "late_count": late_count,
+                    "ontime_amount": ontime_amount,
+                    "late_amount": late_amount,
+                })
 
-    def _plot_ontime_vs_late_amounts_fixed(self, df):
-        df_grouped = df.groupby("config")["ontime_amount", "late_amount"].sum().sort_index()
+            # Save total intended amount for normalized trends
+            intended = stats.get("intended_amount", 0)
+            total_intended_amounts[config] = intended
 
-        plt.figure(figsize=(14, 8))
-        plt.bar(df_grouped.index, df_grouped["ontime_amount"], label="Settled On Time (€)", color='green')
-        plt.bar(df_grouped.index, df_grouped["late_amount"], bottom=df_grouped["ontime_amount"], label="Settled Late (€)", color='orange')
-        plt.title('On-Time vs Late Settlement Amounts by Configuration (Fixed)')
-        plt.ylabel('Settlement Amount (€)')
-        plt.xlabel('Configuration')
-        plt.legend()
-        plt.xticks(df_grouped.index)
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "ontime_vs_late_amounts_fixed.png"))
-        plt.close()
+        df = pd.DataFrame(records)
+        return df, total_intended_amounts
 
-    def _plot_settlement_amount_trends_fixed(self, df, total_intended_amounts):
-        df_grouped = df.groupby("config")["ontime_amount", "late_amount"].sum().sort_index()
-        df_grouped["total_amount"] = df_grouped["ontime_amount"] + df_grouped["late_amount"]
+    def _extract_config_name(self, filename):
+        parts = filename.split("_")
+        for part in parts:
+            if part.lower().startswith("config"):
+                try:
+                    return int(part.replace("config", ""))
+                except ValueError:
+                    return "Unknown"
+        return "Unknown"
 
-        normalized_total = []
-        normalized_ontime = []
-        normalized_late = []
-
-        for config in df_grouped.index:
-            intended = total_intended_amounts.get(config, None)
-            if intended and intended > 0:
-                normalized_total.append(df_grouped.at[config, "total_amount"] / intended * 100)
-                normalized_ontime.append(df_grouped.at[config, "ontime_amount"] / intended * 100)
-                normalized_late.append(df_grouped.at[config, "late_amount"] / intended * 100)
-            else:
-                normalized_total.append(0)
-                normalized_ontime.append(0)
-                normalized_late.append(0)
+    def _plot_late_percentage_by_config(self, df):
+        df_grouped = df.groupby("config")[["ontime_count", "late_count"]].sum().sort_index()
+        df_grouped["late_percentage"] = df_grouped["late_count"] / (df_grouped["ontime_count"] + df_grouped["late_count"]) * 100
 
         plt.figure(figsize=(14, 8))
-        plt.plot(df_grouped.index, normalized_total, 'o-', label="Total Settled (%)", color='blue')
-        plt.plot(df_grouped.index, normalized_ontime, 's--', label="On-Time Settled (%)", color='green')
-        plt.plot(df_grouped.index, normalized_late, '^--', label="Late Settled (%)", color='orange')
-        plt.title('Normalized Settlement Amount Trends by Configuration (Fixed)')
-        plt.ylabel('Percentage of Intended Amount Settled')
-        plt.xlabel('Configuration')
-        plt.xticks(df_grouped.index)
-        plt.legend()
-        plt.grid(axis='y', linestyle='--', alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "settlement_amount_trends_fixed.png"))
-        plt.close()
-
-    def _plot_late_percentage_per_config(self, df):
-        df_grouped = df.groupby("config")[["settled_on_time", "settled_late"]].sum()
-        lateness_percentage = df_grouped["settled_late"] / (df_grouped["settled_on_time"] + df_grouped["settled_late"]) * 100
-
-        plt.figure(figsize=(12, 8))
-        bars = plt.bar(lateness_percentage.index, lateness_percentage, color='orange', alpha=0.7)
-        for bar, pct in zip(bars, lateness_percentage):
-            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5, f'{pct:.1f}%', ha='center')
+        plt.bar(df_grouped.index, df_grouped["late_percentage"], color='tomato')
         plt.title('Late Settlement Percentage by Configuration')
-        plt.ylabel('Percentage of Settlements that were Late')
         plt.xlabel('Configuration')
-        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.ylabel('Percentage of Settlements that were Late')
+        plt.grid(axis='y')
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "late_settlement_percentage.png"))
         plt.close()
 
     def _plot_lateness_by_depth(self, df):
-        depth_totals = {}
-        for _, row in df.iterrows():
-            for depth, counts in row.get("depth_records", {}).items():
-                depth = int(depth)
-                depth_totals.setdefault(depth, {"late": 0, "ontime": 0})
-                depth_totals[depth]["late"] += counts.get("Settled late", 0)
-                depth_totals[depth]["ontime"] += counts.get("Settled on time", 0)
-
-        depth_list = sorted(depth_totals.keys())
-        lateness_pct = [(depth_totals[d]["late"] / (depth_totals[d]["late"] + depth_totals[d]["ontime"]) * 100) if (depth_totals[d]["late"] + depth_totals[d]["ontime"]) > 0 else 0 for d in depth_list]
+        df_depth = df.groupby("depth")[["ontime_count", "late_count"]].sum()
+        df_depth["late_percentage"] = df_depth["late_count"] / (df_depth["ontime_count"] + df_depth["late_count"]) * 100
 
         plt.figure(figsize=(14, 8))
-        plt.plot(depth_list, lateness_pct, 'o-', color='purple')
-        for d, pct in zip(depth_list, lateness_pct):
-            plt.text(d, pct + 1, f'{pct:.1f}%', ha='center')
+        plt.plot(df_depth.index, df_depth["late_percentage"], marker='o', color='purple')
+        for idx, val in enumerate(df_depth["late_percentage"]):
+            plt.text(idx, val + 2, f"{val:.1f}%", ha='center', fontsize=8)
+
+        plt.title('Late Settlement Percentage by Instruction Depth')
         plt.xlabel('Instruction Depth')
         plt.ylabel('Late Settlement Percentage')
-        plt.title('Late Settlement Percentage by Instruction Depth')
-        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.grid()
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "lateness_by_depth.png"))
         plt.close()
 
-    def _plot_lateness_heatmap(self, df):
-        heatmap_data = {}
-        for _, row in df.iterrows():
-            config = row["config"]
-            for depth, counts in row.get("depth_records", {}).items():
-                depth = int(depth)
-                heatmap_data.setdefault(depth, {})
-                total = counts.get("Settled late", 0) + counts.get("Settled on time", 0)
-                if total > 0:
-                    heatmap_data[depth][config] = counts.get("Settled late", 0) / total * 100
-                else:
-                    heatmap_data[depth][config] = 0
+    def _plot_lateness_depth_config_heatmap(self, df):
+        pivot = df.pivot_table(index="depth", columns="config", values="late_count", aggfunc="sum", fill_value=0)
 
-        heatmap_df = pd.DataFrame(heatmap_data).T.sort_index()
+        # To normalize percentages:
+        total = df.pivot_table(index="depth", columns="config", values="total_count", aggfunc="sum", fill_value=1)
+        late_percentage = (pivot / total) * 100
 
         plt.figure(figsize=(16, 10))
-        sns.heatmap(heatmap_df, annot=True, fmt=".1f", cmap="RdYlGn_r", vmin=0, vmax=100)
+        sns.heatmap(late_percentage, annot=True, fmt=".1f", cmap="RdYlGn_r", linewidths=0.5)
         plt.title('Late Settlement Percentage by Depth and Configuration')
         plt.xlabel('Configuration')
         plt.ylabel('Instruction Depth')
@@ -182,17 +123,57 @@ class LatenessAnalyzer:
         plt.savefig(os.path.join(self.output_dir, "lateness_depth_config_heatmap.png"))
         plt.close()
 
-    def _plot_ontime_vs_late_counts(self, df):
-        df_grouped = df.groupby("config")[["settled_on_time", "settled_late"]].sum()
+    def _plot_ontime_vs_late_amounts_fixed(self, df):
+        df_grouped = df.groupby("config")[["ontime_amount", "late_amount"]].sum().sort_index()
 
-        plt.figure(figsize=(14, 8))
-        plt.bar(df_grouped.index, df_grouped["settled_on_time"], label="Settled On Time", color='green')
-        plt.bar(df_grouped.index, df_grouped["settled_late"], bottom=df_grouped["settled_on_time"], label="Settled Late", color='orange')
-        plt.title('On-Time vs Late Settlements by Configuration')
-        plt.ylabel('Number of Settlements')
+        plt.figure(figsize=(16, 8))
+        plt.bar(df_grouped.index - 0.15, df_grouped["ontime_amount"], width=0.3, label="Settled On Time (€)", color='green')
+        plt.bar(df_grouped.index + 0.15, df_grouped["late_amount"], width=0.3, label="Settled Late (€)", color='orange')
         plt.xlabel('Configuration')
+        plt.ylabel('Settlement Amount (€)')
+        plt.title('On-Time vs Late Settlement Amounts by Configuration (Fixed)')
         plt.legend()
-        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.grid(axis='y')
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "ontime_vs_late_amounts_fixed.png"))
+        plt.close()
+
+    def _plot_ontime_vs_late_counts(self, df):
+        df_grouped = df.groupby("config")[["ontime_count", "late_count"]].sum().sort_index()
+
+        plt.figure(figsize=(16, 8))
+        plt.bar(df_grouped.index - 0.15, df_grouped["ontime_count"], width=0.3, label="Settled On Time", color='green')
+        plt.bar(df_grouped.index + 0.15, df_grouped["late_count"], width=0.3, label="Settled Late", color='orange')
+        plt.xlabel('Configuration')
+        plt.ylabel('Number of Settlements')
+        plt.title('On-Time vs Late Settlements by Configuration')
+        plt.legend()
+        plt.grid(axis='y')
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "ontime_vs_late_counts.png"))
+        plt.close()
+
+    def _plot_settlement_amount_trends_fixed(self, df, total_intended_amounts):
+        df_grouped = df.groupby("config")[["ontime_amount", "late_amount"]].sum().sort_index()
+
+        configs = df_grouped.index
+        total_settled = df_grouped["ontime_amount"] + df_grouped["late_amount"]
+        total_intended = [total_intended_amounts.get(cfg, 1) for cfg in configs]
+
+        normalized_total = (total_settled / total_intended) * 100
+        normalized_ontime = (df_grouped["ontime_amount"] / total_intended) * 100
+        normalized_late = (df_grouped["late_amount"] / total_intended) * 100
+
+        plt.figure(figsize=(16, 8))
+        plt.plot(configs, normalized_total, marker='o', label='Total Settled (%)', color='blue')
+        plt.plot(configs, normalized_ontime, marker='s', linestyle='--', label='On-Time Settled (%)', color='green')
+        plt.plot(configs, normalized_late, marker='^', linestyle='--', label='Late Settled (%)', color='orange')
+
+        plt.xlabel('Configuration')
+        plt.ylabel('Percentage of Intended Amount Settled')
+        plt.title('Normalized Settlement Amount Trends by Configuration (Fixed)')
+        plt.legend()
+        plt.grid()
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "settlement_amount_trends_fixed.png"))
         plt.close()

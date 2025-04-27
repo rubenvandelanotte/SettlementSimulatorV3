@@ -195,18 +195,21 @@ class TransactionAgent(Agent):
                 label = "Settled Late"
                 lateness_seconds = (self.model.simulated_time - self.deliverer.get_intended_settlement_date()).total_seconds()
                 lateness_hours = math.ceil(lateness_seconds / 3600)
+                depth = max(self.deliverer.get_depth(), self.receiver.get_depth())
             else:
                 self.deliverer.set_status("Settled on time")
                 self.receiver.set_status("Settled on time")
                 self.status = "Settled on time"
                 label = "Settled On Time"
                 lateness_hours = 0
+                depth = max(self.deliverer.get_depth(), self.receiver.get_depth())
 
             self.model.log_event(
                 event_type=label,
                 object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
-                attributes={"status": self.status, "lateness_hours": lateness_hours}
+                attributes={"status": self.status, "lateness_hours": lateness_hours, "depth": depth}
             )
+
 
             self.model.remove_transaction(self)
             self.model.agents.remove(self.deliverer)
