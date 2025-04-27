@@ -1,8 +1,11 @@
 import os
-import pandas as pd
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from collections import defaultdict
+import re
+from datetime import datetime
 
 class LatenessHoursAnalyzer:
     def __init__(self, input_dir, output_dir, suite):
@@ -11,158 +14,266 @@ class LatenessHoursAnalyzer:
         self.suite = suite
         os.makedirs(self.output_dir, exist_ok=True)
 
+        self.config_lateness = defaultdict(list)
+        self.lateness_by_depth = defaultdict(list)
+        self.all_lateness_hours = []
+        self.log_files = []
+
     def run(self):
-        df = self._build_lateness_dataframe()
-        print(f"[DEBUG] Lateness DataFrame shape: {df.shape}")
-        if df.empty:
-            print("[WARNING] No lateness data found.")
+        self._load_lateness_data()
+        if not self.all_lateness_hours:
+            print("[WARNING] No lateness hours found. Exiting.")
             return
 
-        self._plot_lateness_statistics(df)
-        self._plot_lateness_categories(df)
-        self._plot_lateness_boxplot(df)
-        self._plot_lateness_histogram(df)
-        self._plot_lateness_heatmap(df)
+        self._plot_lateness_statistics()
+        self._plot_lateness_boxplot()
+        self._plot_lateness_histogram()
+        self._plot_lateness_by_depth()
+        self._plot_violin_by_depth()
+        self._plot_lateness_heatmap()
+        self._plot_lateness_scatter()
+        self._plot_lateness_time_buckets()
 
-    def _build_lateness_dataframe(self):
-        records = []
-        for filename, stats in self.suite.statistics.items():
-            config = self._extract_config_name(filename)
-            lateness_by_depth = stats.get("lateness_by_depth", {})
+    def _load_lateness_data(self):
+        print("[INFO] Loading lateness hours from logs...")
+        log_folder = os.path.join(self.input_dir, "logs")
 
-            for depth_str, avg_lateness in lateness_by_depth.items():
-                try:
-                    avg_lateness = float(avg_lateness)
-                except Exception:
-                    continue
-                records.append({
-                    "config": config,
-                    "depth": int(depth_str),
-                    "lateness_hours": avg_lateness
-                })
+        if not os.path.exists(log_folder):
+            print(f"[WARNING] Log folder '{log_folder}' does not exist.")
+            return
 
-        return pd.DataFrame(records)
+        self.log_files = [f for f in os.listdir(log_folder) if f.endswith(".jsonocel") and "simulation" in f]
 
-    def _extract_config_name(self, filename):
-        parts = filename.split("_")
-        for part in parts:
-            if part.lower().startswith("config"):
-                try:
-                    return int(part.replace("config", ""))
-                except ValueError:
-                    return "Unknown"
-        return "Unknown"
+        if not self.log_files:
+            print(f"[WARNING] No simulation log files found in {log_folder}")
+            return
 
-    def _plot_lateness_statistics(self, df):
-        grouped = df.groupby("config")["lateness_hours"]
-        summary_df = pd.DataFrame({
-            "Average": grouped.mean(),
-            "Median": grouped.median(),
-            "Maximum": grouped.max()
-        }).reset_index()
+        for log_file in self.log_files:
+            config_match = re.search(r'config(\d+)', log_file)
+            if not config_match:
+                continue
 
-        x = np.arange(len(summary_df))
-        width = 0.25
+            config_num = int(config_match.group(1))
+            config_name = f"Config {config_num}"
 
-        fig, ax = plt.subplots(figsize=(16, 8))
-        ax.bar(x - width, summary_df["Average"], width, label='Average', color='skyblue')
-        ax.bar(x, summary_df["Median"], width, label='Median', color='green')
-        ax.bar(x + width, summary_df["Maximum"], width, label='Maximum', color='salmon')
+            try:
+                with open(os.path.join(log_folder, log_file), 'r') as f:
+                    log_data = json.load(f)
 
-        for i, v in enumerate(summary_df["Maximum"]):
-            ax.text(i + width, v + 5, f"{v:.1f}", ha='center', fontsize=8)
+                events = log_data.get("ocel:events", log_data.get("events", {}))
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(["Config " + str(c) for c in summary_df["config"]])
-        ax.set_xlabel("Configuration")
-        ax.set_ylabel("Hours Late")
-        ax.set_title("Lateness Statistics by Configuration")
-        ax.legend()
+                for event_id, event in (events.items() if isinstance(events, dict) else enumerate(events)):
+                    lateness_hours = None
+                    depth = None
+
+                    attributes = event.get("ocel:attributes", event.get("attributes", {}))
+
+                    if isinstance(attributes, dict):
+                        lateness_hours = attributes.get("lateness_hours")
+                        depth = attributes.get("depth")
+                    elif isinstance(attributes, list):
+                        for attr in attributes:
+                            if attr.get("name") == "lateness_hours":
+                                lateness_hours = attr.get("value")
+                            if attr.get("name") == "depth":
+                                depth = attr.get("value")
+
+                    if lateness_hours is not None:
+                        try:
+                            lateness_hours = float(lateness_hours)
+                            self.config_lateness[config_name].append(lateness_hours)
+                            self.all_lateness_hours.append(lateness_hours)
+
+                            if depth is not None:
+                                self.lateness_by_depth[int(depth)].append(lateness_hours)
+                        except Exception:
+                            pass
+
+            except Exception as e:
+                print(f"[ERROR] Failed to process {log_file}: {e}")
+
+        print(f"[INFO] Loaded lateness data from {len(self.log_files)} files.")
+
+    def _plot_lateness_statistics(self):
+        configs = sorted(self.config_lateness.keys(), key=lambda x: int(x.split()[1]))
+        avg_lateness = [np.mean(self.config_lateness[cfg]) for cfg in configs]
+        median_lateness = [np.median(self.config_lateness[cfg]) for cfg in configs]
+        max_lateness = [np.max(self.config_lateness[cfg]) for cfg in configs]
+
+        plt.figure(figsize=(14, 8))
+        bar_width = 0.25
+        x = np.arange(len(configs))
+
+        plt.bar(x - bar_width, avg_lateness, width=bar_width, label='Average', color='skyblue')
+        plt.bar(x, median_lateness, width=bar_width, label='Median', color='green')
+        plt.bar(x + bar_width, max_lateness, width=bar_width, label='Maximum', color='salmon')
+
+        plt.xlabel('Configuration')
+        plt.ylabel('Hours Late')
+        plt.title('Lateness Statistics by Configuration')
+        plt.xticks(x, configs)
+        plt.legend()
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "lateness_hours_statistics.png"))
         plt.close()
 
-    def _plot_lateness_categories(self, df):
-        bins = [0, 1, 6, 12, 24, 48, np.inf]
-        labels = ['< 1 hour', '1-6 hours', '6-12 hours', '12-24 hours', '1-2 days', '> 2 days']
-        df['lateness_category'] = pd.cut(df['lateness_hours'], bins=bins, labels=labels, right=False)
+    def _plot_lateness_boxplot(self):
+        configs = sorted(self.config_lateness.keys(), key=lambda x: int(x.split()[1]))
+        box_data = [self.config_lateness[cfg] for cfg in configs]
 
-        category_counts = df.groupby(["config", "lateness_category"], observed=False).size().unstack(fill_value=0)
-
-
-        # Normalize to percentages
-        category_percentages = category_counts.div(category_counts.sum(axis=1), axis=0) * 100
-
-        fig, ax = plt.subplots(figsize=(16, 8))
-        bottom = np.zeros(len(category_percentages))
-
-        for category in labels:
-            ax.bar(
-                category_percentages.index,
-                category_percentages[category],
-                label=category,
-                bottom=bottom
-            )
-            bottom += category_percentages[category]
-
-        for i, total in enumerate(bottom):
-            if total > 100:
-                bottom[i] = 100
-
-        for idx, row in category_percentages.iterrows():
-            cumulative = 0
-            for category in labels:
-                value = row[category]
-                if value > 5:
-                    ax.text(idx, cumulative + value/2, f"{value:.1f}%", ha='center', va='center', fontsize=8)
-                cumulative += value
-
-        ax.set_xlabel('Configuration')
-        ax.set_ylabel('Percentage of Late Settlements')
-        ax.set_title('Lateness Time Categories by Configuration')
-        ax.legend(title="Lateness Category")
-        ax.set_xticks(category_percentages.index)
-        ax.set_xticklabels(["Config " + str(c) for c in category_percentages.index])
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "lateness_categories.png"))
-        plt.close()
-
-    def _plot_lateness_boxplot(self, df):
-        plt.figure(figsize=(16, 10))
-        sns.boxplot(x="config", y="lateness_hours", data=df, showfliers=True, boxprops=dict(alpha=.6))
-        sns.stripplot(x="config", y="lateness_hours", data=df, color="black", size=2, jitter=True, alpha=0.3)
+        plt.figure(figsize=(14, 8))
+        sns.boxplot(data=box_data)
+        for i, config_data in enumerate(box_data):
+            jitter = np.random.normal(i, 0.08, size=len(config_data))
+            plt.scatter(jitter, config_data, alpha=0.3, color='black', s=10)
+        plt.xticks(np.arange(len(configs)), configs)
         plt.title('Distribution of Settlement Lateness Hours by Configuration')
-        plt.ylabel('Hours Late')
         plt.xlabel('Configuration')
+        plt.ylabel('Hours Late')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "lateness_hours_boxplot.png"))
         plt.close()
 
-    def _plot_lateness_histogram(self, df):
+    def _plot_lateness_histogram(self):
         plt.figure(figsize=(14, 8))
-        plt.hist(df['lateness_hours'], bins=30, color='skyblue', edgecolor='black')
-        plt.axvline(df['lateness_hours'].mean(), color='red', linestyle='--', label=f'Mean: {df["lateness_hours"].mean():.2f} hours')
-        plt.axvline(df['lateness_hours'].median(), color='green', linestyle='--', label=f'Median: {df["lateness_hours"].median():.2f} hours')
+        plt.hist(self.all_lateness_hours, bins=30, color='skyblue', edgecolor='black')
+        plt.axvline(np.mean(self.all_lateness_hours), color='red', linestyle='--', label='Mean')
+        plt.axvline(np.median(self.all_lateness_hours), color='green', linestyle='--', label='Median')
         plt.title('Overall Distribution of Settlement Lateness Hours')
         plt.xlabel('Hours Late')
         plt.ylabel('Frequency')
         plt.legend()
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "lateness_hours_histogram.png"))
         plt.close()
 
-    def _plot_lateness_heatmap(self, df):
-        if df.empty or "depth" not in df.columns:
-            print("[WARNING] No depth data available for lateness heatmap.")
+    def _plot_lateness_by_depth(self):
+        if not self.lateness_by_depth:
             return
 
-        heatmap_data = df.pivot_table(index="depth", columns="config", values="lateness_hours", aggfunc="mean")
+        depths = sorted(self.lateness_by_depth.keys())
+        avg_lateness = [np.mean(self.lateness_by_depth[d]) for d in depths]
 
-        plt.figure(figsize=(16, 10))
-        sns.heatmap(heatmap_data, annot=True, fmt=".1f", cmap="YlOrRd", linewidths=0.5)
+        plt.figure(figsize=(14, 8))
+        plt.plot(depths, avg_lateness, 'o-', color='blue')
+        plt.title('Average Lateness Hours by Instruction Depth')
+        plt.xlabel('Instruction Depth')
+        plt.ylabel('Hours Late')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "lateness_hours_by_depth.png"))
+        plt.close()
+
+    def _plot_violin_by_depth(self):
+        if not self.lateness_by_depth:
+            return
+
+        depths = sorted(self.lateness_by_depth.keys())
+        violin_data = [self.lateness_by_depth[d] for d in depths]
+
+        plt.figure(figsize=(14, 8))
+        sns.violinplot(data=violin_data)
+        plt.xticks(np.arange(len(depths)), depths)
+        plt.title('Distribution of Lateness Hours by Instruction Depth')
+        plt.xlabel('Instruction Depth')
+        plt.ylabel('Hours Late')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "lateness_hours_violin.png"))
+        plt.close()
+
+    def _plot_lateness_heatmap(self):
+        if not self.lateness_by_depth or not self.config_lateness:
+            return
+
+        lateness_by_config_depth = defaultdict(lambda: defaultdict(list))
+        for config, lateness_list in self.config_lateness.items():
+            for lateness in lateness_list:
+                lateness_by_config_depth[config][0].append(lateness)
+
+        configs = sorted(lateness_by_config_depth.keys(), key=lambda x: int(x.split()[1]))
+        depths = sorted({depth for conf in lateness_by_config_depth.values() for depth in conf.keys()})
+
+        if not depths or not configs:
+            return
+
+        heatmap_data = np.zeros((len(depths), len(configs)))
+        for i, depth in enumerate(depths):
+            for j, config in enumerate(configs):
+                hours = lateness_by_config_depth[config].get(depth, [])
+                heatmap_data[i, j] = np.mean(hours) if hours else 0
+
+        plt.figure(figsize=(14, 10))
+        sns.heatmap(heatmap_data, annot=True, fmt=".1f", cmap="YlOrRd", cbar_kws={'label': 'Avg Hours Late'})
         plt.title('Average Lateness Hours by Depth and Configuration')
         plt.xlabel('Configuration')
         plt.ylabel('Instruction Depth')
+        plt.xticks(np.arange(len(configs)) + 0.5, configs, rotation=45, ha='right')
+        plt.yticks(np.arange(len(depths)) + 0.5, depths, rotation=0)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "lateness_hours_heatmap.png"))
+        plt.close()
+
+    def _plot_lateness_scatter(self):
+        if not self.lateness_by_depth:
+            return
+
+        x, y = [], []
+        for depth, hours_list in self.lateness_by_depth.items():
+            for hours in hours_list:
+                x.append(depth)
+                y.append(hours)
+
+        plt.figure(figsize=(14, 8))
+        plt.scatter(x, y, alpha=0.5, color='blue')
+        if x and y:
+            z = np.polyfit(x, y, 1)
+            p = np.poly1d(z)
+            plt.plot(sorted(x), p(sorted(x)), "r--", label=f"Trend: y = {z[0]:.2f}x + {z[1]:.2f}")
+            plt.legend()
+        plt.title('Scatter Plot of Lateness Hours vs Instruction Depth')
+        plt.xlabel('Instruction Depth')
+        plt.ylabel('Hours Late')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "lateness_hours_scatter.png"))
+        plt.close()
+
+    def _plot_lateness_time_buckets(self):
+        if not self.config_lateness:
+            return
+
+        configs = sorted(self.config_lateness.keys(), key=lambda x: int(x.split()[1]))
+
+        buckets = [(0, 1, "< 1h"), (1, 6, "1-6h"), (6, 12, "6-12h"), (12, 24, "12-24h"), (24, 48, "1-2d"), (48, float('inf'), ">2d")]
+
+        bucket_counts = {config: [0] * len(buckets) for config in configs}
+        for config in configs:
+            for hours in self.config_lateness[config]:
+                for idx, (low, high, _) in enumerate(buckets):
+                    if low <= hours < high:
+                        bucket_counts[config][idx] += 1
+                        break
+
+        bucket_pcts = {config: [(count / sum(bucket_counts[config]) * 100) if sum(bucket_counts[config]) else 0 for count in counts] for config, counts in bucket_counts.items()}
+
+        plt.figure(figsize=(14, 8))
+        bottom = np.zeros(len(configs))
+        bucket_colors = ['green', 'yellowgreen', 'gold', 'orange', 'darkorange', 'red']
+
+        for i, (_, _, label) in enumerate(buckets):
+            heights = [bucket_pcts[cfg][i] for cfg in configs]
+            plt.bar(configs, heights, bottom=bottom, label=label, color=bucket_colors[i])
+            bottom += np.array(heights)
+
+        plt.xlabel('Configuration')
+        plt.ylabel('Percentage of Late Settlements')
+        plt.title('Lateness Time Categories by Configuration')
+        plt.legend(title='Lateness Category')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "lateness_categories.png"))
         plt.close()
