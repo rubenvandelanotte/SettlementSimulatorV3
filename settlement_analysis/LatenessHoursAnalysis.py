@@ -1,7 +1,6 @@
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
-import numpy as np
 import seaborn as sns
 
 class LatenessHoursAnalyzer:
@@ -13,15 +12,14 @@ class LatenessHoursAnalyzer:
 
     def run(self):
         df = self._build_lateness_dataframe()
+        print(f"[DEBUG] Dataframe shape: {df.shape}")  # Debug line
         if df.empty:
             print("[WARNING] No lateness data found.")
             return
 
-        self._plot_lateness_categories(df)
         self._plot_lateness_boxplot(df)
-        self._plot_lateness_heatmap(df)
         self._plot_lateness_histogram(df)
-        self._plot_lateness_statistics(df)
+        self._plot_lateness_heatmap(df)
 
     def _build_lateness_dataframe(self):
         records = []
@@ -37,50 +35,34 @@ class LatenessHoursAnalyzer:
 
             for event in events:
                 event_type = event.get("type") or event.get("ocel:activity")
-                if event_type == "Settled Late":
+                if event_type and "settled" in event_type.lower() and "late" in event_type.lower():
                     lateness_hours = event.get("lateness_hours")
-                    depth = event.get("depth", None)
                     if lateness_hours is not None:
                         records.append({
                             "config": config,
                             "lateness_hours": lateness_hours,
-                            "depth": depth
+                            "depth": event.get("depth", None)
                         })
 
+        print(f"[DEBUG] Total late events found: {len(records)}")  # Debug line
         return pd.DataFrame(records)
 
     def _extract_config_name(self, log):
-        if isinstance(log, dict) and "log_name" in log:
-            parts = log["log_name"].split("_")
-        elif isinstance(log, dict) and "meta" in log and "name" in log["meta"]:
-            parts = log["meta"]["name"].split("_")
-        else:
-            return None
+        if isinstance(log, dict):
+            if "log_name" in log:
+                parts = log["log_name"].split("_")
+            elif "meta" in log and "name" in log["meta"]:
+                parts = log["meta"]["name"].split("_")
+            else:
+                return "Unknown"
 
-        for part in parts:
-            if part.startswith("config"):
-                return part
-        return None
-
-    def _plot_lateness_categories(self, df):
-        bins = [0, 1, 6, 12, 24, 48, np.inf]
-        labels = ['< 1 hour', '1-6 hours', '6-12 hours', '12-24 hours', '1-2 days', '> 2 days']
-        df['category'] = pd.cut(df['lateness_hours'], bins=bins, labels=labels, right=False)
-
-        grouped = df.groupby(['config', 'category']).size().unstack(fill_value=0)
-        grouped = grouped.div(grouped.sum(axis=1), axis=0) * 100
-
-        colors = sns.color_palette("YlOrRd", len(labels))
-
-        plt.figure(figsize=(14, 8))
-        grouped.plot(kind='bar', stacked=True, color=colors, ax=plt.gca())
-        plt.title('Lateness Time Categories by Configuration')
-        plt.ylabel('Percentage of Late Settlements')
-        plt.xlabel('Configuration')
-        plt.legend(title='Lateness Category')
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "lateness_categories.png"))
-        plt.close()
+            for part in parts:
+                if part.lower().startswith("config"):
+                    try:
+                        return int(part.replace("config", ""))
+                    except ValueError:
+                        return "Unknown"
+        return "Unknown"
 
     def _plot_lateness_boxplot(self, df):
         plt.figure(figsize=(16, 10))
@@ -91,22 +73,6 @@ class LatenessHoursAnalyzer:
         plt.xlabel('Configuration')
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "lateness_hours_boxplot.png"))
-        plt.close()
-
-    def _plot_lateness_heatmap(self, df):
-        if "depth" not in df.columns:
-            print("[WARNING] No depth data available for lateness heatmap.")
-            return
-
-        heatmap_data = df.dropna(subset=["depth"]).groupby(["depth", "config"])['lateness_hours'].mean().unstack()
-
-        plt.figure(figsize=(16, 10))
-        sns.heatmap(heatmap_data, annot=True, fmt=".1f", cmap="YlOrRd", linewidths=0.5)
-        plt.title('Average Lateness Hours by Depth and Configuration')
-        plt.xlabel('Configuration')
-        plt.ylabel('Instruction Depth')
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "lateness_hours_heatmap.png"))
         plt.close()
 
     def _plot_lateness_histogram(self, df):
@@ -122,21 +88,18 @@ class LatenessHoursAnalyzer:
         plt.savefig(os.path.join(self.output_dir, "lateness_hours_histogram.png"))
         plt.close()
 
-    def _plot_lateness_statistics(self, df):
-        grouped = df.groupby("config")["lateness_hours"].agg(["mean", "median", "max"])
+    def _plot_lateness_heatmap(self, df):
+        if "depth" not in df.columns or df['depth'].isnull().all():
+            print("[WARNING] No depth data available for lateness heatmap.")
+            return
 
-        x = np.arange(len(grouped.index))
-        width = 0.25
+        heatmap_data = df.dropna(subset=["depth"]).groupby(["depth", "config"])["lateness_hours"].mean().unstack()
 
         plt.figure(figsize=(16, 10))
-        plt.bar(x - width, grouped["mean"], width, label='Average')
-        plt.bar(x, grouped["median"], width, label='Median')
-        plt.bar(x + width, grouped["max"], width, label='Maximum')
-
-        plt.xticks(x, grouped.index, rotation=45)
-        plt.ylabel('Hours Late')
-        plt.title('Lateness Statistics by Configuration')
-        plt.legend()
+        sns.heatmap(heatmap_data, annot=True, fmt=".1f", cmap="YlOrRd", linewidths=0.5)
+        plt.title('Average Lateness Hours by Depth and Configuration')
+        plt.xlabel('Configuration')
+        plt.ylabel('Instruction Depth')
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "lateness_hours_statistics.png"))
+        plt.savefig(os.path.join(self.output_dir, "lateness_hours_heatmap.png"))
         plt.close()
