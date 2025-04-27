@@ -1,14 +1,12 @@
-import pandas
 from mesa import Model
 from datetime import datetime, timedelta
-import pandas as pd
-from sympy.physics.units import seconds
-import math
 import InstitutionAgent
 import Account
 import random
-import os
 from jsonocellogger import JSONOCELLogger
+from statistics_tracker import SettlementStatisticsTracker
+
+
 
 def generate_iban():
     """Generate a simple IBAN-like string.
@@ -25,7 +23,8 @@ class SettlementModel(Model):
         super().__init__()
         self.partialsallowed= partialsallowed
         #parameters of the model
-        self.num_institutions = 10
+        self.statistics_tracker = SettlementStatisticsTracker()
+        self.num_institutions = 4
         self.min_total_accounts = 4
         self.max_total_accounts = 10
         self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
@@ -89,6 +88,10 @@ class SettlementModel(Model):
 
         self.generate_data()
 
+
+
+
+
     def in_main_period(self):
         """Helper method to determine if the current simulated time is within the main period."""
         main_start = self.simulation_start + self.warm_up_period
@@ -115,12 +118,25 @@ class SettlementModel(Model):
         if attributes is None:
             attributes = {}
 
+        timestamp_iso = self.simulated_time.isoformat() + "Z"
+
         self.logger.log_event(
             event_type=event_type,
             object_ids=object_ids,
             event_attributes=attributes,
-            timestamp=self.simulated_time.isoformat() + "Z"
+            timestamp=timestamp_iso
         )
+        if event_type in ["Settled On Time", "Settled Late"]:
+            self.statistics_tracker.classify_settlement(
+                event_type=event_type,
+                event_timestamp_str=timestamp_iso,
+                lateness_hours=attributes.get("lateness_hours"),
+                depth=attributes.get("depth")
+             )
+
+
+
+
 
     def save_ocel_log(self, filename: str = "simulation_log.jsonocel"):
         self.logger.export_log(filename)
@@ -280,6 +296,7 @@ class SettlementModel(Model):
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
                 transaction.settle()
+
 
     def mini_batch_settlement(self):
         print(f"[INFO] Running mini-batch settlement at {self.simulated_time}")
@@ -739,7 +756,7 @@ class SettlementModel(Model):
         """
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         total = sum(inst.get_amount() for inst in relevant_instructions if inst.get_status() == "Settled on time")
-        return total
+        return total / 2
 
     def get_settled_late_amount(self):
         """
@@ -747,7 +764,7 @@ class SettlementModel(Model):
         """
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         total = sum(inst.get_amount() for inst in relevant_instructions if inst.get_status() == "Settled late")
-        return total
+        return total / 2
 
     def get_cancelled_partial_amount(self):
         """
@@ -756,7 +773,7 @@ class SettlementModel(Model):
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         total = sum(inst.get_amount() for inst in relevant_instructions if
                     inst.get_status() == "Cancelled due to partial settlement")
-        return total
+        return total / 2
 
     def get_cancelled_error_amount(self):
         """
@@ -765,7 +782,7 @@ class SettlementModel(Model):
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
         total = sum(
             inst.get_amount() for inst in relevant_instructions if inst.get_status() == "Cancelled due to error")
-        return total
+        return total / 2
 
     def get_avg_instruction_age_before_settlement(self):
         relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
@@ -951,9 +968,12 @@ class SettlementModel(Model):
             "depth_status_counts": depth_status_counts,
         }
 
+        result.update(self.statistics_tracker.export_summary())
+
         # Optional metadata: seed, runtime, memory, config info
         if config_metadata:
             result.update(config_metadata)
+
 
         with open(filename, 'w') as f:
             json.dump(result, f, indent=2)
