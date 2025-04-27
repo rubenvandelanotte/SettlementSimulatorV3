@@ -2,7 +2,6 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
-from datetime import datetime, time
 
 class RTPvsBatchAnalyzer:
     def __init__(self, input_dir, output_dir, suite):
@@ -22,55 +21,46 @@ class RTPvsBatchAnalyzer:
         self._plot_trend_lines(config_data)
 
     def _build_rtp_batch_data(self):
-        config_data = defaultdict(lambda: {"rtp": 0, "batch": 0})
+        # Change: Track both SUM and COUNT
+        config_data = defaultdict(lambda: {"rtp_sum": 0, "batch_sum": 0, "count": 0})
 
-        for log in self.suite.logs:
-            events = []
-            if isinstance(log, dict):
-                if "ocel:events" in log:
-                    events = list(log.get("ocel:events", {}).values())
-                elif "events" in log:
-                    events = log.get("events", [])
-
-            config_name = self._extract_config_name(log)
-            if config_name is None:
+        for filename, stats in self.suite.statistics.items():
+            config = self._extract_config_name(filename)
+            if config == "Unknown":
                 continue
 
-            for event in events:
-                event_type = event.get("type") or event.get("ocel:activity")
-                if event_type in ["Settled On Time", "Settled Late"]:
-                    timestamp = event.get("time") or event.get("ocel:timestamp")
-                    if timestamp:
-                        try:
-                            dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                            event_time = dt.time()
-                            if time(1, 30) <= event_time <= time(19, 30):
-                                config_data[config_name]["rtp"] += 1
-                            elif event_time >= time(22, 0):
-                                config_data[config_name]["batch"] += 1
-                        except Exception:
-                            continue
+            rtp_count = stats.get("settled_ontime_rtp", 0) + stats.get("settled_late_rtp", 0)
+            batch_count = stats.get("settled_ontime_batch", 0) + stats.get("settled_late_batch", 0)
 
-        return config_data
+            config_data[config]["rtp_sum"] += rtp_count
+            config_data[config]["batch_sum"] += batch_count
+            config_data[config]["count"] += 1
 
-    def _extract_config_name(self, log):
-        if isinstance(log, dict) and "log_name" in log:
-            parts = log["log_name"].split("_")
-        elif isinstance(log, dict) and "meta" in log and "name" in log["meta"]:
-            parts = log["meta"]["name"].split("_")
-        else:
-            return None
+        # Now build the average counts
+        averaged_data = {}
+        for config, values in config_data.items():
+            count = values["count"]
+            if count > 0:
+                averaged_data[config] = {
+                    "rtp": values["rtp_sum"] / count,
+                    "batch": values["batch_sum"] / count
+                }
 
+        return averaged_data
+
+    def _extract_config_name(self, filename):
+        parts = filename.split("_")
         for part in parts:
-            if part.startswith("config"):
-                try:
-                    return int(part.replace("config", ""))
-                except ValueError:
-                    return None
-        return None
+            if part.lower().startswith("config"):
+                num_part = part.replace("config", "")
+                if num_part.isdigit():
+                    return int(num_part)
+        print(f"[WARNING] Failed to parse config from {filename}")
+        return "Unknown"
 
     def _plot_absolute_counts(self, config_data):
-        configs = sorted(config_data.keys())
+        configs = sorted([c for c in config_data.keys() if isinstance(c, int)])
+
         rtp_counts = [config_data[cfg]["rtp"] for cfg in configs]
         batch_counts = [config_data[cfg]["batch"] for cfg in configs]
 
@@ -91,7 +81,8 @@ class RTPvsBatchAnalyzer:
         plt.close()
 
     def _plot_percentage_stack(self, config_data):
-        configs = sorted(config_data.keys())
+        configs = sorted([c for c in config_data.keys() if isinstance(c, int)])
+
         rtp_pct = []
         batch_pct = []
 
@@ -117,7 +108,8 @@ class RTPvsBatchAnalyzer:
         plt.close()
 
     def _plot_trend_lines(self, config_data):
-        configs = sorted(config_data.keys())
+        configs = sorted([c for c in config_data.keys() if isinstance(c, int)])
+
         rtp = [config_data[cfg]["rtp"] for cfg in configs]
         batch = [config_data[cfg]["batch"] for cfg in configs]
         total = [r + b for r, b in zip(rtp, batch)]
