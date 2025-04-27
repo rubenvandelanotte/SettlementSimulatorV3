@@ -80,7 +80,7 @@ def finalize_visualizations(output_dir, label):
         visualizer.generate_all_visualizations()
 
 def generate_partial_configs(base_seed, runs_per_config):
-    for true_count in range(1, 11):
+    for true_count in range(1, 5):
         for run_number in range(1, runs_per_config + 1):
             partialsallowed = tuple([True] * true_count + [False] * (10 - true_count))
             seed = base_seed + (run_number - 1)
@@ -117,7 +117,7 @@ def generate_amount_configs(base_seed, runs_per_config):
                 "run_number": run_number
             }
 
-def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed, visualize_only=False):
+def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed, visualize_only=False, no_visualization=False):
     print(f"=== RUNNING ANALYSIS: {label.upper()} ===")
 
     results_dir = os.path.join(output_dir, "results_all_analysis")
@@ -175,6 +175,8 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
     tracker.save_results()
     print("[✓] Simulation runs complete.")
 
+
+    # otherwise continue to aggregation and visualization
     if label == "partial":
         aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "partial_allowance_final_results.csv"), analysis_type="partial")
     elif label == "depth":
@@ -182,23 +184,29 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
     elif label == "amount":
         aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "min_settlement_amount_final_results.csv"), analysis_type="amount")
 
+    if no_visualization:
+        print("[INFO] Skipping visualizations because --no_visualization was passed.")
+        return
+
     finalize_visualizations(output_dir, label)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run settlement model analysis.")
     parser.add_argument("--analysis", choices=["partial", "depth", "amount", "all"], required=True, help="Which analysis to run")
     parser.add_argument("--runs", type=int, default=10, help="Number of runs per configuration")
     parser.add_argument("--seed", type=int, default=42, help="Base random seed")
-    parser.add_argument("--visualize_only", action="store_true", help="Skip simulation and only run visualization")
+    parser.add_argument("--visualize_only", action="store_true", help="Only generate visualizations, skip simulation")
+    parser.add_argument("--no_visualization", action="store_true", help="Run simulations but skip visualizations")
     args = parser.parse_args()
 
     if args.analysis == "partial":
-        run_analysis("partial", lambda base_seed, runs: generate_partial_configs(base_seed, runs), args.runs, "partial_allowance_files", args.seed, visualize_only=args.visualize_only)
+        run_analysis("partial", generate_partial_configs, args.runs, "partial_allowance_files", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
     elif args.analysis == "depth":
-        run_analysis("depth", lambda base_seed, runs: generate_depth_configs(base_seed, runs), args.runs, "max_depth_files", args.seed, visualize_only=args.visualize_only)
+        run_analysis("depth", generate_depth_configs, args.runs, "max_depth_files", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
     elif args.analysis == "amount":
-        run_analysis("amount", lambda base_seed, runs: generate_amount_configs(base_seed, runs), args.runs, "min_amount_files", args.seed, visualize_only=args.visualize_only)
+        run_analysis("amount", generate_amount_configs, args.runs, "min_amount_files", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
     elif args.analysis == "all":
-        run_analysis("partial", lambda base_seed, runs: generate_partial_configs(base_seed, runs), args.runs, "partial_allowance_files", args.seed, visualize_only=args.visualize_only)
-        run_analysis("depth", lambda base_seed, runs: generate_depth_configs(base_seed, runs), args.runs, "max_depth_files", args.seed, visualize_only=args.visualize_only)
-        run_analysis("amount", lambda base_seed, runs: generate_amount_configs(base_seed, runs), args.runs, "min_amount_files", args.seed, visualize_only=args.visualize_only)
+        run_analysis("partial", generate_partial_configs, args.runs, "partial_allowance_files", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
+        run_analysis("depth", generate_depth_configs, args.runs, "max_depth_files", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
+        run_analysis("amount", generate_amount_configs, args.runs, "min_amount_files", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
