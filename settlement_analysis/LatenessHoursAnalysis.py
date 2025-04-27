@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import defaultdict
 import re
-from datetime import datetime
 
 class LatenessHoursAnalyzer:
     def __init__(self, input_dir, output_dir, suite):
