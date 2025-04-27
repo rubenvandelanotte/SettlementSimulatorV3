@@ -14,7 +14,8 @@ class DepthAnalyzer:
 
     def run(self):
         configs = self._aggregate_statistics()
-        self._analyze_per_config(configs)
+        for config_name, data in self.statistics.items():
+            self._analyze_single_config(config_name, data)
         self._analyze_comparative(configs)
         self._export_summary(configs)
 
@@ -40,11 +41,13 @@ class DepthAnalyzer:
 
         return config_data
 
-    def _analyze_per_config(self, configs):
-        for config_key, data in configs.items():
-            self._plot_depth_distribution(data, config_key)
-            self._plot_status_by_depth(data, config_key)
-            self._plot_success_rate_by_depth(data, config_key)
+    def _analyze_single_config(self, config_name, data):
+        config_output_dir = os.path.join(self.output_dir, config_name)
+        os.makedirs(config_output_dir, exist_ok=True)
+
+        self._depth_distribution(data, config_name, os.path.join(config_output_dir, "depth_distribution.png"))
+        self._status_by_depth(data, config_name, os.path.join(config_output_dir, "status_by_depth.png"))
+        self._success_rate_by_depth(data, config_name, os.path.join(config_output_dir, "success_rate.png"))
 
     def _analyze_comparative(self, configs):
         self._plot_comparative_depth_distribution(configs)
@@ -71,58 +74,81 @@ class DepthAnalyzer:
         with open(os.path.join(self.output_dir, "depth_summary.json"), "w") as f:
             json.dump(summary, f, indent=4)
 
-    def _plot_depth_distribution(self):
-        plt.figure(figsize=(14, 8))
-        colors = plt.cm.tab10(np.linspace(0, 1, len(self.depth_data)))
+    def _depth_distribution(self, data, config_name, output_file):
+        depth_counts = data["depth_counts"]
+        depths = sorted(int(d) for d in depth_counts.keys())
+        counts = [depth_counts[str(d)] for d in depths]
 
-        for idx, (config, counts) in enumerate(sorted(self.depth_data.items(), key=lambda x: int(x[0].replace('config', '')))):
-            plt.bar(range(len(counts)), counts, color=colors[idx % len(colors)], alpha=0.7, label=config)
-
-        plt.xlabel('Depth Level', fontsize=14)
-        plt.ylabel('Average Instructions', fontsize=14)
-        plt.title('Depth Distribution per Configuration', fontsize=16)
-        plt.xticks(rotation=45, ha='right')
-        plt.grid(True, linestyle='--', alpha=0.6)
-        plt.legend(title='Configuration', fontsize=10, title_fontsize=12)
+        plt.figure(figsize=(10, 6))
+        plt.bar(depths, counts, color='skyblue')
+        plt.xlabel('Instruction Depth')
+        plt.ylabel('Average Number of Instructions')
+        plt.title(f'{config_name}: Depth Distribution')
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "depth_distribution.png"), dpi=300)
+        plt.savefig(output_file)
         plt.close()
 
-    def _plot_status_by_depth(self, status_data):
-        plt.figure(figsize=(14, 8))
-        statuses = ['Settled on time', 'Settled late', 'Cancelled', 'In process']
-        colors = {'Settled on time': 'green', 'Settled late': 'orange', 'Cancelled': 'red', 'In process': 'lightgray'}
+    def _status_by_depth(self, data, config_name, output_file):
+        depth_status_counts = data["depth_status_counts"]
+        depths = sorted(int(d) for d in depth_status_counts.keys())
 
-        depths = sorted(status_data.keys())
-        bottom = np.zeros(len(depths))
+        status_groups = {
+            "Settled on time": ["Settled on time"],
+            "Settled late": ["Settled late"],
+            "Cancelled": ["Cancelled"],
+            "In process": ["In process"]
+        }
+        group_colors = {
+            "Settled on time": "green",
+            "Settled late": "orange",
+            "Cancelled": "red",
+            "In process": "gray"
+        }
 
-        for status in statuses:
-            counts = [status_data[d].get(status, 0) for d in depths]
-            plt.bar(depths, counts, bottom=bottom, label=status, color=colors.get(status, 'gray'))
-            bottom += np.array(counts)
+        group_data = {}
+        for group, statuses in status_groups.items():
+            group_data[group] = []
+            for depth in depths:
+                count = sum(depth_status_counts.get(str(depth), {}).get(status, 0) for status in statuses)
+                group_data[group].append(count)
 
-        plt.xlabel('Instruction Depth', fontsize=14)
-        plt.ylabel('Count', fontsize=14)
-        plt.title('Status Distribution by Depth', fontsize=16)
-        plt.xticks(rotation=45, ha='right')
-        plt.grid(True, linestyle='--', alpha=0.6)
-        plt.legend(title='Status', fontsize=10, title_fontsize=12)
+        plt.figure(figsize=(12, 8))
+        bottom = [0] * len(depths)
+
+        for group, counts in group_data.items():
+            plt.bar(depths, counts, bottom=bottom, label=group, color=group_colors.get(group, 'gray'))
+            bottom = [b + c for b, c in zip(bottom, counts)]
+
+        plt.xlabel('Instruction Depth')
+        plt.ylabel('Average Number of Instructions')
+        plt.title(f'{config_name}: Status by Depth')
+        plt.legend()
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "status_by_depth.png"), dpi=300)
+        plt.savefig(output_file)
         plt.close()
 
-    def _plot_success_rate_by_depth(self, success_data):
-        plt.figure(figsize=(14, 8))
-        depths = sorted(success_data.keys())
-        success_rates = [success_data[d] for d in depths]
+    def _success_rate_by_depth(self, data, config_name, output_file):
+        depth_status_counts = data["depth_status_counts"]
+        depths = sorted(int(d) for d in depth_status_counts.keys())
 
-        plt.plot(depths, success_rates, 'o-', markersize=6, linewidth=2.5, color='blue')
-        plt.xlabel('Instruction Depth', fontsize=14)
-        plt.ylabel('Success Rate (%)', fontsize=14)
-        plt.title('Success Rate by Depth', fontsize=16)
-        plt.grid(True, linestyle='--', alpha=0.6)
+        success_rates = []
+        for depth in depths:
+            statuses = depth_status_counts.get(str(depth), {})
+            total = sum(statuses.values())
+            successful = statuses.get("Settled on time", 0) + statuses.get("Settled late", 0)
+            success_rate = (successful / total * 100) if total > 0 else 0
+            success_rates.append(success_rate)
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(depths, success_rates, 'o-', linewidth=2, markersize=8, color='blue')
+        plt.xlabel('Depth Level')
+        plt.ylabel('Success Rate (%)')
+        plt.title(f'{config_name}: Success Rate by Depth')
+        plt.grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "success_rate_by_depth.png"), dpi=300)
+        plt.savefig(output_file)
         plt.close()
 
     def _plot_comparative_depth_distribution(self):
