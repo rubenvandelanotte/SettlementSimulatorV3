@@ -72,7 +72,7 @@ class RTPvsBatchAnalyzer:
         plt.bar(x + width/2, batch_counts, width, label='Batch Processing', color='salmon')
         plt.xticks(x, configs)
         plt.xlabel('Configuration')
-        plt.ylabel('Number of Settled Instructions')
+        plt.ylabel('Number of Settled Instructions (Average)')
         plt.title('RTP vs Batch Processing Settlements by Configuration')
         plt.legend()
         plt.grid(axis='y', linestyle='--', alpha=0.3)
