@@ -107,14 +107,14 @@ class LatenessAnalyzer:
         plt.close()
 
     def _plot_lateness_depth_config_heatmap(self, df):
-        pivot = df.pivot_table(index="depth", columns="config", values="late_count", aggfunc="sum", fill_value=0)
+        grouped = df.groupby(["depth", "config"])[["ontime_count", "late_count"]].sum()
+        grouped["late_percentage"] = grouped["late_count"] / (grouped["ontime_count"] + grouped["late_count"]) * 100
 
-        # To normalize percentages:
-        total = df.pivot_table(index="depth", columns="config", values="total_count", aggfunc="sum", fill_value=1)
-        late_percentage = (pivot / total) * 100
+        pivot = grouped["late_percentage"].unstack(fill_value=0)
 
         plt.figure(figsize=(16, 10))
-        sns.heatmap(late_percentage, annot=True, fmt=".1f", cmap="RdYlGn_r", linewidths=0.5)
+        ax = sns.heatmap(pivot, annot=True, fmt=".1f", cmap="RdYlGn_r", linewidths=0.5)
+
         plt.title('Late Settlement Percentage by Depth and Configuration')
         plt.xlabel('Configuration')
         plt.ylabel('Instruction Depth')

@@ -13,11 +13,29 @@ class DepthAnalyzer:
         self.output_dir = os.path.join(output_dir, "depth_analysis")
         self.suite = suite
         os.makedirs(self.output_dir, exist_ok=True)
-        self.statistics = self._aggregate_statistics()
 
-    def _aggregate_statistics(self):
+        # [PATCH] Local fix only, don't overwrite suite.statistics
+        fixed_statistics = self._fix_statistics_format(self.suite.statistics)
+        self.statistics = self._aggregate_statistics(fixed_statistics)
+
+    def _fix_statistics_format(self, statistics):
+        fixed_statistics = {}
+        for stat_file, data in statistics.items():
+            fixed_data = {}
+            if "depth_counts" in data:
+                fixed_data["depth_counts"] = {str(k): int(v) for k, v in data["depth_counts"].items()}
+            if "depth_status_counts" in data:
+                fixed_status_counts = {}
+                for depth, statuses in data["depth_status_counts"].items():
+                    fixed_status_counts[str(depth)] = {str(status): int(count) for status, count in statuses.items()}
+                fixed_data["depth_status_counts"] = fixed_status_counts
+            fixed_statistics[stat_file] = fixed_data
+        return fixed_statistics
+
+    # [PATCH] Accept statistics as argument
+    def _aggregate_statistics(self, statistics):
         aggregated_stats = {}
-        for stat_file, data in self.suite.statistics.items():
+        for stat_file, data in statistics.items():
             config_match = re.search(r'config(\d+)', stat_file)
             if config_match:
                 config_num = int(config_match.group(1))
@@ -32,10 +50,16 @@ class DepthAnalyzer:
                 }
 
             depth_counts = data.get("depth_counts", {})
+            if not depth_counts:
+                print(f"[WARNING] No depth_counts found in {stat_file}")
+
             for depth, count in depth_counts.items():
                 aggregated_stats[config_name]["depth_counts"][depth] += count
 
             depth_status_counts = data.get("depth_status_counts", {})
+            if not depth_status_counts:
+                print(f"[WARNING] No depth_status_counts found in {stat_file}")
+
             for depth, statuses in depth_status_counts.items():
                 for status, count in statuses.items():
                     aggregated_stats[config_name]["depth_status_counts"][depth][status] += count
@@ -43,7 +67,9 @@ class DepthAnalyzer:
         return aggregated_stats
 
     def run(self):
+        print("[INFO] Running DepthAnalyzer with the following configurations:")
         for config_name, data in self.statistics.items():
+            print(f"Config: {config_name}, Depths: {list(data['depth_counts'].keys())}")
             self._analyze_single_config(config_name, data)
 
         self._compare_success_rates()
@@ -53,6 +79,11 @@ class DepthAnalyzer:
         self._compare_normalized_completion_rate()
         self._plot_success_rate_heatmap()
         self._export_summary()
+
+    def _safe_legend(self):
+        handles, labels = plt.gca().get_legend_handles_labels()
+        if any(label and not label.startswith('_') for label in labels):
+            plt.legend()
 
     def _analyze_single_config(self, config_name, data):
         config_output_dir = os.path.join(self.output_dir, config_name)
@@ -250,7 +281,7 @@ class DepthAnalyzer:
     def _plot_success_rate_heatmap(self):
         configs = sorted(self.statistics.keys())
         depths = range(30)
-        heatmap_data = np.zeros((len(depths), len(configs)))
+        heatmap_data = np.full((len(depths), len(configs)), np.nan)
 
         for j, config_name in enumerate(configs):
             depth_status_counts = self.statistics[config_name]["depth_status_counts"]
@@ -258,16 +289,20 @@ class DepthAnalyzer:
                 statuses = depth_status_counts.get(str(i), {})
                 total = sum(statuses.values())
                 successful = statuses.get("Settled on time", 0) + statuses.get("Settled late", 0)
-                heatmap_data[i, j] = (successful / total * 100) if total > 0 else 0
+                if total > 0:
+                    heatmap_data[i, j] = (successful / total) * 100
 
-        plt.figure(figsize=(14, 10))
-        sns.heatmap(heatmap_data, annot=False, cmap="YlGnBu", xticklabels=configs, yticklabels=depths)
-        plt.xlabel('Configuration')
-        plt.ylabel('Instruction Depth')
-        plt.title('Heatmap of Success Rate by Depth and Configuration')
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "success_rate_heatmap.png"))
-        plt.close()
+        if np.any(~np.isnan(heatmap_data)):
+            plt.figure(figsize=(14, 10))
+            sns.heatmap(heatmap_data, annot=False, cmap="YlGnBu", xticklabels=configs, yticklabels=depths)
+            plt.xlabel('Configuration')
+            plt.ylabel('Instruction Depth')
+            plt.title('Heatmap of Success Rate by Depth and Configuration')
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.output_dir, "success_rate_heatmap.png"))
+            plt.close()
+        else:
+            print("[WARNING] No valid data to plot in heatmap, skipping.")
 
     def _export_summary(self):
         summary_data = []

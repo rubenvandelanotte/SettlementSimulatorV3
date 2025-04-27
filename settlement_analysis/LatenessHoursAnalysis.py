@@ -41,7 +41,7 @@ class LatenessHoursAnalyzer:
             print(f"[WARNING] Log folder '{log_folder}' does not exist.")
             return
 
-        self.log_files = [f for f in os.listdir(log_folder) if f.endswith(".jsonocel") and "simulation" in f]
+        self.log_files = [f for f in os.listdir(log_folder) if f.endswith(".jsonocel")]
 
         if not self.log_files:
             print(f"[WARNING] No simulation log files found in {log_folder}")
