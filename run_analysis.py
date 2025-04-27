@@ -80,7 +80,7 @@ def finalize_visualizations(output_dir, label):
         visualizer.generate_all_visualizations()
 
 def generate_partial_configs(base_seed, runs_per_config):
-    for true_count in range(1, 5):
+    for true_count in range(1, 11):
         for run_number in range(1, runs_per_config + 1):
             partialsallowed = tuple([True] * true_count + [False] * (10 - true_count))
             seed = base_seed + (run_number - 1)
