@@ -77,4 +77,8 @@ class SettlementAnalysisSuite:
             self.runtime_data = []
             print(f"[WARNING] No runtime file found in {self.input_dir}")
 
-
+if __name__ == "__main__":
+        suite = SettlementAnalysisSuite(
+            input_dir= R"C:\Users\ruben\thesis\SettlementSimulatorV3.16\partial_allowance_files",
+            output_dir= os.path.join( R"C:\Users\ruben\thesis\SettlementSimulatorV3.16\partial_allowance_files", "visualizations", "partial"))
+        suite.analyze_all()
