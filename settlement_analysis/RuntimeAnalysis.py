@@ -22,11 +22,11 @@ class RuntimeAnalyzer:
 
         self._plot_runtime_and_efficiency(df)
         self._plot_runtime_distribution(df)
-        self._plot_runtime_bars(df)
+        self._plot_runtime_bars_mean_median(df)
         self._plot_runtime_boxplot(df)
+        self._plot_runtime_vs_efficiency_scatter(df, "instruction_efficiency")
+        self._plot_runtime_vs_efficiency_scatter(df, "value_efficiency")
         self._plot_correlation_heatmap(df)
-        self._plot_runtime_vs_instruction_efficiency(df)
-        self._plot_runtime_vs_value_efficiency(df)
 
     def _build_runtime_dataframe(self):
         records = []
@@ -45,7 +45,6 @@ class RuntimeAnalyzer:
             instruction_efficiency = None
             value_efficiency = None
 
-            # Try to match to results file
             if true_count is not None and run_number is not None:
                 stats_filename = f"results_partial_config{true_count}_run{run_number}.json"
                 stats_path = os.path.join(results_dir, stats_filename)
@@ -70,47 +69,47 @@ class RuntimeAnalyzer:
 
         df = pd.DataFrame(records)
         if df.empty:
-            print("[WARNING] RuntimeAnalyzer built empty dataframe — check JSON contents.")
+            print("[WARNING] RuntimeAnalyzer built empty dataframe.")
         return df
 
     def _plot_runtime_and_efficiency(self, df):
         grouped = df.groupby("config").mean().sort_index()
 
         fig, ax1 = plt.subplots(figsize=(16, 8))
-
-        color = 'tab:blue'
         ax1.set_xlabel('Configuration')
-        ax1.set_ylabel('Execution Time (seconds)', color=color)
-        ax1.plot(grouped.index, grouped["execution_time"], 'o-', color=color, label='Execution Time (s)')
-        ax1.tick_params(axis='y', labelcolor=color)
+        ax1.set_ylabel('Execution Time (seconds)', color='tab:blue')
+        ax1.plot(grouped.index, grouped["execution_time"], 'o-', color='tab:blue', label='Execution Time')
+        ax1.tick_params(axis='y', labelcolor='tab:blue')
 
         ax2 = ax1.twinx()
-        color = 'tab:green'
-        ax2.set_ylabel('Efficiency (%)', color=color)
+        ax2.set_ylabel('Efficiency (%)')
         ax2.plot(grouped.index, grouped["instruction_efficiency"], 's--', color='tab:green', label='Instruction Efficiency')
         ax2.plot(grouped.index, grouped["value_efficiency"], '^--', color='tab:orange', label='Value Efficiency')
-        ax2.tick_params(axis='y', labelcolor=color)
 
-        lines_1, labels_1 = ax1.get_legend_handles_labels()
-        lines_2, labels_2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='best')
+        lines, labels = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines + lines2, labels + labels2, loc='best')
 
         plt.title('Runtime and Efficiencies by Configuration')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "runtime_and_efficiency.png"))
         plt.close()
 
     def _plot_runtime_distribution(self, df):
         plt.figure(figsize=(14, 8))
-        sns.histplot(df["execution_time"], bins=20, kde=False, color='skyblue', edgecolor='black')
+        plt.hist(df['execution_time'], bins=20, color='skyblue', edgecolor='black', alpha=0.7)
+        plt.axvline(df['execution_time'].mean(), color='red', linestyle='--', label=f'Mean: {df["execution_time"].mean():.2f}s')
+        plt.axvline(df['execution_time'].median(), color='green', linestyle='--', label=f'Median: {df["execution_time"].median():.2f}s')
         plt.title('Global Runtime Distribution')
         plt.xlabel('Runtime (seconds)')
         plt.ylabel('Frequency')
+        plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "runtime_histogram.png"))
         plt.close()
 
-    def _plot_runtime_bars(self, df):
+    def _plot_runtime_bars_mean_median(self, df):
         grouped = df.groupby("config")["execution_time"]
 
         mean_runtime = grouped.mean()
@@ -118,25 +117,18 @@ class RuntimeAnalyzer:
         stddev_runtime = grouped.std()
 
         configs = mean_runtime.index
-
-        x = np.arange(len(configs))  # Config positions
+        x = np.arange(len(configs))
         width = 0.35
 
         fig, ax = plt.subplots(figsize=(16, 8))
-
-        # Plot mean runtimes
-        ax.bar(x - width / 2, mean_runtime, width, yerr=stddev_runtime, capsize=5, label='Mean Runtime (s)',
-               color='skyblue')
-
-        # Plot median runtimes
-        ax.bar(x + width / 2, median_runtime, width, label='Median Runtime (s)', color='lightgreen')
+        ax.bar(x - width/2, mean_runtime, width, yerr=stddev_runtime, capsize=5, label='Mean Runtime', color='skyblue')
+        ax.bar(x + width/2, median_runtime, width, label='Median Runtime', color='lightgreen')
 
         ax.set_xlabel('Configuration')
         ax.set_ylabel('Runtime (seconds)')
         ax.set_title('Mean and Median Runtime per Configuration')
         ax.set_xticks(x)
         ax.set_xticklabels([f"Config {cfg}" for cfg in configs])
-
         ax.legend()
         ax.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
@@ -153,60 +145,41 @@ class RuntimeAnalyzer:
         plt.savefig(os.path.join(self.output_dir, "runtime_boxplot.png"))
         plt.close()
 
+    def _plot_runtime_vs_efficiency_scatter(self, df, metric):
+        df_valid = df.dropna(subset=["execution_time", metric])
+
+        if df_valid.empty:
+            print(f"[WARNING] No valid data for runtime vs {metric} scatter plot.")
+            return
+
+        plt.figure(figsize=(12, 8))
+        plt.scatter(df_valid["execution_time"], df_valid[metric], s=100, alpha=0.7, color='skyblue', edgecolors='black')
+
+        for idx, row in df_valid.iterrows():
+            plt.annotate(f"Config {row['config']}", (row["execution_time"], row[metric]), xytext=(5, 5), textcoords='offset points', fontsize=8)
+
+        m, b = np.polyfit(df_valid["execution_time"], df_valid[metric], 1)
+        x_trend = np.linspace(df_valid["execution_time"].min(), df_valid["execution_time"].max(), 100)
+        plt.plot(x_trend, m*x_trend + b, "r--", label=f"Trend: y = {m:.2f}x + {b:.2f}")
+
+        corr = df_valid["execution_time"].corr(df_valid[metric])
+        plt.figtext(0.5, 0.01, f"Correlation: {corr:.4f}", ha='center', fontsize=12, bbox={"facecolor": "white", "alpha": 0.5, "pad": 5})
+
+        plt.xlabel('Execution Time (seconds)')
+        plt.ylabel(metric.replace('_', ' ').title())
+        plt.title(f'Runtime vs {metric.replace("_", " ").title()}')
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, f"runtime_vs_{metric}.png"))
+        plt.close()
+
     def _plot_correlation_heatmap(self, df):
         corr = df[["execution_time", "instruction_efficiency", "value_efficiency"]].corr()
 
         plt.figure(figsize=(10, 8))
-        sns.heatmap(corr, annot=True, cmap="coolwarm", center=0, linewidths=0.5)
+        sns.heatmap(corr, annot=True, cmap="coolwarm", center=0, linewidths=0.5, fmt=".2f")
         plt.title('Correlation between Runtime and Efficiencies')
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "runtime_correlation_heatmap.png"))
-        plt.close()
-
-    def _plot_runtime_vs_instruction_efficiency(self, df):
-        df_valid = df.dropna(subset=["execution_time", "instruction_efficiency"])
-
-        if df_valid.empty:
-            print("[WARNING] No valid data for runtime vs instruction efficiency plot.")
-            return
-
-        plt.figure(figsize=(10, 8))
-        plt.scatter(df_valid["execution_time"], df_valid["instruction_efficiency"], color='blue')
-
-        m, b = np.polyfit(df_valid["execution_time"], df_valid["instruction_efficiency"], 1)
-        plt.plot(df_valid["execution_time"], m*df_valid["execution_time"] + b, color='red', linestyle='--', label=f"Trend: y = {m:.4f}x + {b:.2f}")
-
-        corr = df_valid["execution_time"].corr(df_valid["instruction_efficiency"])
-        plt.text(0.05, 0.9, f"Correlation: {corr:.4f}", transform=plt.gca().transAxes)
-
-        plt.title('Runtime vs Instruction Efficiency (%)')
-        plt.xlabel('Runtime (seconds)')
-        plt.ylabel('Instruction Efficiency (%)')
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "runtime_vs_instruction_efficiency.png"))
-        plt.close()
-
-    def _plot_runtime_vs_value_efficiency(self, df):
-        df_valid = df.dropna(subset=["execution_time", "value_efficiency"])
-
-        if df_valid.empty:
-            print("[WARNING] No valid data for runtime vs value efficiency plot.")
-            return
-
-        plt.figure(figsize=(10, 8))
-        plt.scatter(df_valid["execution_time"], df_valid["value_efficiency"], color='green')
-
-        m, b = np.polyfit(df_valid["execution_time"], df_valid["value_efficiency"], 1)
-        plt.plot(df_valid["execution_time"], m*df_valid["execution_time"] + b, color='red', linestyle='--', label=f"Trend: y = {m:.4f}x + {b:.2f}")
-
-        corr = df_valid["execution_time"].corr(df_valid["value_efficiency"])
-        plt.text(0.05, 0.9, f"Correlation: {corr:.4f}", transform=plt.gca().transAxes)
-
-        plt.title('Runtime vs Value Efficiency (%)')
-        plt.xlabel('Runtime (seconds)')
-        plt.ylabel('Value Efficiency (%)')
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "runtime_vs_value_efficiency.png"))
         plt.close()
