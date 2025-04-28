@@ -221,9 +221,9 @@ class TransactionAgent(Agent):
 
     def step(self):
         # ✨ Retry settlement on every step if allowed
-        if self.status in ["Matched"]:
-            self.settle()
-        elif self.deliverer.is_instruction_time_out():
+        #if self.status in ["Matched"]:
+        #   self.settle()
+        if self.deliverer.is_instruction_time_out():
             self.deliverer.cancel_timeout()
         elif self.receiver.is_instruction_time_out():
             self.receiver.cancel_timeout()

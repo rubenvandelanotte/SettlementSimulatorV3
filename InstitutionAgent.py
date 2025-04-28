@@ -107,7 +107,6 @@ class InstitutionAgent(Agent):
 
     def create_instruction(self):
         instruction_type = random.choice(['delivery', 'receipt'])
-
         cash_account = self.getSecurityAccounts(securityType= "Cash")
         # Filter available security accounts from the institution's accounts
         security_accounts = [acc for acc in self.accounts if acc.accountType in self.model.bond_types]
@@ -129,7 +128,7 @@ class InstitutionAgent(Agent):
         if other_institution_security_account is None:
             # Create a new security account for the counterparty institution
             new_security_account_id = SettlementModel.generate_iban()  # Generates an IBAN-like string
-            new_security_balance = int(random.uniform(600e7, 900e7))  # Mimic the balance generation logic
+            new_security_balance = int(random.uniform(60e7, 90e7))  # Mimic the balance generation logic
             new_security_account = Account.Account(
                 accountID=new_security_account_id,
                 accountType=securityType,
