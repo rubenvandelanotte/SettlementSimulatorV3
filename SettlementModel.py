@@ -64,8 +64,8 @@ class SettlementModel(Model):
         #mini batching
         self.mini_batch_times = [
             timedelta(hours=h, minutes=0)
-            for h in range(2, 20, 3)
-        ]
+            for h in range(2, 20)
+                                ]
         self.mini_batches_processed = set()
 
         # Instruction indices for fast lookup
@@ -85,6 +85,8 @@ class SettlementModel(Model):
         self.partial_cancelled_count = 0
 
         self.generate_data()
+
+
 
 
 
@@ -130,6 +132,10 @@ class SettlementModel(Model):
                 depth=attributes.get("depth")
              )
 
+
+
+
+
     def save_ocel_log(self, filename: str = "simulation_log.jsonocel"):
         self.logger.export_log(filename)
 
@@ -146,14 +152,9 @@ class SettlementModel(Model):
         that approximates the mean (€324M), std (€829M), and median (€20M)
         of the original two-point distribution.
         """
-        mu = 18.0857  # ln(median)
-        sigma = 0.25  # controls skewness and std
+        mu = 18.5857  # ln(median)
+        sigma = 1.42166  # controls skewness and std
         amount = random.lognormvariate(mu, sigma)
-
-        # Apply a cap to further prevent extreme outliers (optional)
-        cap = 2e9  # 2 billion cap
-        amount = min(amount, cap)
-
         return int(amount)
 
     def generate_data(self):
@@ -168,7 +169,7 @@ class SettlementModel(Model):
             #generate cash account => there has to be at least 1 cash account
             new_cash_accountID = generate_iban()
             new_cash_accountType = "Cash"
-            new_cash_balance =  int(random.uniform(6e11, 9e11))  # Increased balance range
+            new_cash_balance =  int(random.uniform(6e9, 9e9))  # Increased balance range
             new_cash_creditLimit = 0.1*new_cash_balance
             new_cash_Account = Account.Account(accountID=new_cash_accountID, accountType= new_cash_accountType, balance= new_cash_balance, creditLimit=new_cash_creditLimit)
             inst_accounts.append(new_cash_Account)
@@ -269,31 +270,40 @@ class SettlementModel(Model):
             if instruction.get_status() == "Pending":
                 instruction.validate()
 
-        # --- Phase 3: Match all ---
-        # Process one linkcode at a time where both delivery and receipt instructions exist
-        common_linkcodes = set(self.validated_delivery_instructions.keys()) & set(
-            self.validated_receipt_instructions.keys())
 
-        for linkcode in common_linkcodes:
-            delivery_list = self.validated_delivery_instructions.get(linkcode, [])
-            if delivery_list:  # If there are delivery instructions with this linkcode
-                delivery = delivery_list[0]  # Take the first one
-                if delivery.get_status() == "Validated":
-                    delivery.match()
+        # --- Phase 3: Match with retries ---
+        matching_changed = True
+        attempts = 0
+        while matching_changed and attempts <3 :
+            matching_changed = False
+            attempts = attempts + 1
 
-        # Continue with settlement phase (5 attempts)
-        for attempt in range(5):
-            for transaction in self.transactions:
-                if transaction.get_status() == "Matched":
-                    if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities()):
-                        if self.simulated_time >= transaction.get_deliverer().get_intended_settlement_date() - timedelta(days=1,minutes=35):
-                            transaction.settle()
+            # Process one linkcode at a time where both delivery and receipt instructions exist
+            common_linkcodes = set(self.validated_delivery_instructions.keys()) & set(
+                self.validated_receipt_instructions.keys())
+
+            for linkcode in common_linkcodes:
+                delivery_list = self.validated_delivery_instructions.get(linkcode, [])
+                if delivery_list:  # If there are delivery instructions with this linkcode
+                    delivery = delivery_list[0]  # Take the first one
+                    if delivery.get_status() == "Validated":
+                        result = delivery.match()
+                        if result is not None:
+                            matching_changed = True
+
+        # Continue with settlement phase
+        for transaction in self.transactions:
+            if transaction.get_status() == "Matched":
+                if self.simulated_time >= transaction.get_deliverer().get_intended_settlement_date() - timedelta(days=1,minutes=35):
+                    transaction.settle()
+
 
     def mini_batch_settlement(self):
         print(f"[INFO] Running mini-batch settlement at {self.simulated_time}")
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
-                if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities()):
+                if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities() or
+                transaction.get_receiver().get_cashAccount().get_newSecurities()):
                     if self.simulated_time >= transaction.get_deliverer().get_intended_settlement_date() - timedelta(days=1, minutes=30):
                         transaction.settle()
 
