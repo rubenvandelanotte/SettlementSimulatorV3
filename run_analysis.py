@@ -1,10 +1,9 @@
 import os
-import json
 import gc
 import sys
 import time
-import pandas as pd
 import argparse
+import psutil
 
 from SettlementModel import SettlementModel
 from RuntimeTracker import RuntimeTracker
@@ -27,38 +26,7 @@ def deep_cleanup():
         except Exception as e:
             print(f"[WARNING] Memory release failed: {e}")
 
-def aggregate_statistics_to_csv(results_dir, output_csv, analysis_type):
-    records = []
-    for file in os.listdir(results_dir):
-        if file.endswith(".json") and "CRASH" not in file:
-            with open(os.path.join(results_dir, file)) as f:
-                data = json.load(f)
 
-            # Look for top-level metadata if available
-            stats = {
-                "instruction_efficiency": data.get("instruction_efficiency"),
-                "value_efficiency": data.get("value_efficiency"),
-                "runtime_seconds": data.get("execution_info", {}).get("execution_time_seconds"),
-                "settled_count": data.get("settled_on_time_count", 0) + data.get("settled_late_count", 0),
-                "settled_amount": data.get("settled_on_time_amount", 0) + data.get("settled_late_amount", 0),
-                "memory_usage_mb": data.get("execution_info", {}).get("memory_usage_mb", 0),
-                "partial_settlements": data.get("partial_cancelled_count", 0)
-            }
-
-            # 🌟 Use top-level fields if available, fallback to config_metadata if needed
-            if analysis_type == "depth":
-                stats["max_child_depth"] = data.get("max_child_depth", data.get("config_metadata", {}).get("max_child_depth", -1))
-            elif analysis_type == "amount":
-                stats["min_settlement_percentage"] = data.get("min_settlement_percentage", data.get("config_metadata", {}).get("min_settlement_percentage", -1))
-            elif analysis_type == "partial":
-                stats["true_count"] = data.get("true_count", data.get("config_metadata", {}).get("true_count", -1))
-
-            records.append(stats)
-
-    if records:
-        df = pd.DataFrame(records)
-        df.to_csv(output_csv, index=False)
-        print(f"[✓] Aggregated statistics to {output_csv}")
 
 def finalize_visualizations(output_dir, label):
     if label == "partial":
@@ -69,16 +37,17 @@ def finalize_visualizations(output_dir, label):
         suite.analyze_all()
     elif label == "depth":
         visualizer = MaxDepthVisualizer(
-            results_csv=os.path.join(output_dir, "max_child_depth_final_results.csv"),
+            results_dir=os.path.join(output_dir, "results_all_analysis"),
             output_dir=os.path.join(output_dir, "visualizations", "depth")
         )
         visualizer.generate_all_visualizations()
     elif label == "amount":
         visualizer = MinSettlementAmountVisualizer(
-            results_csv=os.path.join(output_dir, "min_settlement_amount_final_results.csv"),
+            results_dir=os.path.join(output_dir, "results_all_analysis"),
             output_dir=os.path.join(output_dir, "visualizations", "amount")
         )
         visualizer.generate_all_visualizations()
+
 
 def generate_partial_configs(base_seed, runs_per_config):
     for true_count in range(1, 11):
@@ -101,7 +70,6 @@ def generate_depth_configs(base_seed, runs_per_config):
                 "partialsallowed": partialsallowed,
                 "seed": seed,
                 "max_child_depth": depth,
-                "depth": depth,
                 "run_number": run_number
             }
 
@@ -128,21 +96,6 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
 
     if visualize_only:
         print("[INFO] Skipping simulation. Only running visualizations.")
-
-        # 🌟 Check if aggregation CSV exists
-        stats_file = None
-        if label == "partial":
-            stats_file = os.path.join(output_dir, "partial_allowance_final_results.csv")
-        elif label == "depth":
-            stats_file = os.path.join(output_dir, "max_child_depth_final_results.csv")
-        elif label == "amount":
-            stats_file = os.path.join(output_dir, "min_settlement_amount_final_results.csv")
-
-        if stats_file and not os.path.exists(stats_file):
-            print(f"[INFO] Aggregated statistics file {stats_file} not found. Re-aggregating from raw results...")
-            aggregate_statistics_to_csv(os.path.join(output_dir, "results_all_analysis"), stats_file,
-                                        analysis_type=label)
-
         finalize_visualizations(output_dir, label)
         return
 
@@ -165,6 +118,14 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
         print(f"[INFO] {label} | Config {config_name}, Run {run_number}")
 
         def run_simulation(config):
+
+            process = psutil.Process(os.getpid())
+
+            # Start meten
+            start_time = time.time()
+            start_mem = process.memory_info().rss / (1024 * 1024)
+
+
             model = SettlementModel(partialsallowed=config["partialsallowed"], seed=config["seed"])
 
             if "max_child_depth" in config:
@@ -187,13 +148,23 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
                         print("[FATAL] Simulation failed after maximum retries.")
                         return
 
+
+            end_time = time.time()
+            end_mem = process.memory_info().rss / (1024 * 1024)  # in MB
+
+            execution_time_seconds = end_time - start_time
+            memory_usage_mb = max(end_mem - start_mem, 0)
+
+            config_metadata = config.copy()
+            config_metadata["execution_time_seconds"] = execution_time_seconds
+            config_metadata["memory_usage_mb"] = memory_usage_mb
+
             # 🚀 Save files with better names
             ocel_log_filename = os.path.join(log_dir, f"log_{label}_{config_name}_run{run_number}.jsonocel")
             model.save_ocel_log(filename=ocel_log_filename)
 
             results_filename = os.path.join(results_dir, f"results_{label}_{config_name}_run{run_number}.json")
-            model.export_all_statistics(filename=results_filename, config_metadata=config)
-
+            model.export_all_statistics(filename=results_filename, config_metadata=config_metadata)
             deep_cleanup()
             time.sleep(1)
 
@@ -202,13 +173,6 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
     tracker.save_results()
     print("[✓] Simulation runs complete.")
 
-    # Aggregate statistics
-    if label == "partial":
-        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "partial_allowance_final_results.csv"), analysis_type="partial")
-    elif label == "depth":
-        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "max_child_depth_final_results.csv"), analysis_type="depth")
-    elif label == "amount":
-        aggregate_statistics_to_csv(results_dir, os.path.join(output_dir, "min_settlement_amount_final_results.csv"), analysis_type="amount")
 
     if no_visualization:
         print("[INFO] Skipping visualizations because --no_visualization was passed.")
