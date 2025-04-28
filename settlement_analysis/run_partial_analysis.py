@@ -15,9 +15,25 @@ class SettlementAnalysisSuite:
         self.output_dir = output_dir
 
         self.statistics = {}
-        self.runtime_data = []
+        self.runtime_data = {}
 
-        # Initialize analyzers
+        # REMOVE analyzer initialization from here
+        self.depth_analyzer = None
+        self.lateness_analyzer = None
+        self.lateness_hours_analyzer = None
+        self.runtime_analyzer = None
+        self.ci_analyzer = None
+        self.rtp_vs_batch_analyzer = None
+
+    def analyze_all(self, analysis_types=None):
+        if analysis_types is None:
+            analysis_types = ["depth", "lateness", "lateness_hours", "runtime", "confidence_intervals", "rtp_vs_batch"]
+
+        # Load data first
+        self._load_statistics()
+        self._load_runtime_results()
+
+        # NOW instantiate analyzers after loading data
         self.depth_analyzer = DepthAnalyzer(self.input_dir, self.output_dir, self)
         self.lateness_analyzer = LatenessAnalyzer(self.input_dir, self.output_dir, self)
         self.lateness_hours_analyzer = LatenessHoursAnalyzer(self.input_dir, self.output_dir, self)
@@ -25,17 +41,7 @@ class SettlementAnalysisSuite:
         self.ci_analyzer = ConfidenceIntervalAnalyzer(self.input_dir, self.output_dir, self)
         self.rtp_vs_batch_analyzer = RTPvsBatchAnalyzer(self.input_dir, self.output_dir, self)
 
-    def analyze_all(self, analysis_types=None):
-        if analysis_types is None:
-            analysis_types = [
-                "depth", "lateness", "lateness_hours", "runtime", "confidence_intervals", "rtp_vs_batch"
-            ]
-
-        # Load all inputs
-        self._load_statistics()
-        self._load_runtime_results()
-
-        # Dispatch analyzers
+        # Now run analyzers
         if "depth" in analysis_types:
             self.depth_analyzer.run()
         if "lateness" in analysis_types:
