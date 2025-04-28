@@ -102,6 +102,9 @@ class InstructionAgent (Agent):
         """Returns the original amount from the mother instruction."""
         return self.original_mother_amount
 
+    def get_intended_settlement_date(self):
+        return self.intended_settlement_date
+
     def set_status(self, new_status: str):
         old_status = self.status
         self.status = new_status

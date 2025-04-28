@@ -63,11 +63,9 @@ class SettlementModel(Model):
 
         #mini batching
         self.mini_batch_times = [
-                                    timedelta(hours=h, minutes=m)
-                                    for h in range(2, 19)
-                                    for m in range(0, 60, 20)
-                                ] + [timedelta(hours=19, minutes=0)]
-
+            timedelta(hours=h, minutes=0)
+            for h in range(2, 20)
+                                ]
         self.mini_batches_processed = set()
 
         # Instruction indices for fast lookup
@@ -272,6 +270,7 @@ class SettlementModel(Model):
             if instruction.get_status() == "Pending":
                 instruction.validate()
 
+
         # --- Phase 3: Match with retries ---
         matching_changed = True
         attempts = 0
@@ -295,7 +294,8 @@ class SettlementModel(Model):
         # Continue with settlement phase
         for transaction in self.transactions:
             if transaction.get_status() == "Matched":
-                transaction.settle()
+                if self.simulated_time >= transaction.get_deliverer().get_intended_settlement_date() - timedelta(days=1,minutes=35):
+                    transaction.settle()
 
 
     def mini_batch_settlement(self):
@@ -304,7 +304,8 @@ class SettlementModel(Model):
             if transaction.get_status() == "Matched":
                 if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities() or
                 transaction.get_receiver().get_cashAccount().get_newSecurities()):
-                    transaction.settle()
+                    if self.simulated_time >= transaction.get_deliverer().get_intended_settlement_date() - timedelta(days=1, minutes=30):
+                        transaction.settle()
 
     def get_main_period_mothers_and_descendants(self):
         main_start = self.simulation_start + self.warm_up_period
