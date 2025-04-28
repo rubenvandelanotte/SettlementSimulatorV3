@@ -147,7 +147,7 @@ class SettlementModel(Model):
         of the original two-point distribution.
         """
         mu = 18.0857  # ln(median)
-        sigma = 0.25  # controls skewness and std
+        sigma = 1  # controls skewness and std
         amount = random.lognormvariate(mu, sigma)
 
         # Apply a cap to further prevent extreme outliers (optional)
