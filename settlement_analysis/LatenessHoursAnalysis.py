@@ -13,8 +13,13 @@ class LatenessHoursAnalyzer:
         self.suite = suite
         os.makedirs(self.output_dir, exist_ok=True)
 
+        # Global & per-config lateness
         self.config_lateness = defaultdict(list)
+        # Per-depth lateness across all configs
         self.lateness_by_depth = defaultdict(list)
+        # Per-(config, depth) lateness
+        self.lateness_by_cfg_depth = defaultdict(lambda: defaultdict(list))
+        # All lateness values
         self.all_lateness_hours = []
         self.log_files = []
 
@@ -41,18 +46,14 @@ class LatenessHoursAnalyzer:
             print(f"[WARNING] Log folder '{log_folder}' does not exist.")
             return
 
-        # grab both .jsonocel and .json exports
-        self.log_files = [
-            f for f in os.listdir(log_folder)
-            if f.endswith(".jsonocel") or f.endswith(".json")
-        ]
+        self.log_files = [f for f in os.listdir(log_folder)
+                          if f.endswith(".jsonocel") or f.endswith(".json")]
 
         if not self.log_files:
             print(f"[WARNING] No simulation log files found in {log_folder}")
             return
 
         for log_file in self.log_files:
-            # match either “config12” or “truecount12” (case-insensitive)
             config_match = re.search(r'(?:config|truecount)(\d+)', log_file, re.IGNORECASE)
             if not config_match:
                 continue
@@ -65,24 +66,34 @@ class LatenessHoursAnalyzer:
                     log_data = json.load(f)
 
                 events = log_data.get("ocel:events", log_data.get("events", {}))
+                iterable = events.values() if isinstance(events, dict) else events
 
-                for event in (events.values() if isinstance(events, dict) else events):
-                    # extract lateness and depth
+                for event in iterable:
+                    # extract attributes container
                     attrs = event.get("ocel:attributes", event.get("attributes", {}))
                     if isinstance(attrs, dict):
                         lateness = attrs.get("lateness_hours")
                         depth = attrs.get("depth")
                     else:
-                        lateness = next((a["value"] for a in attrs if a.get("name") == "lateness_hours"), None)
-                        depth = next((a["value"] for a in attrs if a.get("name") == "depth"), None)
+                        lateness = next((a["value"] for a in attrs if a.get("name")=="lateness_hours"), None)
+                        depth = next((a["value"] for a in attrs if a.get("name")=="depth"), None)
 
                     if lateness is not None:
                         try:
                             h = float(lateness)
+                            d = int(depth) if depth is not None else None
+
+                            # global and per-config
                             self.config_lateness[config_name].append(h)
                             self.all_lateness_hours.append(h)
-                            if depth is not None:
-                                self.lateness_by_depth[int(depth)].append(h)
+
+                            # per-depth across configs
+                            if d is not None:
+                                self.lateness_by_depth[d].append(h)
+
+                            # per-(config, depth)
+                            if d is not None:
+                                self.lateness_by_cfg_depth[config_name][d].append(h)
                         except ValueError:
                             pass
 
@@ -164,7 +175,7 @@ class LatenessHoursAnalyzer:
                 plt.text(edge + (bins[1] - bins[0]) / 2, count + 0.5, str(int(count)),
                          ha='center', va='bottom', fontsize=7)
 
-        plt.title('Overall Distribution of Settlement Lateness Hours')
+        plt.title('Overall Distribution of Settlement Lateness Hours Over All Configurations')
         plt.xlabel('Hours Late')
         plt.ylabel('Frequency')
         plt.legend()
@@ -178,9 +189,14 @@ class LatenessHoursAnalyzer:
         avg_lateness = [np.mean(self.lateness_by_depth[d]) for d in depths]
 
         plt.figure(figsize=(14, 8))
-        plt.plot(depths, avg_lateness, 'o-', color='blue')
+        plt.plot(depths, avg_lateness, 'o-', linewidth=2, markersize=6, color='blue')
+
+        # Annotate each point
         for d, h in zip(depths, avg_lateness):
             plt.text(d, h + 0.5, f"{h:.2f}", ha='center', va='bottom', fontsize=8)
+
+        # **Ensure every depth** appears on x-axis
+        plt.xticks(depths, [str(d) for d in depths])
 
         plt.title('Average Lateness Hours by Instruction Depth')
         plt.xlabel('Instruction Depth')
@@ -189,6 +205,8 @@ class LatenessHoursAnalyzer:
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "lateness_hours_by_depth.png"))
         plt.close()
+
+
 
     def _plot_violin_by_depth(self):
         depths = sorted(self.lateness_by_depth.keys())
@@ -211,24 +229,35 @@ class LatenessHoursAnalyzer:
         plt.close()
 
     def _plot_lateness_heatmap(self):
-        # build mean hours by config/depth
-        lateness_md = defaultdict(lambda: defaultdict(list))
-        for cfg, lst in self.config_lateness.items():
-            for h in lst:
-                lateness_md[cfg][0].append(h)
+        # sort configs numerically
+        configs = sorted(
+            self.lateness_by_cfg_depth.keys(),
+            key=lambda name: int(name.split()[1])
+        )
+        # collect all depths seen under any config
+        depths = sorted({
+            d for cfg in configs
+            for d in self.lateness_by_cfg_depth[cfg].keys()
+        })
 
-        configs = sorted(lateness_md.keys(), key=lambda x: int(x.split()[1]))
-        depths = sorted({d for sub in lateness_md.values() for d in sub.keys()})
-
-        heat = np.zeros((len(depths), len(configs)))
+        # build matrix of averages (NaN if missing)
+        heatmap_data = np.full((len(depths), len(configs)), np.nan)
         for i, d in enumerate(depths):
             for j, cfg in enumerate(configs):
-                vals = lateness_md[cfg].get(d, [])
-                heat[i, j] = np.mean(vals) if vals else 0
+                vals = self.lateness_by_cfg_depth[cfg].get(d, [])
+                if vals:
+                    heatmap_data[i, j] = np.mean(vals)
 
         plt.figure(figsize=(14, 10))
-        ax = sns.heatmap(heat, annot=True, fmt=".2f", cmap="YlOrRd",
-                         cbar_kws={'label': 'Avg Hours Late'})
+        ax = sns.heatmap(
+            heatmap_data,
+            annot=True,
+            fmt=".2f",
+            cmap="YlOrRd",
+            cbar_kws={'label': 'Avg Hours Late'},
+            xticklabels=configs,
+            yticklabels=depths
+        )
         ax.set_xticklabels(configs, rotation=45, ha='right')
         ax.set_yticklabels(depths, rotation=0)
 
@@ -242,19 +271,28 @@ class LatenessHoursAnalyzer:
     def _plot_lateness_scatter(self):
         x = []
         y = []
-        for d, lst in self.lateness_by_depth.items():
-            x += [d] * len(lst)
+        for depth, lst in self.lateness_by_depth.items():
+            x += [depth] * len(lst)
             y += lst
+
+        # Determine all depth levels present
+        depths = sorted(self.lateness_by_depth.keys())
 
         plt.figure(figsize=(14, 8))
         plt.scatter(x, y, alpha=0.5, s=30)
+
+        # Add a linear trend line if there's data
         if x and y:
             m, b = np.polyfit(x, y, 1)
-            xs = np.array(sorted(set(x)))
+            xs = np.array(depths)
             plt.plot(xs, m * xs + b, "r--", label=f"Trend: y = {m:.2f}x + {b:.2f}")
-        # annotate a few random points to avoid clutter
+
+        # Annotate a sample of points to avoid clutter
         for xi, yi in list(zip(x, y))[:20]:
             plt.text(xi, yi, f"{yi:.1f}", fontsize=6, alpha=0.7)
+
+        # Ensure every depth appears on the x-axis
+        plt.xticks(depths)
 
         plt.title('Scatter Plot of Lateness Hours vs Instruction Depth')
         plt.xlabel('Instruction Depth')
