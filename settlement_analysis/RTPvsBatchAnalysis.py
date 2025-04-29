@@ -2,6 +2,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
+import re
 
 class RTPvsBatchAnalyzer:
     def __init__(self, input_dir, output_dir, suite):
@@ -47,36 +48,39 @@ class RTPvsBatchAnalyzer:
         return averaged_data
 
     def _extract_config_name(self, filename):
-        parts = filename.split("_")
-        for part in parts:
-            if part.lower().startswith("config"):
-                num_part = part.replace("config", "")
-                if num_part.isdigit():
-                    return int(num_part)
-        print(f"[WARNING] Failed to parse config from {filename}")
-        return "Unknown"
+        """
+        Extract config number from filename.
+        Supports both 'configX' and 'truecountX'.
+        """
+        match = re.search(r'(?:config|truecount)(\d+)', filename)
+        if match:
+            return int(match.group(1))
+        else:
+            print(f"[WARNING] Failed to parse config from {filename}")
+            return None
 
     def _plot_absolute_counts(self, config_data):
         configs = sorted(config_data.keys())
-        rtp_counts = [config_data[cfg]["rtp"] for cfg in configs]
-        batch_counts = [config_data[cfg]["batch"] for cfg in configs]
+        rtp_counts = [config_data[c]["rtp"] for c in configs]
+        batch_counts = [config_data[c]["batch"] for c in configs]
 
         x = np.arange(len(configs))
         width = 0.35
 
         plt.figure(figsize=(12, 8))
-        plt.bar(x - width/2, rtp_counts, width, label='Real-Time Processing', color='skyblue')
-        plt.bar(x + width/2, batch_counts, width, label='Batch Processing', color='salmon')
+        bars_rtp = plt.bar(x - width/2, rtp_counts, width, label='Real-Time', color='skyblue')
+        bars_batch = plt.bar(x + width/2, batch_counts, width, label='Batch', color='salmon')
 
-        # Add value labels
-        for idx, (rtp, batch) in enumerate(zip(rtp_counts, batch_counts)):
-            plt.text(x[idx] - width/2, rtp + 200, f"{int(rtp)}", ha='center', va='bottom', fontsize=8)
-            plt.text(x[idx] + width/2, batch + 200, f"{int(batch)}", ha='center', va='bottom', fontsize=8)
+        # Add value labels on top of each bar
+        for bar in bars_rtp + bars_batch:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2, height + max(rtp_counts+batch_counts)*0.01,
+                     f"{int(height)}", ha='center', va='bottom', fontsize=8)
 
-        plt.xticks(x, [f"Config {cfg}" for cfg in configs])
+        plt.xticks(x, [f"Config {c}" for c in configs])
         plt.xlabel('Configuration')
-        plt.ylabel('Average Number of Settled Instructions')
-        plt.title('RTP vs Batch Processing Settlements by Configuration (Averaged)')
+        plt.ylabel('Average Settled Instructions')
+        plt.title('RTP vs Batch: Absolute Settlement Counts')
         plt.legend()
         plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
@@ -87,29 +91,35 @@ class RTPvsBatchAnalyzer:
         configs = sorted(config_data.keys())
         rtp_pct = []
         batch_pct = []
-
-        for cfg in configs:
-            total = config_data[cfg]["rtp"] + config_data[cfg]["batch"]
+        for c in configs:
+            r = config_data[c]["rtp"]
+            b = config_data[c]["batch"]
+            total = r + b
             if total > 0:
-                rtp_pct.append((config_data[cfg]["rtp"] / total) * 100)
-                batch_pct.append((config_data[cfg]["batch"] / total) * 100)
+                rtp_pct.append(r/total*100)
+                batch_pct.append(b/total*100)
             else:
                 rtp_pct.append(0)
                 batch_pct.append(0)
 
+        x = np.arange(len(configs))
         plt.figure(figsize=(12, 8))
-        plt.bar(configs, rtp_pct, label='Real-Time Processing', color='skyblue')
-        plt.bar(configs, batch_pct, bottom=rtp_pct, label='Batch Processing', color='salmon')
+        bars_rtp = plt.bar(x, rtp_pct, label='Real-Time %', color='skyblue')
+        bars_batch = plt.bar(x, batch_pct, bottom=rtp_pct, label='Batch %', color='salmon')
 
-        # Annotate the RTP percentage on the bars
-        for idx, rtp in enumerate(rtp_pct):
-            plt.text(configs[idx], rtp/2, f"{rtp:.1f}%", ha='center', va='center', fontsize=8, fontweight='bold')
+        # Annotate each segment
+        for idx in range(len(configs)):
+            # RTP segment
+            plt.text(x[idx], rtp_pct[idx]/2, f"{rtp_pct[idx]:.1f}%", ha='center', va='center', fontsize=8)
+            # Batch segment
+            plt.text(x[idx], rtp_pct[idx] + batch_pct[idx]/2, f"{batch_pct[idx]:.1f}%",
+                     ha='center', va='center', fontsize=8)
 
+        plt.xticks(x, [f"Config {c}" for c in configs])
         plt.xlabel('Configuration')
-        plt.ylabel('Percentage of Settled Instructions')
-        plt.title('RTP vs Batch Processing Settlements by Configuration (Percentage)')
+        plt.ylabel('Percentage of Settlements')
+        plt.title('RTP vs Batch: Settlement Percentages')
         plt.legend()
-        plt.xticks(configs, [f"Config {cfg}" for cfg in configs])
         plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "rtp_vs_batch_percentage.png"))
@@ -117,23 +127,28 @@ class RTPvsBatchAnalyzer:
 
     def _plot_trend_lines(self, config_data):
         configs = sorted(config_data.keys())
-        rtp = [config_data[cfg]["rtp"] for cfg in configs]
-        batch = [config_data[cfg]["batch"] for cfg in configs]
+        rtp = [config_data[c]["rtp"] for c in configs]
+        batch = [config_data[c]["batch"] for c in configs]
         total = [r + b for r, b in zip(rtp, batch)]
 
-        x = range(len(configs))
+        x = np.arange(len(configs))
         plt.figure(figsize=(12, 8))
-        plt.plot(x, total, 'o-', color='purple', label='Total Settlements')
-        plt.plot(x, rtp, 's--', color='deepskyblue', label='Real-Time Processing')
-        plt.plot(x, batch, '^--', color='tomato', label='Batch Processing')
+        line_tot, = plt.plot(x, total, 'o-', label='Total', color='purple')
+        line_rtp, = plt.plot(x, rtp, 's--', label='Real-Time', color='deepskyblue')
+        line_batch, = plt.plot(x, batch, '^--', label='Batch', color='tomato')
 
-        for idx in x:
-            plt.text(idx, total[idx] + 200, f"{int(total[idx])}", ha='center', va='bottom', fontsize=8)
+        # Annotate each point
+        for xi, yv in zip(x, total):
+            plt.text(xi, yv + max(total)*0.01, f"{int(yv)}", ha='center', va='bottom', fontsize=8)
+        for xi, yv in zip(x, rtp):
+            plt.text(xi, yv - max(total)*0.02, f"{int(yv)}", ha='center', va='top', fontsize=8)
+        for xi, yv in zip(x, batch):
+            plt.text(xi, yv - max(total)*0.02, f"{int(yv)}", ha='center', va='top', fontsize=8)
 
-        plt.xticks(x, [f"Config {cfg}" for cfg in configs])
+        plt.xticks(x, [f"Config {c}" for c in configs])
         plt.xlabel('Configuration')
-        plt.ylabel('Average Number of Settled Instructions')
-        plt.title('Settlement Trends by Processing Type Across Configurations (Averaged)')
+        plt.ylabel('Average Settled Instructions')
+        plt.title('Settlement Trends by Processing Type')
         plt.legend()
         plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()
