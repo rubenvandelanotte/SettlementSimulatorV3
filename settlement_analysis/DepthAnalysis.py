@@ -1,331 +1,260 @@
 import os
+import re
 import json
-import numpy as np
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from collections import defaultdict
-import re
 
 class DepthAnalyzer:
-    def __init__(self, input_dir, output_dir, suite):
+    """
+    Analyzes depth statistics from settlement simulation results and produces
+    individual and comparative visualizations:
+      - Depth distribution per configuration
+      - Status distribution by depth per configuration
+      - Success rate by depth per configuration
+      - Comparative plots across configurations
+      - Export summary CSV/JSON
+    """
+
+    def __init__(self, input_dir: str, output_dir: str, suite):
         self.input_dir = input_dir
         self.output_dir = os.path.join(output_dir, "depth_analysis")
         self.suite = suite
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # [PATCH] Local fix only, don't overwrite suite.statistics
-        fixed_statistics = self._fix_statistics_format(self.suite.statistics)
-        self.statistics = self._aggregate_statistics(fixed_statistics)
+    def _extract_config_name(self, filename: str) -> str:
+        match = re.search(r'(?:config|truecount)(\d+)', filename, re.IGNORECASE)
+        if match:
+            return f"Config {int(match.group(1))}"
+        return os.path.splitext(filename)[0]
 
-    def _fix_statistics_format(self, statistics):
-        fixed_statistics = {}
-        for stat_file, data in statistics.items():
-            fixed_data = {}
-            if "depth_counts" in data:
-                fixed_data["depth_counts"] = {str(k): int(v) for k, v in data["depth_counts"].items()}
-            if "depth_status_counts" in data:
-                fixed_status_counts = {}
-                for depth, statuses in data["depth_status_counts"].items():
-                    fixed_status_counts[str(depth)] = {str(status): int(count) for status, count in statuses.items()}
-                fixed_data["depth_status_counts"] = fixed_status_counts
-            fixed_statistics[stat_file] = fixed_data
-        return fixed_statistics
+    def _sort_configs(self, configs):
+        def key_fn(c):
+            m = re.search(r'(\d+)', c)
+            return int(m.group(1)) if m else float('inf')
+        return sorted(configs, key=key_fn)
 
-    # [PATCH] Accept statistics as argument
-    def _aggregate_statistics(self, statistics):
-        aggregated_stats = {}
-        for stat_file, data in statistics.items():
-            config_match = re.search(r'config(\d+)', stat_file)
-            if config_match:
-                config_num = int(config_match.group(1))
-                config_name = f"Config {config_num}"
-            else:
-                config_name = "Unknown"
-
-            if config_name not in aggregated_stats:
-                aggregated_stats[config_name] = {
-                    "depth_counts": defaultdict(int),
-                    "depth_status_counts": defaultdict(lambda: defaultdict(int))
-                }
-
-            depth_counts = data.get("depth_counts", {})
-            if not depth_counts:
-                print(f"[WARNING] No depth_counts found in {stat_file}")
-
-            for depth, count in depth_counts.items():
-                aggregated_stats[config_name]["depth_counts"][depth] += count
-
-            depth_status_counts = data.get("depth_status_counts", {})
-            if not depth_status_counts:
-                print(f"[WARNING] No depth_status_counts found in {stat_file}")
-
-            for depth, statuses in depth_status_counts.items():
-                for status, count in statuses.items():
-                    aggregated_stats[config_name]["depth_status_counts"][depth][status] += count
-
-        return aggregated_stats
+    def _build_dataframe(self):
+        depth_records, status_records = [], []
+        for filename, data in self.suite.statistics.items():
+            cfg = self._extract_config_name(filename)
+            for depth_str, cnt in data.get('depth_counts', {}).items():
+                try:
+                    d = int(depth_str)
+                    depth_records.append({'config': cfg, 'depth': d, 'count': int(cnt)})
+                except:
+                    continue
+            for depth_str, smap in data.get('depth_status_counts', {}).items():
+                try:
+                    d = int(depth_str)
+                except:
+                    continue
+                if isinstance(smap, dict):
+                    for status, cnt in smap.items():
+                        try:
+                            status_records.append({'config': cfg, 'depth': d, 'status': status, 'count': int(cnt)})
+                        except:
+                            continue
+        return pd.DataFrame(depth_records), pd.DataFrame(status_records)
 
     def run(self):
-        print("[INFO] Running DepthAnalyzer with the following configurations:")
-        for config_name, data in self.statistics.items():
-            print(f"Config: {config_name}, Depths: {list(data['depth_counts'].keys())}")
-            self._analyze_single_config(config_name, data)
+        df_depth, df_status = self._build_dataframe()
+        if df_depth.empty or df_status.empty:
+            print("[WARNING] No depth statistics found. Skipping depth analysis.")
+            return
 
-        self._compare_success_rates()
-        self._compare_depth_distributions()
-        self._compare_status_distributions()
-        self._compare_total_instructions()
-        self._compare_normalized_completion_rate()
-        self._plot_success_rate_heatmap()
-        self._export_summary()
+        # individual plots
+        self.plot_depth_distribution(df_depth)
+        self.plot_status_by_depth(df_status)
+        self.plot_success_rate_by_depth(df_status)
 
-    def _safe_legend(self):
-        handles, labels = plt.gca().get_legend_handles_labels()
-        if any(label and not label.startswith('_') for label in labels):
-            plt.legend()
+        # comparative plots
+        self.compare_depth_distributions(df_depth)
+        self.compare_status_distributions(df_status)
+        self.compare_success_rates(df_status)
+        self.compare_total_instructions(df_depth)
+        self.compare_normalized_completion_rate(df_status)
+        self.plot_success_rate_heatmap(df_status, df_depth)
 
-    def _analyze_single_config(self, config_name, data):
-        config_output_dir = os.path.join(self.output_dir, config_name)
-        os.makedirs(config_output_dir, exist_ok=True)
+        # summary export
+        self.export_summary(df_depth, df_status)
 
-        self._depth_distribution(data, config_name, os.path.join(config_output_dir, "depth_distribution.png"))
-        self._status_by_depth(data, config_name, os.path.join(config_output_dir, "status_by_depth.png"))
-        self._success_rate_by_depth(data, config_name, os.path.join(config_output_dir, "success_rate.png"))
+    def plot_depth_distribution(self, df):
+        for cfg, grp in df.groupby('config'):
+            fig, ax = plt.subplots()
+            grp_sorted = grp.sort_values('depth')
+            depths = grp_sorted['depth'].tolist()
+            counts = grp_sorted['count'].tolist()
+            ax.bar(depths, counts, color='skyblue')
+            ax.set_title(f'Depth Distribution - {cfg}')
+            ax.set_xlabel('Depth')
+            ax.set_ylabel('Count')
+            ax.set_xticks(depths)
+            ax.set_xticklabels(depths)
+            ax.grid(axis='y', linestyle='--', alpha=0.7)
+            od = os.path.join(self.output_dir, cfg)
+            os.makedirs(od, exist_ok=True)
+            fig.savefig(os.path.join(od, 'depth_distribution.png'), dpi=300)
+            plt.close(fig)
 
-    def _depth_distribution(self, data, config_name, output_file):
-        depth_counts = data["depth_counts"]
-        depths = sorted(int(d) for d in depth_counts.keys())
-        counts = [depth_counts[str(d)] for d in depths]
+    def plot_status_by_depth(self, df):
+        for cfg, grp in df.groupby('config'):
+            pivot = grp.pivot_table(index='depth', columns='status', values='count', aggfunc='sum', fill_value=0)
+            depths = pivot.index.tolist()
+            fig, ax = plt.subplots(figsize=(10,6))
+            pivot.plot(kind='bar', stacked=True, ax=ax)
+            ax.set_title(f'Status by Depth - {cfg}')
+            ax.set_xlabel('Depth')
+            ax.set_ylabel('Count')
+            ax.set_xticks(range(len(depths)))
+            ax.set_xticklabels(depths)
+            ax.grid(axis='y', linestyle='--', alpha=0.7)
+            od = os.path.join(self.output_dir, cfg)
+            os.makedirs(od, exist_ok=True)
+            fig.savefig(os.path.join(od, 'status_by_depth.png'), dpi=300)
+            plt.close(fig)
 
-        plt.figure(figsize=(10, 6))
-        plt.bar(depths, counts, color='skyblue')
-        plt.xlabel('Instruction Depth')
-        plt.ylabel('Average Number of Instructions')
-        plt.title(f'{config_name}: Depth Distribution')
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
+    def plot_success_rate_by_depth(self, df):
+        for cfg, grp in df.groupby('config'):
+            pivot = grp.pivot_table(index='depth', columns='status', values='count', aggfunc='sum', fill_value=0)
+            depths = sorted(pivot.index.tolist())
+            rates = [(pivot.loc[d].get('Settled on time',0) + pivot.loc[d].get('Settled late',0)) / pivot.loc[d].sum() * 100 if pivot.loc[d].sum()>0 else 0 for d in depths]
+            fig, ax = plt.subplots()
+            ax.plot(depths, rates, 'o-', linewidth=2)
+            ax.set_title(f'Success Rate by Depth - {cfg}')
+            ax.set_xlabel('Depth')
+            ax.set_ylabel('Success Rate (%)')
+            ax.set_xticks(depths)
+            ax.set_xticklabels(depths)
+            ax.grid(True, linestyle='--', alpha=0.7)
+            od = os.path.join(self.output_dir, cfg)
+            os.makedirs(od, exist_ok=True)
+            fig.savefig(os.path.join(od, 'success_rate_by_depth.png'), dpi=300)
+            plt.close(fig)
+
+    def compare_depth_distributions(self, df):
+        configs = self._sort_configs(df['config'].unique())
+        fig, ax = plt.subplots(figsize=(12,8))
+        for cfg in configs:
+            grp = df[df['config']==cfg].sort_values('depth')
+            ax.plot(grp['depth'], grp['count'], 'o-', label=cfg)
+        ax.set_title('Depth Distributions Across Configurations')
+        ax.set_xlabel('Depth')
+        ax.set_ylabel('Count')
+        ax.legend()
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(output_file)
-        plt.close()
+        plt.savefig(os.path.join(self.output_dir, 'compare_depth_distributions.png'), dpi=300)
+        plt.close(fig)
 
-    def _status_by_depth(self, data, config_name, output_file):
-        depth_status_counts = data["depth_status_counts"]
-        depths = sorted(int(d) for d in depth_status_counts.keys())
-
-        status_groups = {
-            "Settled on time": ["Settled on time"],
-            "Settled late": ["Settled late"],
-            "Cancelled": ["Cancelled"],
-            "In process": ["In process"]
-        }
-        group_colors = {
-            "Settled on time": "green",
-            "Settled late": "orange",
-            "Cancelled": "red",
-            "In process": "gray"
-        }
-
-        group_data = {}
-        for group, statuses in status_groups.items():
-            group_data[group] = []
-            for depth in depths:
-                count = sum(depth_status_counts.get(str(depth), {}).get(status, 0) for status in statuses)
-                group_data[group].append(count)
-
-        plt.figure(figsize=(12, 8))
-        bottom = [0] * len(depths)
-
-        for group, counts in group_data.items():
-            plt.bar(depths, counts, bottom=bottom, label=group, color=group_colors.get(group, 'gray'))
-            bottom = [b + c for b, c in zip(bottom, counts)]
-
-        plt.xlabel('Instruction Depth')
-        plt.ylabel('Average Number of Instructions')
-        plt.title(f'{config_name}: Status by Depth')
-        plt.legend()
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
+    def compare_status_distributions(self, df):
+        configs = self._sort_configs(df['config'].unique())
+        statuses = sorted(df['status'].unique())
+        depths = sorted(df['depth'].unique())
+        fig, ax = plt.subplots(figsize=(14,8))
+        for cfg in configs:
+            sub = df[df['config']==cfg]
+            for status in statuses:
+                counts = [sub[(sub['depth']==d)&(sub['status']==status)]['count'].sum() for d in depths]
+                ax.plot(depths, counts, 'o-', label=f"{cfg}-{status}")
+        ax.set_title('Status Distributions Across Configurations')
+        ax.set_xlabel('Depth')
+        ax.set_ylabel('Count')
+        ax.legend(ncol=2)
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(output_file)
-        plt.close()
+        plt.savefig(os.path.join(self.output_dir, 'compare_status_distributions.png'), dpi=300)
+        plt.close(fig)
 
-    def _success_rate_by_depth(self, data, config_name, output_file):
-        depth_status_counts = data["depth_status_counts"]
-        depths = sorted(int(d) for d in depth_status_counts.keys())
-
-        success_rates = []
-        for depth in depths:
-            statuses = depth_status_counts.get(str(depth), {})
-            total = sum(statuses.values())
-            successful = statuses.get("Settled on time", 0) + statuses.get("Settled late", 0)
-            success_rate = (successful / total * 100) if total > 0 else 0
-            success_rates.append(success_rate)
-
-        plt.figure(figsize=(10, 6))
-        plt.plot(depths, success_rates, 'o-', linewidth=2, markersize=8, color='blue')
-        plt.xlabel('Depth Level')
-        plt.ylabel('Success Rate (%)')
-        plt.title(f'{config_name}: Success Rate by Depth')
-        plt.grid(True, linestyle='--', alpha=0.7)
+    def compare_success_rates(self, df):
+        configs = self._sort_configs(df['config'].unique())
+        fig, ax = plt.subplots(figsize=(12,8))
+        depths_all = sorted(df['depth'].unique())
+        for cfg in configs:
+            sub = df[df['config']==cfg]
+            pivot = sub.pivot_table(index='depth', columns='status', values='count', aggfunc='sum', fill_value=0)
+            depths = sorted(pivot.index)
+            rates = [(pivot.loc[d].get('Settled on time',0) + pivot.loc[d].get('Settled late',0)) / pivot.loc[d].sum()*100 if pivot.loc[d].sum()>0 else 0 for d in depths]
+            ax.plot(depths, rates, 'o-', label=cfg)
+        ax.set_title('Success Rates by Depth Across Configurations')
+        ax.set_xlabel('Depth')
+        ax.set_ylabel('Success Rate (%)')
+        ax.legend()
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(output_file)
-        plt.close()
+        plt.savefig(os.path.join(self.output_dir, 'compare_success_rates.png'), dpi=300)
+        plt.close(fig)
 
-    def _compare_success_rates(self):
-        plt.figure(figsize=(14, 8))
-        for config_name, data in self.statistics.items():
-            depth_status_counts = data["depth_status_counts"]
-            depths = sorted(int(d) for d in depth_status_counts.keys())
-
-            success_rates = []
-            for depth in depths:
-                statuses = depth_status_counts.get(str(depth), {})
-                total = sum(statuses.values())
-                successful = statuses.get("Settled on time", 0) + statuses.get("Settled late", 0)
-                success_rate = (successful / total * 100) if total > 0 else 0
-                success_rates.append(success_rate)
-
-            plt.plot(depths, success_rates, marker='o', label=config_name)
-
-        plt.xlabel('Depth Level')
-        plt.ylabel('Success Rate (%)')
-        plt.title('Comparative Success Rate Across Configurations')
-        plt.legend()
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
+    def compare_total_instructions(self, df):
+        configs = self._sort_configs(df['config'].unique())
+        totals = [df[df['config']==cfg]['count'].sum() for cfg in configs]
+        fig, ax = plt.subplots(figsize=(10,6))
+        ax.bar(range(len(configs)), totals, color='skyblue')
+        ax.set_xticks(range(len(configs)))
+        ax.set_xticklabels(configs, rotation=45, ha='right')
+        ax.set_title('Total Instructions per Configuration')
+        ax.set_xlabel('Configuration')
+        ax.set_ylabel('Total Instructions')
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "comparative_success_rate.png"))
-        plt.close()
+        plt.savefig(os.path.join(self.output_dir, 'compare_total_instructions.png'), dpi=300)
+        plt.close(fig)
 
-    def _compare_depth_distributions(self):
-        plt.figure(figsize=(14, 8))
-        for config_name, data in self.statistics.items():
-            depth_counts = data["depth_counts"]
-            depths = sorted(int(d) for d in depth_counts.keys())
-            counts = [depth_counts[str(d)] for d in depths]
-            plt.plot(depths, counts, marker='o', label=config_name)
-
-        plt.xlabel('Instruction Depth')
-        plt.ylabel('Average Number of Instructions')
-        plt.title('Comparative Depth Distribution Across Configurations')
-        plt.legend()
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "comparative_depth_distribution.png"))
-        plt.close()
-
-    def _compare_status_distributions(self):
-        plt.figure(figsize=(14, 8))
-        depths = range(30)
-        status_groups = ["Settled on time", "Settled late", "Cancelled", "In process"]
-        colors = ['green', 'orange', 'red', 'gray']
-
-        for config_name, data in self.statistics.items():
-            depth_status_counts = data["depth_status_counts"]
-            for idx, status in enumerate(status_groups):
-                counts = [depth_status_counts.get(str(d), {}).get(status, 0) for d in depths]
-                plt.plot(depths, counts, label=f'{config_name} - {status}', color=colors[idx % len(colors)])
-
-        plt.xlabel('Depth Level')
-        plt.ylabel('Instruction Count')
-        plt.title('Comparative Status Distribution Across Configurations')
-        plt.legend()
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "comparative_status_distribution.png"))
-        plt.close()
-
-    def _compare_total_instructions(self):
-        configs = []
-        totals = []
-        for config_name, data in self.statistics.items():
-            total_instructions = sum(data["depth_counts"].values())
-            configs.append(config_name)
-            totals.append(total_instructions)
-
-        plt.figure(figsize=(14, 8))
-        plt.bar(configs, totals, color='skyblue')
-        plt.xticks(rotation=45)
-        plt.xlabel('Configuration')
-        plt.ylabel('Total Instructions')
-        plt.title('Total Instructions per Configuration')
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "total_instructions_comparison.png"))
-        plt.close()
-
-    def _compare_normalized_completion_rate(self):
-        plt.figure(figsize=(14, 8))
-        configs = []
+    def compare_normalized_completion_rate(self, df):
+        configs = self._sort_configs(df['config'].unique())
         rates = []
-
-        for config_name, data in self.statistics.items():
-            depth_status_counts = data["depth_status_counts"]
-            total = sum([sum(depth_status_counts.get(str(d), {}).values()) for d in range(30)])
-            successful = sum([
-                depth_status_counts.get(str(d), {}).get("Settled on time", 0) +
-                depth_status_counts.get(str(d), {}).get("Settled late", 0) for d in range(30)
-            ])
-            rate = (successful / total * 100) if total > 0 else 0
-            configs.append(config_name)
-            rates.append(rate)
-
-        plt.bar(configs, rates, color='lightgreen')
-        plt.xticks(rotation=45)
-        plt.xlabel('Configuration')
-        plt.ylabel('Completion Rate (%)')
-        plt.title('Normalized Completion Rate Across Configurations')
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        for cfg in configs:
+            sub = df[df['config']==cfg]
+            total = sub['count'].sum()
+            success = sub[sub['status'].isin(['Settled on time','Settled late'])]['count'].sum()
+            rates.append(success/total*100 if total>0 else 0)
+        fig, ax = plt.subplots(figsize=(10,6))
+        ax.bar(range(len(configs)), rates, color='lightgreen')
+        ax.set_xticks(range(len(configs)))
+        ax.set_xticklabels(configs, rotation=45, ha='right')
+        ax.set_title('Normalized Completion Rate by Configuration')
+        ax.set_xlabel('Configuration')
+        ax.set_ylabel('Completion Rate (%)')
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "normalized_completion_rate.png"))
-        plt.close()
+        plt.savefig(os.path.join(self.output_dir, 'compare_normalized_completion_rate.png'), dpi=300)
+        plt.close(fig)
 
-    def _plot_success_rate_heatmap(self):
-        configs = sorted(self.statistics.keys())
-        depths = range(30)
-        heatmap_data = np.full((len(depths), len(configs)), np.nan)
-
-        for j, config_name in enumerate(configs):
-            depth_status_counts = self.statistics[config_name]["depth_status_counts"]
-            for i in range(len(depths)):
-                statuses = depth_status_counts.get(str(i), {})
-                total = sum(statuses.values())
-                successful = statuses.get("Settled on time", 0) + statuses.get("Settled late", 0)
-                if total > 0:
-                    heatmap_data[i, j] = (successful / total) * 100
-
-        if np.any(~np.isnan(heatmap_data)):
-            plt.figure(figsize=(14, 10))
-            sns.heatmap(heatmap_data, annot=False, cmap="YlGnBu", xticklabels=configs, yticklabels=depths)
-            plt.xlabel('Configuration')
-            plt.ylabel('Instruction Depth')
-            plt.title('Heatmap of Success Rate by Depth and Configuration')
+    def plot_success_rate_heatmap(self, df_status, df_depth):
+        configs = self._sort_configs(df_status['config'].unique())
+        depths = sorted(df_depth['depth'].unique())
+        heat = np.full((len(depths), len(configs)), np.nan)
+        for j, cfg in enumerate(configs):
+            sub = df_status[df_status['config']==cfg]
+            pivot = sub.pivot_table(index='depth', columns='status', values='count', aggfunc='sum', fill_value=0)
+            for i, d in enumerate(depths):
+                if d in pivot.index:
+                    row = pivot.loc[d]
+                    tot = row.sum()
+                    succ = row.get('Settled on time',0) + row.get('Settled late',0)
+                    heat[i,j] = succ/tot*100 if tot>0 else np.nan
+        if np.any(~np.isnan(heat)):
+            fig, ax = plt.subplots(figsize=(12,10))
+            sns.heatmap(heat, xticklabels=configs, yticklabels=depths, cmap='YlGnBu', ax=ax)
+            ax.set_title('Heatmap of Success Rate by Depth and Configuration')
+            ax.set_xlabel('Configuration')
+            ax.set_ylabel('Depth')
             plt.tight_layout()
-            plt.savefig(os.path.join(self.output_dir, "success_rate_heatmap.png"))
-            plt.close()
-        else:
-            print("[WARNING] No valid data to plot in heatmap, skipping.")
+            plt.savefig(os.path.join(self.output_dir, 'success_rate_heatmap.png'), dpi=300)
+            plt.close(fig)
 
-    def _export_summary(self):
-        summary_data = []
-        for config_name, data in self.statistics.items():
-            total_instructions = sum(data["depth_counts"].values())
-            success = 0
-            total = 0
-
-            for depth, statuses in data["depth_status_counts"].items():
-                total += sum(statuses.values())
-                success += statuses.get("Settled on time", 0) + statuses.get("Settled late", 0)
-
-            success_rate = (success / total * 100) if total > 0 else 0
-            max_depth = max([int(d) for d in data["depth_counts"].keys()]) if data["depth_counts"] else 0
-
-            summary_data.append({
-                "Configuration": config_name,
-                "Total Instructions": total_instructions,
-                "Success Rate (%)": success_rate,
-                "Max Depth": max_depth
-            })
-
-        df = pd.DataFrame(summary_data)
-        df.to_csv(os.path.join(self.output_dir, "depth_summary.csv"), index=False)
-        with open(os.path.join(self.output_dir, "depth_summary.json"), 'w') as f:
-            json.dump(summary_data, f, indent=2)
+    def export_summary(self, df_depth, df_status):
+        rows = []
+        for cfg in self._sort_configs(df_depth['config'].unique()):
+            tot_inst = int(df_depth[df_depth['config']==cfg]['count'].sum())
+            sub = df_status[df_status['config']==cfg]
+            total = sub['count'].sum()
+            succ = sub[sub['status'].isin(['Settled on time','Settled late'])]['count'].sum()
+            rate = succ/total*100 if total>0 else 0
+            maxd = int(df_depth[df_depth['config']==cfg]['depth'].max())
+            rows.append({'Configuration':cfg,'Total Instructions':tot_inst,'Success Rate (%)':rate,'Max Depth':maxd})
+        df_sum = pd.DataFrame(rows)
+        df_sum.to_csv(os.path.join(self.output_dir,'depth_summary.csv'), index=False)
+        with open(os.path.join(self.output_dir,'depth_summary.json'),'w') as f:
+            json.dump(rows, f, indent=2)
