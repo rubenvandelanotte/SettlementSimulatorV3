@@ -9,7 +9,7 @@ from SettlementModel import SettlementModel
 from RuntimeTracker import RuntimeTracker
 from settlement_analysis.run_partial_analysis import SettlementAnalysisSuite
 from DepthVisualizer import MaxDepthVisualizer
-from SettlementAmountVisualizer import MinSettlementAmountAnalyzer
+from SettlementAmountVisualizer import SettlementAmountVisualizer
 
 def ensure_directory(path):
     if not os.path.exists(path):
@@ -42,7 +42,7 @@ def finalize_visualizations(output_dir, label):
         )
         visualizer.generate_all_visualizations()
     elif label == "amount":
-        visualizer = MinSettlementAmountAnalyzer(
+        visualizer = SettlementAmountVisualizer(
             results_dir=os.path.join(output_dir, "results_all_analysis"),
             output_dir=os.path.join(output_dir, "visualizations", "amount")
         )

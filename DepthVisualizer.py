@@ -49,7 +49,7 @@ class MaxDepthVisualizer:
                 continue
             settled_on_time = data.get("settled_on_time_amount", 0)
             settled_late = data.get("settled_late_amount", 0)
-            count = data.get("instructions_settled_total") or data.get("mothers_effectively_settled")
+            count = data['mothers_effectively_settled']
             if count is None:
                 warnings.warn(f"No settled count in {fname}, skipping.")
                 continue
