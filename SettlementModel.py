@@ -41,8 +41,8 @@ class SettlementModel(Model):
 
 
         self.simulation_start = datetime(2025, 4, 1, 1, 30)
-        self.warm_up_period = timedelta(days=5)
-        self.cool_down_period = timedelta(days=5)
+        self.warm_up_period = timedelta(days=15)
+        self.cool_down_period = timedelta(days=15)
 
         self.simulation_main_duration = timedelta(days=self.simulation_duration_days)
         self.simulation_total_duration = self.warm_up_period + self.simulation_main_duration + self.cool_down_period
@@ -187,7 +187,7 @@ class SettlementModel(Model):
                 new_security_accountID = generate_iban()
                 new_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
 
-                new_security_balance = int(random.uniform(60e7, 90e7))
+                new_security_balance = int(random.uniform(13e8, 16e8))
                 new_security_creditLimit = 0
                 new_security_Account = Account.Account(accountID=new_security_accountID, accountType= new_security_accountType, balance= new_security_balance, creditLimit= new_security_creditLimit)
                 inst_accounts.append(new_security_Account)
