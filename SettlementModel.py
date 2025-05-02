@@ -154,6 +154,8 @@ class SettlementModel(Model):
         cap = 2e9  # 2 billion cap
         amount = min(amount, cap)
 
+        #0.88 klein bedrag 10e7 en 12 kans groot 10e9
+
         return int(amount)
 
     def generate_data(self):
@@ -187,7 +189,7 @@ class SettlementModel(Model):
                 new_security_accountID = generate_iban()
                 new_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
 
-                new_security_balance = int(random.uniform(23e8, 27e8))
+                new_security_balance = int(random.uniform(18e8, 30e8))
                 new_security_creditLimit = 0
                 new_security_Account = Account.Account(accountID=new_security_accountID, accountType= new_security_accountType, balance= new_security_balance, creditLimit= new_security_creditLimit)
                 inst_accounts.append(new_security_Account)
@@ -334,16 +336,9 @@ class SettlementModel(Model):
             if inst.get_motherID() == "mother" and main_start <= inst.get_creation_time() <= main_end
         ]
 
-        warmup_mothers = [
-            inst for inst in self.instructions
-            if (inst.get_motherID() == "mother" and
-                inst.get_creation_time() < main_start and
-                inst.get_status() in ["Settled on time", "Settled late", "Cancelled due to partial settlement",
-                                      "Cancelled due to timeout", "Cancelled due to error"] and
-                main_start <= inst.last_modified_time <= main_end)
-        ]
+
         # Use a set for faster membership testing
-        descendants = set(mother_instructions + warmup_mothers)
+        descendants = set(mother_instructions)
 
         # Create a mapping from parent ID to children for faster lookup
         parent_to_children = {}
