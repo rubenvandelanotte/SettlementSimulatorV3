@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import InstitutionAgent
 import Account
 import random
+from collections import defaultdict
 from jsonocellogger import JSONOCELLogger
 from statistics_tracker import SettlementStatisticsTracker
 
@@ -640,6 +641,239 @@ class SettlementModel(Model):
 
         return instruction_efficiency, value_efficiency
 
+    def calculate_daily_metrics_optimized(self, debug=False):
+        """
+        Compute per-day efficiency using the optimized settlement logic.
+        Only includes days present in the main period mothers, sorted by the mothers' ISD.
+        If debug=True, returns dict[date_iso] = (orig_pairs, settled_pairs, orig_value, settled_value).
+        Else, returns dict[date_iso] = (instr_eff_pct, value_eff_pct).
+        """
+        # Prefetch and cache instruction data
+        rel = self.get_main_period_mothers_and_descendants_optimized()
+        # All instructions from main period (already filtered by ISD in getter)
+        child_map, status_cache, amount_cache = {}, {}, {}
+        for inst in rel:
+            iid = inst.get_uniqueID()
+            status_cache[iid] = inst.get_status()
+            amount_cache[iid] = inst.get_amount()
+            if inst.isChild:
+                child_map.setdefault(inst.get_motherID(), []).append(iid)
+        # Build mapping of ISD to mother instructions
+        daily = defaultdict(list)
+        for inst in rel:
+            if inst.get_motherID() == 'mother':
+                date_iso = inst.get_intended_settlement_date().date().isoformat()
+                daily[date_iso].append(inst)
+        # Sort dates
+        result = {}
+        for date_iso in sorted(daily.keys()):
+            group_insts = daily[date_iso]
+            # Group by linkcode for this date
+            pairs = defaultdict(list)
+            for inst in group_insts:
+                pairs[inst.get_linkcode()].append(inst)
+            orig_pairs = settled_pairs = orig_value = settled_value = 0.0
+            for pair in pairs.values():
+                orig_pairs += 1
+                amt = amount_cache[pair[0].get_uniqueID()]
+                orig_value += amt
+                if len(pair) >= 2:
+                    st0 = status_cache[pair[0].get_uniqueID()]
+                    st1 = status_cache[pair[1].get_uniqueID()]
+                    if st0 == 'Settled on time' and st1 == 'Settled on time':
+                        settled_pairs += 1
+                        settled_value += amt
+                    elif st0 == 'Cancelled due to partial settlement' and st1 == 'Cancelled due to partial settlement':
+                        child_amt = self.get_settled_amount_iterative(pair[0].get_uniqueID(), child_map, status_cache,
+                                                                      amount_cache)
+                        eff = min(child_amt, amt)
+                        if eff == amt:
+                            settled_pairs += 1
+                        settled_value += eff
+            if debug:
+                result[date_iso] = (orig_pairs, settled_pairs, orig_value, settled_value)
+            else:
+                ie = (settled_pairs / orig_pairs * 100) if orig_pairs else 0.0
+                ve = (settled_value / orig_value * 100) if orig_value else 0.0
+                result[date_iso] = (ie, ve)
+        # return after processing all dates
+        return result
+
+    def calculate_average_daily_metrics(self):
+        """
+        Compute the unweighted average of per-day instruction and value efficiencies
+        based on optimized daily metrics.
+        Returns:
+            tuple: (avg_instr_eff_pct, avg_value_eff_pct)
+        """
+        # Use optimized daily metrics
+        daily = self.calculate_daily_metrics_optimized(debug=False)
+        if not daily:
+            return 0.0, 0.0
+        instr_vals = [vals[0] for vals in daily.values()]
+        value_vals = [vals[1] for vals in daily.values()]
+        avg_instr = sum(instr_vals) / len(instr_vals)
+        avg_value = sum(value_vals) / len(value_vals)
+        return avg_instr, avg_value
+
+    def calculate_weighted_average_daily_metrics(self):
+        """
+        Compute volume-weighted average of per-day efficiencies by using raw counts
+        from optimized daily metrics.
+        Returns:
+            tuple: (weighted_instr_eff_pct, weighted_value_eff_pct)
+        """
+        daily_raw = self.calculate_daily_metrics_optimized(debug=True)
+        if not daily_raw:
+            return 0.0, 0.0
+        total_pairs = total_weighted_instr = 0.0
+        total_value = total_weighted_value = 0.0
+        for orig, settled, orig_val, settled_val in daily_raw.values():
+            total_pairs += orig
+            total_weighted_instr += (settled / orig * 100 if orig else 0.0) * orig
+            total_value += orig_val
+            total_weighted_value += (settled_val / orig_val * 100 if orig_val else 0.0) * orig_val
+        instr_eff = total_weighted_instr / total_pairs if total_pairs else 0.0
+        value_eff = total_weighted_value / total_value if total_value else 0.0
+        return instr_eff, value_eff
+
+    def calculate_average_participant_metrics(self):
+        """
+        Compute the unweighted average of per-participant instruction and value efficiencies
+        based on optimized participant metrics.
+        Returns:
+            tuple: (avg_instr_eff_pct, avg_value_eff_pct)
+        """
+        # Use optimized participant metrics
+        part = self.calculate_participant_metrics_optimized(debug=False)
+        if not part:
+            return 0.0, 0.0
+        instr_vals = [vals[0] for vals in part.values()]
+        value_vals = [vals[1] for vals in part.values()]
+        avg_instr = sum(instr_vals) / len(instr_vals)
+        avg_value = sum(value_vals) / len(value_vals)
+        return avg_instr, avg_value
+
+    # Deprecated unoptimized weighted average participant metrics removed to avoid duplication
+
+    def calculate_participant_metrics_optimized(self, debug=False):
+        """
+        Compute per-participant efficiency using optimized settlement logic.
+        Splits each instruction pair (linkcode) evenly among its participants to match global totals.
+        Results sorted by numeric participant ID suffix.
+        If debug=True, returns dict[participant] = (orig_pairs, settled_pairs, orig_value, settled_value).
+        Else, returns dict[participant] = (instr_eff_pct, value_eff_pct).
+        """
+        from collections import defaultdict
+        # 1. Fetch relevant instructions and build caches
+        rel = self.get_main_period_mothers_and_descendants_optimized()
+        child_map, status_cache, amount_cache = {}, {}, {}
+        for inst in rel:
+            iid = inst.get_uniqueID()
+            status_cache[iid] = inst.get_status()
+            amount_cache[iid] = inst.get_amount()
+            if inst.isChild:
+                child_map.setdefault(inst.get_motherID(), []).append(iid)
+
+        # 2. Group mother instructions by linkcode
+        pairs = defaultdict(list)
+        for inst in rel:
+            if inst.get_motherID() == 'mother':
+                pairs[inst.get_linkcode()].append(inst)
+
+        # 3. Compute raw per-participant shares
+        raw = {}
+        for linkcode, group in pairs.items():
+            # determine number of distinct participants in this group
+            participants = {m.get_institution().institutionID for m in group}
+            share = 1.0 / len(participants)
+            amt = amount_cache[group[0].get_uniqueID()]
+            # settlement logic for this link
+            s0 = status_cache[group[0].get_uniqueID()]
+            s1 = status_cache.get(group[1].get_uniqueID() if len(group) > 1 else None)
+            # determine settled flags and value
+            settled_pair = False
+            settled_amt = 0.0
+            if s0 == 'Settled on time' and s1 == 'Settled on time':
+                settled_pair = True
+                settled_amt = amt
+            elif s0 == 'Cancelled due to partial settlement' and s1 == 'Cancelled due to partial settlement':
+                child_amt = self.get_settled_amount_iterative(group[0].get_uniqueID(), child_map, status_cache,
+                                                              amount_cache)
+                eff = min(child_amt, amt)
+                settled_amt = eff
+                if eff == amt:
+                    settled_pair = True
+            # distribute to participants
+            for pid in participants:
+                if pid not in raw:
+                    raw[pid] = [0.0, 0.0, 0.0, 0.0]
+                raw[pid][0] += share  # orig_pairs
+                raw[pid][2] += amt * share  # orig_value
+                if settled_pair:
+                    raw[pid][1] += share  # settled_pairs
+                raw[pid][3] += settled_amt * share  # settled_value
+
+        # 4. Sort participants by numeric suffix
+        def pid_key(x):
+            try:
+                return int(x.split('-')[-1])
+            except:
+                return x
+
+        sorted_pids = sorted(raw.keys(), key=pid_key)
+
+        # 5. Build result
+        result = {}
+        for pid in sorted_pids:
+            orig, settled, orig_val, settled_val = raw[pid]
+            if debug:
+                result[pid] = (orig, settled, orig_val, settled_val)
+            else:
+                ie = (settled / orig * 100) if orig else 0.0
+                ve = (settled_val / orig_val * 100) if orig_val else 0.0
+                result[pid] = (ie, ve)
+        return result
+
+    def calculate_weighted_average_participant_metrics(self):
+        """
+        Compute global efficiency by summing raw per-participant counts to mirror calculate_settlement_efficiency_optimized.
+        Returns:
+            tuple: (instr_eff_pct, value_eff_pct)
+        """
+        part_raw = self.calculate_participant_metrics_optimized(debug=True)
+        total_orig = total_settled = total_val = total_settled_val = 0.0
+        for orig, settled, orig_val, settled_val in part_raw.values():
+            total_orig += orig
+            total_settled += settled
+            total_val += orig_val
+            total_settled_val += settled_val
+        instr_eff = (total_settled / total_orig * 100) if total_orig else 0.0
+        value_eff = (total_settled_val / total_val * 100) if total_val else 0.0
+        return instr_eff, value_eff
+
+    def get_days_with_no_pairs(self):
+        """
+        Identify dates in the main period that have no settlement pairs at all.
+        Returns:
+            list of dates (datetime.date) with zero mother-instructions.
+        """
+        # collect all dates with mother instructions
+        rel = self.get_main_period_mothers_and_descendants_optimized()
+        present_dates = {inst.get_intended_settlement_date().date()
+                         for inst in rel if inst.get_motherID() == 'mother'}
+
+
+        # build full range from min to max
+        start, end = min(present_dates), max(present_dates)
+        missing = []
+        current = start
+        while current <= end:
+            if current not in present_dates:
+                missing.append(current)
+            current += timedelta(days=1)
+        return missing
+
     def count_settled_instructions(self):
         """
         Counts the total number of instructions that reached "Settled on time" status
@@ -975,14 +1209,36 @@ class SettlementModel(Model):
 
         result.update(self.statistics_tracker.export_summary())
 
+        # Add daily metrics
+        daily_metrics = {}
+        for date, (instr_eff, val_eff) in self.calculate_daily_metrics_optimized().items():
+            key = date.isoformat() if hasattr(date, 'isoformat') else str(date)
+            daily_metrics[key] = {
+                "instruction_efficiency": instr_eff,
+                "value_efficiency": val_eff
+            }
+        result["daily_metrics"] = daily_metrics
+        result["average_daily"] = self.calculate_average_daily_metrics()
+        result["weighted_average_daily"] = self.calculate_weighted_average_daily_metrics()
+
+        # Add participant metrics
+        participant_metrics = {}
+        for pid, (instr_eff, val_eff) in self.calculate_participant_metrics_optimized().items():
+            participant_metrics[pid] = {
+                "instruction_efficiency": instr_eff,
+                "value_efficiency": val_eff
+            }
+        result["participant_metrics"] = participant_metrics
+        result["average_particpant"] = self.calculate_average_participant_metrics()
+        result["weighted_average_particpant"] = self.calculate_weighted_average_participant_metrics()
+        result["missing_days"] = self.get_days_with_no_pairs()
+
         # Optional metadata: seed, runtime, memory, config info
         if config_metadata:
             result.update(config_metadata)
 
-
         with open(filename, 'w') as f:
             json.dump(result, f, indent=2)
-
 
 
 
