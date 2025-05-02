@@ -174,7 +174,7 @@ class SettlementModel(Model):
 
         #0.88 klein bedrag 10e7 en 12 kans groot 10e9
 
-        return int(amount*100)
+        return int(amount*10)
 
 
     def generate_data(self):
