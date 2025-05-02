@@ -158,6 +158,25 @@ class SettlementModel(Model):
 
         return int(amount)
 
+    def sample_initial_balance_amount(self):
+        """
+        Samples an instruction amount (in EUR) from a log-normal distribution
+        that approximates the mean (€324M), std (€829M), and median (€20M)
+        of the original two-point distribution.
+        """
+        mu = 18.0857  # ln(median)
+        sigma = 1  # controls skewness and std
+        amount = random.lognormvariate(mu, sigma)
+
+        # Apply a cap to further prevent extreme outliers (optional)
+        cap = 2e9  # 2 billion cap
+        amount = min(amount, cap)
+
+        #0.88 klein bedrag 10e7 en 12 kans groot 10e9
+
+        return int(amount*100)
+
+
     def generate_data(self):
         print("Generate Accounts & Institutions:")
         print("-----------------------------------------")
@@ -189,7 +208,7 @@ class SettlementModel(Model):
                 new_security_accountID = generate_iban()
                 new_security_accountType = random.choice([bt for bt in self.bond_types if bt not in inst_bondtypes])
 
-                new_security_balance = int(random.uniform(18e8, 30e8))
+                new_security_balance = self.sample_initial_balance_amount()
                 new_security_creditLimit = 0
                 new_security_Account = Account.Account(accountID=new_security_accountID, accountType= new_security_accountType, balance= new_security_balance, creditLimit= new_security_creditLimit)
                 inst_accounts.append(new_security_Account)
