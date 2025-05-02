@@ -114,7 +114,12 @@ class InstitutionAgent(Agent):
             raise ValueError("No security accounts available for institution " + self.institutionID)
         security_account = random.choice(security_accounts)
         random_security = security_account.accountType  # Use the type from the chosen account
-        amount = self.model.sample_instruction_amount()
+
+        original_balance = security_account.get_original_balance()
+        percentage = random.uniform(0.08, 0.19)
+        # amount = self.model.sample_instruction_amount()
+        amount = int(original_balance * percentage)
+
         model = self.model
         linkedTransaction = None
         uniqueID = len(self.model.instructions) + 1

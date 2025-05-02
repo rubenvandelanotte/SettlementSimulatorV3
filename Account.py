@@ -7,7 +7,8 @@ class Account:
         self.balance = balance
         self.creditLimit = creditLimit
         self.newSecurities = newSecurities
-        self.usedCredit = 0  #why not int declaration?
+        self.usedCredit = 0
+        self.original_balance = balance
 
     def getAccountID(self):
         return self.accountID
@@ -26,6 +27,9 @@ class Account:
 
     def get_newSecurities(self):
         return self.newSecurities
+
+    def get_original_balance(self):
+        return self.original_balance
 
     def set_newSecurities(self, new:bool):
         #gets set to true if new securities arrive, gets set to false if settlement fails.
