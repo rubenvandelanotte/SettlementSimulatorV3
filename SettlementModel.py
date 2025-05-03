@@ -29,7 +29,7 @@ class SettlementModel(Model):
         self.min_total_accounts = 4
         self.max_total_accounts = 10
         self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
-        self.min_settlement_percentage = 0.05
+        self.min_settlement_percentage = 0.01
         self.max_child_depth = 15
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()

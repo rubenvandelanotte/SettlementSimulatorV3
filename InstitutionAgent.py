@@ -116,7 +116,13 @@ class InstitutionAgent(Agent):
         random_security = security_account.accountType  # Use the type from the chosen account
 
         original_balance = security_account.get_original_balance()
-        percentage = random.uniform(0.08, 0.19)
+
+        # Creates a mix of regular and larger instructions
+        if random.random() < 0.15:  # 15% chance for larger instructions
+            percentage = random.uniform(0.20, 0.30)
+        else:
+            percentage = random.uniform(0.03, 0.1)
+
         # amount = self.model.sample_instruction_amount()
         amount = int(original_balance * percentage)
 
