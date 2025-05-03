@@ -190,7 +190,7 @@ class SettlementModel(Model):
             #generate cash account => there has to be at least 1 cash account
             new_cash_accountID = generate_iban()
             new_cash_accountType = "Cash"
-            new_cash_balance =  int(random.uniform(6e11, 9e11))  # Increased balance range
+            new_cash_balance =  int(random.uniform(6e12, 9e12))  # Increased balance range
             new_cash_creditLimit = 0.1*new_cash_balance
             new_cash_Account = Account.Account(accountID=new_cash_accountID, accountType= new_cash_accountType, balance= new_cash_balance, creditLimit=new_cash_creditLimit)
             inst_accounts.append(new_cash_Account)
@@ -304,7 +304,7 @@ class SettlementModel(Model):
                     delivery.match()
 
         # Continue with settlement phase (5 attempts)
-        for attempt in range(5):
+        for attempt in range(10):
             for transaction in self.transactions:
                 if transaction.get_status() == "Matched":
                     if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities()):
