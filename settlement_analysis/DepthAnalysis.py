@@ -136,9 +136,14 @@ class DepthAnalyzer:
     def compare_depth_distributions(self, df):
         configs = self._sort_configs(df['config'].unique())
         fig, ax = plt.subplots(figsize=(12,8))
+
+        # Group by config and depth, then calculate mean count
+        avg_df = df.groupby(['config', 'depth'])['count'].mean().reset_index()
+
         for cfg in configs:
-            grp = df[df['config']==cfg].sort_values('depth')
+            grp = avg_df[avg_df['config'] == cfg].sort_values('depth')
             ax.plot(grp['depth'], grp['count'], 'o-', label=cfg)
+
         ax.set_title('Depth Distributions Across Configurations')
         ax.set_xlabel('Depth')
         ax.set_ylabel('Count')
