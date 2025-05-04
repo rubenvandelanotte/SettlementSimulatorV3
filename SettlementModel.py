@@ -302,10 +302,12 @@ class SettlementModel(Model):
         def sequence_rule(t):
             deliverer = t.get_deliverer()
             receiver = t.get_receiver()
-            if deliverer.get_priority() or receiver.get_priority() is None:
-                print(f"[WARNING] Instruction {deliverer.get_uniqueID()} has no priority assigned!")
-                print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
-
+            if deliverer.get_priority() is None:
+                    print(f"[WARNING] Delivery Instruction {deliverer.get_uniqueID()} has no priority assigned!")
+                    print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
+            elif receiver.get_priority() is None:
+                    print(f"[WARNING] Receiver Instruction {receiver.get_uniqueID()} has no priority assigned!")
+                    print(f"  Status: {receiver.get_status()}, Depth: {receiver.get_depth()}, Amount: {receiver.get_amount()}, Creation: {receiver.get_creation_time()}")
 
             return (
                 deliverer.get_intended_settlement_date(),
@@ -328,10 +330,13 @@ class SettlementModel(Model):
         def sequence_rule(t):
             deliverer = t.get_deliverer()
             receiver = t.get_receiver()
-            if deliverer.get_priority() or receiver.get_priority() is None:
-                print(f"[WARNING] Instruction {deliverer.get_uniqueID()} has no priority assigned!")
-                print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
 
+            if deliverer.get_priority() is None:
+                print(f"[WARNING] Delivery Instruction {deliverer.get_uniqueID()} has no priority assigned!")
+                print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
+            elif receiver.get_priority() is None:
+                print(f"[WARNING] Receiver Instruction {receiver.get_uniqueID()} has no priority assigned!")
+                print(f"  Status: {receiver.get_status()}, Depth: {receiver.get_depth()}, Amount: {receiver.get_amount()}, Creation: {receiver.get_creation_time()}")
 
             return (
                 deliverer.get_intended_settlement_date(),
