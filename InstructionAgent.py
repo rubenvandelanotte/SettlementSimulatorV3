@@ -136,8 +136,8 @@ class InstructionAgent (Agent):
     def assign_priority(self):
         amount = self.amount
         isd = self.get_intended_settlement_date()
-        current_time = self.model.simulated_time
-        age_in_days = (isd - current_time).days
+        creation_time = self.creation_time
+        age_in_days = (isd - creation_time).days
 
         if amount >= 10000000:
             self.priority = 3

@@ -301,14 +301,15 @@ class SettlementModel(Model):
         #settle transactions
         def sequence_rule(t):
             deliverer = t.get_deliverer()
-            if deliverer.get_priority() is None:
+            receiver = t.get_receiver()
+            if deliverer.get_priority() or receiver.get_priority() is None:
                 print(f"[WARNING] Instruction {deliverer.get_uniqueID()} has no priority assigned!")
                 print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
 
 
             return (
                 deliverer.get_intended_settlement_date(),
-                -deliverer.get_priority(), 2,
+                -max(deliverer.get_priority(), receiver.get_priority()),
                 not t.is_fully_settleable(),
                 -deliverer.get_amount(),
                 deliverer.get_creation_time()
@@ -326,13 +327,15 @@ class SettlementModel(Model):
 
         def sequence_rule(t):
             deliverer = t.get_deliverer()
-            if deliverer.get_priority() is None:
+            receiver = t.get_receiver()
+            if deliverer.get_priority() or receiver.get_priority() is None:
                 print(f"[WARNING] Instruction {deliverer.get_uniqueID()} has no priority assigned!")
                 print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
 
+
             return (
                 deliverer.get_intended_settlement_date(),
-                -deliverer.get_priority(), 2,
+                -max(deliverer.get_priority(), receiver.get_priority()),
                 not t.is_fully_settleable(),
                 -deliverer.get_amount(),
                 deliverer.get_creation_time()
