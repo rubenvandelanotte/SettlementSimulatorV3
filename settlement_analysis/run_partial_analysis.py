@@ -9,6 +9,8 @@ from settlement_analysis.ConfidenceIntervalAnalysis import ConfidenceIntervalAna
 from settlement_analysis.RTPvsBatchAnalysis import RTPvsBatchAnalyzer
 from settlement_analysis.EfficiencyPerDay import EfficiencyPerDayAnalyzer
 from settlement_analysis.EfficiencyPerParticipant import EfficiencyPerParticipantAnalyzer
+from settlement_analysis.SettlementTypeAnalysis import SettlementTypeAnalyzer
+
 
 
 class SettlementAnalysisSuite:
@@ -28,11 +30,13 @@ class SettlementAnalysisSuite:
         self.rtp_vs_batch_analyzer = RTPvsBatchAnalyzer(self.input_dir, self.output_dir, self)
         self.eff_per_day_analyzer = EfficiencyPerDayAnalyzer(self.input_dir, self.output_dir, self)
         self.eff_per_part_analyzer = EfficiencyPerParticipantAnalyzer(self.input_dir,self.output_dir,self)
+        self.settlement_type_analyzer = SettlementTypeAnalyzer(self.input_dir, self.output_dir, self)  # Add the new analyzer
+
 
     def analyze_all(self, analysis_types=None):
         if analysis_types is None:
             analysis_types = [
-                "depth", "lateness", "lateness_hours", "runtime", "confidence_intervals", "rtp_vs_batch", "effi_per_day", "effi_per_part"
+                "depth", "lateness", "lateness_hours", "runtime", "confidence_intervals", "rtp_vs_batch", "effi_per_day", "effi_per_part","settlement_type"
             ]
 
         # Load all inputs
@@ -52,10 +56,12 @@ class SettlementAnalysisSuite:
             self.ci_analyzer.run()
         if "rtp_vs_batch" in analysis_types:
             self.rtp_vs_batch_analyzer.run()
-        if "effi_per_day" in analysis_types:
-            self.eff_per_day_analyzer.run()
-        if "effi_per_part" in analysis_types:
-            self.eff_per_part_analyzer.run()
+        #if "effi_per_day" in analysis_types:
+        #    self.eff_per_day_analyzer.run()
+        #if "effi_per_part" in analysis_types:
+        #    self.eff_per_part_analyzer.run()
+        if "settlement_type" in analysis_types:
+            self.settlement_type_analyzer.run()
 
 
     def _load_statistics(self):
@@ -88,6 +94,6 @@ class SettlementAnalysisSuite:
 
 if __name__ == "__main__":
         suite = SettlementAnalysisSuite(
-            input_dir= R"C:\Users\ruben\thesis\SettlementSimulatorV3.16\partial_allowance_files",
-            output_dir= os.path.join( R"C:\Users\ruben\thesis\SettlementSimulatorV3.16\partial_allowance_files", "visualizations", "partial"))
+            input_dir= R"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_files",
+            output_dir= os.path.join( R"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_files", "visualizations", "partial"))
         suite.analyze_all()

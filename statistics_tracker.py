@@ -14,7 +14,13 @@ class SettlementStatisticsTracker:
         self.lateness_count = 0
         self.lateness_by_depth_records = defaultdict(list)
 
-    def classify_settlement(self, event_type, event_timestamp_str, lateness_hours=None, depth=None):
+        # Add these new tracking variables
+        self.normal_settlements_count = 0
+        self.partial_settlements_count = 0
+        self.normal_settled_amount = 0
+        self.partial_settled_amount = 0
+
+    def classify_settlement(self, event_type, event_timestamp_str, lateness_hours=None, depth=None, is_child=False, amount=0):
         """
         Call this method for each settlement event (on-time or late).
         """
@@ -25,6 +31,14 @@ class SettlementStatisticsTracker:
 
         is_rtp = time(1, 30) <= event_time <= time(19, 30)
         is_batch = event_time >= time(22, 0)
+
+        # Track by settlement type (normal vs partial)
+        if is_child:
+            self.partial_settlements_count += 1
+            self.partial_settled_amount += amount
+        else:
+            self.normal_settlements_count += 1
+            self.normal_settled_amount += amount
 
         if event_type.lower() == "settled on time":
             if is_rtp:
@@ -64,6 +78,12 @@ class SettlementStatisticsTracker:
             "settled_late_batch": self.settled_late_batch,
             "lateness_hours_total": self.lateness_hours_total,
             "lateness_hours_average": (self.lateness_hours_total / self.lateness_count) if self.lateness_count > 0 else 0,
-            "lateness_by_depth": lateness_by_depth_avg
+            "lateness_by_depth": lateness_by_depth_avg,
+
+            # Settlement type statistics (new)
+            "normal_settlements_count": self.normal_settlements_count,
+            "partial_settlements_count": self.partial_settlements_count,
+            "normal_settled_amount": self.normal_settled_amount,
+            "partial_settled_amount": self.partial_settled_amount
         }
         return summary

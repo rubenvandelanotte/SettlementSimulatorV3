@@ -84,7 +84,8 @@ class SettlementModel(Model):
         self.last_cache_update = None
 
         self.partial_cancelled_count = 0
-
+        self.normal_settled_amount = 0  # First-try settlement (non-child)
+        self.partial_settled_amount = 0  # Settlement via child instructions
         self.generate_data()
 
 
@@ -128,7 +129,9 @@ class SettlementModel(Model):
                 event_type=event_type,
                 event_timestamp_str=timestamp_iso,
                 lateness_hours=attributes.get("lateness_hours"),
-                depth=attributes.get("depth")
+                depth=attributes.get("depth"),
+                is_child = attributes.get("is_child", False),
+                amount = attributes.get("amount", 0)
              )
 
     def save_ocel_log(self, filename: str = "simulation_log.jsonocel"):
@@ -1003,7 +1006,26 @@ class SettlementModel(Model):
 
         return total_settled_amount
 
+    def get_settlement_type_amounts(self):
+        """
+        Returns the separate amounts settled via normal first-try settlement vs partial settlement.
 
+        Returns:
+            tuple: (normal_settlement_amount, partial_settlement_amount)
+        """
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+
+        normal_settled_amount = 0
+        partial_settled_amount = 0
+
+        for inst in relevant_instructions:
+            if inst.get_status() in ["Settled on time"]:
+                if not inst.isChild:
+                    normal_settled_amount += inst.get_amount()
+                else:
+                    partial_settled_amount += inst.get_amount()
+
+        return normal_settled_amount, partial_settled_amount
 
     #def print_settlement_efficiency(self):
     #    """
@@ -1214,6 +1236,7 @@ class SettlementModel(Model):
         """
         import json
         depth_counts, depth_status_counts = self.generate_depth_counts_and_depth_status_counts()
+        normal_amount, partial_amount = self.get_settlement_type_amounts()
 
         result = {
             # Efficiency & core metrics
@@ -1235,6 +1258,9 @@ class SettlementModel(Model):
             "settled_on_time_amount": self.get_settled_on_time_amount(),
             "settled_late_amount": self.get_settled_late_amount(),
 
+            # Settlement type breakdown
+            "normal_settled_amount": normal_amount,
+            "partial_settled_amount": partial_amount,
             # Volume & dynamics
             "instructions_settled_total": self.count_settled_instructions(),
             "avg_instruction_age_hours": self.get_avg_instruction_age_before_settlement(),
