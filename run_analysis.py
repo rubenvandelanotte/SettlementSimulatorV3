@@ -63,7 +63,7 @@ def generate_partial_configs(base_seed, runs_per_config):
 
 def generate_depth_configs(base_seed, runs_per_config):
     partialsallowed = tuple([True] * 8 + [False] * 2)
-    for depth in [3, 5, 7, 10, 15]:
+    for depth in [1, 2, 4, 6, 8]:
         for run_number in range(1, runs_per_config + 1):
             seed = base_seed + (run_number - 1)
             yield {
