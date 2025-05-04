@@ -11,6 +11,8 @@ class SettlementTypeAnalyzer:
     """
     Analyzes and visualizes the comparison between normal first-try settlements
     and settlements via partial settlement mechanism (child instructions).
+
+    Uses the properly calculated efficiency values from the SettlementModel.
     """
 
     def __init__(self, input_dir, output_dir, suite):
@@ -60,6 +62,7 @@ class SettlementTypeAnalyzer:
                         print(f"[WARNING] Could not determine configuration for {filename}, skipping.")
                         continue
 
+            # Get settlement amounts
             normal_amount = stats.get("normal_settled_amount", 0)
             partial_amount = stats.get("partial_settled_amount", 0)
             intended_amount = stats.get("intended_amount", 0)
@@ -71,15 +74,24 @@ class SettlementTypeAnalyzer:
                     normal_amount = summary.get("normal_settled_amount", 0)
                     partial_amount = summary.get("partial_settled_amount", 0)
 
-            # Only include if we have the settlement type breakdown
+            # Get properly calculated efficiency values directly from the model
+            # These metrics are now correctly calculated in the SettlementModel class
+            normal_instr_eff = stats.get("normal_instruction_efficiency")
+            normal_value_eff = stats.get("normal_value_efficiency")
+            total_instr_eff = stats.get("instruction_efficiency")
+            total_value_eff = stats.get("value_efficiency")
+
+            # Only include if we have the settlement type data
             if normal_amount or partial_amount:
                 config_data[config_id].append({
                     "normal_amount": normal_amount,
                     "partial_amount": partial_amount,
                     "total_amount": normal_amount + partial_amount,
                     "intended_amount": intended_amount if intended_amount else normal_amount + partial_amount,
-                    "normal_pct": (normal_amount / intended_amount * 100) if intended_amount else 0,
-                    "partial_pct": (partial_amount / intended_amount * 100) if intended_amount else 0
+                    "normal_instr_eff": normal_instr_eff,
+                    "normal_value_eff": normal_value_eff,
+                    "total_instr_eff": total_instr_eff,
+                    "total_value_eff": total_value_eff
                 })
             else:
                 print(f"[WARNING] No settlement type data found in {filename}")
@@ -92,7 +104,9 @@ class SettlementTypeAnalyzer:
 
             avg_data = {}
             for key in runs[0].keys():
-                avg_data[key] = sum(run[key] for run in runs) / len(runs)
+                # Skip None values when averaging
+                valid_values = [run[key] for run in runs if run[key] is not None]
+                avg_data[key] = sum(valid_values) / len(valid_values) if valid_values else None
 
             result[config_id] = avg_data
 
@@ -273,38 +287,65 @@ class SettlementTypeAnalyzer:
         print(f"[INFO] Saved total settled stacked to {os.path.join(self.output_dir, 'total_settled_stacked.png')}")
 
     def _plot_settlement_efficiency_comparison(self, data):
-        """Compare settlement efficiency with and without partial settlement contribution."""
+        """
+        Compare settlement efficiency with and without partial settlement contribution.
+        Uses properly calculated efficiency values from the SettlementModel:
+        - normal_instruction_efficiency: efficiency without partial settlements
+        - instruction_efficiency: total efficiency including partial settlements
+        """
         configs = sorted(data.keys())
 
-        normal_efficiency = []
-        combined_efficiency = []
-        partial_contribution = []
+        # Extract efficiency values directly from the data
+        normal_instr_effs = []
+        total_instr_effs = []
+        normal_value_effs = []
+        total_value_effs = []
 
         for cfg in configs:
-            intended = data[cfg]["intended_amount"]
-            if intended > 0:
-                normal_eff = data[cfg]["normal_amount"] / intended * 100
-                combined_eff = (data[cfg]["normal_amount"] + data[cfg]["partial_amount"]) / intended * 100
+            # Get normal efficiency (without partials)
+            normal_instr_eff = data[cfg].get("normal_instr_eff")
+            normal_value_eff = data[cfg].get("normal_value_eff")
 
-                normal_efficiency.append(normal_eff)
-                combined_efficiency.append(combined_eff)
-                partial_contribution.append(combined_eff - normal_eff)
-            else:
-                normal_efficiency.append(0)
-                combined_efficiency.append(0)
-                partial_contribution.append(0)
+            # Get total efficiency (with partials)
+            total_instr_eff = data[cfg].get("total_instr_eff")
+            total_value_eff = data[cfg].get("total_value_eff")
 
+            # Use zeros for missing values
+            normal_instr_effs.append(normal_instr_eff if normal_instr_eff is not None else 0)
+            normal_value_effs.append(normal_value_eff if normal_value_eff is not None else 0)
+            total_instr_effs.append(total_instr_eff if total_instr_eff is not None else 0)
+            total_value_effs.append(total_value_eff if total_value_eff is not None else 0)
+
+        # Create two separate plots - one for instruction efficiency and one for value efficiency
+        self._create_efficiency_comparison_plot(
+            configs, normal_instr_effs, total_instr_effs,
+            "Instruction Efficiency Comparison",
+            "instruction_efficiency_comparison.png"
+        )
+
+        self._create_efficiency_comparison_plot(
+            configs, normal_value_effs, total_value_effs,
+            "Value Efficiency Comparison",
+            "value_efficiency_comparison.png"
+        )
+
+    def _create_efficiency_comparison_plot(self, configs, normal_effs, total_effs, title, filename):
+        """Create a comparison plot for either instruction or value efficiency."""
         fig, ax = plt.subplots(figsize=(14, 8))
 
         x = np.arange(len(configs))
         width = 0.35
 
-        bars1 = ax.bar(x - width / 2, normal_efficiency, width,
-                       label="Value Efficiency without Partial Settlement", color="lightblue")
-        bars2 = ax.bar(x + width / 2, combined_efficiency, width,
-                       label="Value Efficiency with Partial Settlement", color="green")
+        # Calculate the contribution from partial settlements
+        partial_contribution = [t - n for t, n in zip(total_effs, normal_effs)]
 
-             # Annotate bars
+        bars1 = ax.bar(x - width / 2, normal_effs, width,
+                       label="Without Partial Settlement", color="lightblue")
+        bars2 = ax.bar(x + width / 2, total_effs, width,
+                       label="With Partial Settlement", color="green")
+
+
+        # Annotate bars
         for bar in bars1:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width() / 2, height + 0.5,
@@ -322,15 +363,14 @@ class SettlementTypeAnalyzer:
                         fontsize=8, color="darkgreen", fontweight="bold")
 
         ax.set_xlabel("Configuration (Number of Institutions Allowing Partials)")
-        ax.set_ylabel("Settlement Efficiency (%)")
-        ax.set_title("Settlement Efficiency: Contribution of Partial Settlement")
+        ax.set_ylabel("Efficiency (%)")
+        ax.set_title(title)
         ax.set_xticks(x)
         ax.set_xticklabels([f"Config {cfg}" for cfg in configs])
         ax.legend()
         ax.grid(axis="y", linestyle="--", alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "settlement_efficiency_comparison.png"), dpi=300)
+        plt.savefig(os.path.join(self.output_dir, filename), dpi=300)
         plt.close()
-        print(
-            f"[INFO] Saved settlement efficiency comparison to {os.path.join(self.output_dir, 'settlement_efficiency_comparison.png')}")
+        print(f"[INFO] Saved {filename} to {os.path.join(self.output_dir, filename)}")
