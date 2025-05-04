@@ -669,31 +669,48 @@ class SettlementModel(Model):
                 date_iso = inst.get_intended_settlement_date().date().isoformat()
                 daily[date_iso].append(inst)
         # Sort dates
+        matched_statuses = ["Matched", "Settled on time", "Settled late", "Cancelled due to partial settlement",
+                            "Cancelled due to timeout", "Cancelled due to error"]
         result = {}
+
         for date_iso in sorted(daily.keys()):
             group_insts = daily[date_iso]
             # Group by linkcode for this date
+
             pairs = defaultdict(list)
+
             for inst in group_insts:
                 pairs[inst.get_linkcode()].append(inst)
+
             orig_pairs = settled_pairs = orig_value = settled_value = 0.0
+
             for pair in pairs.values():
+                #skip pairs without counter instruction
+                if len(pair) < 2:
+                    continue
+
+                st0 = status_cache[pair[0].get_uniqueID()]
+                st1 = status_cache[pair[1].get_uniqueID()]
+
+                if not (st0 in matched_statuses and st1 in matched_statuses):
+                    continue
+
                 orig_pairs += 1
                 amt = amount_cache[pair[0].get_uniqueID()]
                 orig_value += amt
-                if len(pair) >= 2:
-                    st0 = status_cache[pair[0].get_uniqueID()]
-                    st1 = status_cache[pair[1].get_uniqueID()]
-                    if st0 == 'Settled on time' and st1 == 'Settled on time':
+
+                if st0 == 'Settled on time' and st1 == 'Settled on time':
+                    settled_pairs += 1
+                    settled_value += amt
+
+                elif st0 == 'Cancelled due to partial settlement' and st1 == 'Cancelled due to partial settlement':
+                    child_amt = self.get_settled_amount_iterative(pair[0].get_uniqueID(), child_map, status_cache,
+                                                                  amount_cache)
+                    eff = min(child_amt, amt)
+                    if eff == amt:
                         settled_pairs += 1
-                        settled_value += amt
-                    elif st0 == 'Cancelled due to partial settlement' and st1 == 'Cancelled due to partial settlement':
-                        child_amt = self.get_settled_amount_iterative(pair[0].get_uniqueID(), child_map, status_cache,
-                                                                      amount_cache)
-                        eff = min(child_amt, amt)
-                        if eff == amt:
-                            settled_pairs += 1
-                        settled_value += eff
+                    settled_value += eff
+
             if debug:
                 result[date_iso] = (orig_pairs, settled_pairs, orig_value, settled_value)
             else:
@@ -772,6 +789,7 @@ class SettlementModel(Model):
         # 1. Fetch relevant instructions and build caches
         rel = self.get_main_period_mothers_and_descendants_optimized()
         child_map, status_cache, amount_cache = {}, {}, {}
+
         for inst in rel:
             iid = inst.get_uniqueID()
             status_cache[iid] = inst.get_status()
@@ -785,22 +803,37 @@ class SettlementModel(Model):
             if inst.get_motherID() == 'mother':
                 pairs[inst.get_linkcode()].append(inst)
 
+        matched_statuses = ["Matched", "Settled on time", "Settled late", "Cancelled due to partial settlement",
+                            "Cancelled due to timeout", "Cancelled due to error"]
         # 3. Compute raw per-participant shares
         raw = {}
         for linkcode, group in pairs.items():
+
+            if len(group) < 2:
+                continue
+
+            # Get statuses for both instructions in the pair
+            s0 = status_cache[group[0].get_uniqueID()]
+            s1 = status_cache[group[1].get_uniqueID()]
+
+            # Only count pairs where both instructions were matched
+            if not (s0 in matched_statuses and s1 in matched_statuses):
+                continue
+
             # determine number of distinct participants in this group
             participants = {m.get_institution().institutionID for m in group}
             share = 1.0 / len(participants)
             amt = amount_cache[group[0].get_uniqueID()]
-            # settlement logic for this link
-            s0 = status_cache[group[0].get_uniqueID()]
-            s1 = status_cache.get(group[1].get_uniqueID() if len(group) > 1 else None)
+
+
             # determine settled flags and value
             settled_pair = False
             settled_amt = 0.0
+
             if s0 == 'Settled on time' and s1 == 'Settled on time':
                 settled_pair = True
                 settled_amt = amt
+
             elif s0 == 'Cancelled due to partial settlement' and s1 == 'Cancelled due to partial settlement':
                 child_amt = self.get_settled_amount_iterative(group[0].get_uniqueID(), child_map, status_cache,
                                                               amount_cache)
@@ -808,6 +841,7 @@ class SettlementModel(Model):
                 settled_amt = eff
                 if eff == amt:
                     settled_pair = True
+
             # distribute to participants
             for pid in participants:
                 if pid not in raw:
