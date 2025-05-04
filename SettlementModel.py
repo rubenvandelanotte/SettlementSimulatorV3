@@ -6,6 +6,8 @@ import random
 from collections import defaultdict
 from jsonocellogger import JSONOCELLogger
 from statistics_tracker import SettlementStatisticsTracker
+from InstructionAgent import InstructionAgent
+from TransactionAgent import TransactionAgent
 
 
 
@@ -256,8 +258,12 @@ class SettlementModel(Model):
                 #real-time processing
                 self.batch_processed = False
 
-                #shuffles all agents and then executes their step module once for all of them
-                self.agents.shuffle_do("step")
+                #shuffles all agents and then executes their step module once for all of them, only shuffles instructionAgents & InstitutionAgents
+                agents_to_step = [a for a in self.agents if isinstance(a, (InstructionAgent, InstitutionAgent.InstitutionAgent))]
+                self.random.shuffle(agents_to_step)
+                for agent in agents_to_step:
+                    agent.step()
+
                 print(f"{len(self.agents)} Agents executed their step module")
 
                 for batch_time in self.mini_batch_times:
@@ -284,43 +290,26 @@ class SettlementModel(Model):
         self.transactions.remove(t)
 
     def batch_processing(self):
-        # --- Phase 1: Insert all ---
-        for instruction in self.instructions:
-            if instruction.get_status() == "Exists":
-                instruction.insert()
-
-        # --- Phase 2: Validate all ---
-        for instruction in self.instructions:
-            if instruction.get_status() == "Pending":
-                instruction.validate()
-
-        # --- Phase 3: Match all ---
-        # Process one linkcode at a time where both delivery and receipt instructions exist
-        common_linkcodes = set(self.validated_delivery_instructions.keys()) & set(
-            self.validated_receipt_instructions.keys())
-
-        for linkcode in common_linkcodes:
-            delivery_list = self.validated_delivery_instructions.get(linkcode, [])
-            if delivery_list:  # If there are delivery instructions with this linkcode
-                delivery = delivery_list[0]  # Take the first one
-                if delivery.get_status() == "Validated":
-                    delivery.match()
-
-        # Continue with settlement phase (10 attempts)
+        # --- Insert, validate & match all (needs max 3 loops) ---
+        for i in range(3):
+            agents_to_step = [a for a in self.agents if isinstance(a, (InstructionAgent))]
+            self.random.shuffle(agents_to_step)
+            for agent in agents_to_step:
+                agent.step()
+        #settle transactions
         for attempt in range(10):
-            for transaction in self.transactions:
-                if transaction.get_status() == "Matched":
-                    if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities()):
-                        if self.simulated_time >= transaction.get_deliverer().get_intended_settlement_date() - timedelta(days=1,minutes=35):
-                            transaction.settle()
+            agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
+            self.random.shuffle(agents_to_step)
+            for agent in agents_to_step:
+                agent.step()
+
 
     def mini_batch_settlement(self):
         print(f"[INFO] Running mini-batch settlement at {self.simulated_time}")
-        for transaction in self.transactions:
-            if transaction.get_status() == "Matched":
-                if (transaction.get_deliverer().get_securitiesAccount().get_newSecurities()):
-                    if self.simulated_time >= transaction.get_deliverer().get_intended_settlement_date() - timedelta(days=1, minutes=30):
-                        transaction.settle()
+        agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
+        self.random.shuffle(agents_to_step)
+        for agent in agents_to_step:
+            agent.step()
 
     def get_main_period_mothers_and_descendants(self):
         main_start = self.simulation_start + self.warm_up_period
