@@ -223,12 +223,16 @@ class TransactionAgent(Agent):
 
     def step(self):
         # ✨ Retry settlement on every step if allowed
-        #if self.status in ["Matched"]:
-        #   self.settle()
         if self.deliverer.is_instruction_time_out():
             self.deliverer.cancel_timeout()
         elif self.receiver.is_instruction_time_out():
             self.receiver.cancel_timeout()
+        elif self.status in ["Matched"]:
+            if (self.get_deliverer().get_securitiesAccount().get_newSecurities()):
+                if self.model.simulated_time >= self.get_deliverer().get_intended_settlement_date() - timedelta(days=1,minutes=35):
+                    self.settle()
+
+
 
     def cancel_partial(self):
         self.status = "Cancelled due to partial settlement"
