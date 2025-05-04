@@ -303,7 +303,7 @@ class SettlementModel(Model):
                 if delivery.get_status() == "Validated":
                     delivery.match()
 
-        # Continue with settlement phase (5 attempts)
+        # Continue with settlement phase (10 attempts)
         for attempt in range(10):
             for transaction in self.transactions:
                 if transaction.get_status() == "Matched":
@@ -592,11 +592,6 @@ class SettlementModel(Model):
             if not pair:
                 continue
 
-            # Process each pair only once
-            intended_amount = pair[0].get_amount()
-            total_original_pairs += 1
-            total_intended_value += intended_amount
-
             if len(pair) < 2:
                 # Skip instructions without a counter instruction
                 continue
@@ -606,6 +601,15 @@ class SettlementModel(Model):
             pair_1_id = pair[1].get_uniqueID()
             pair_0_status = status_cache[pair_0_id]
             pair_1_status = status_cache[pair_1_id]
+
+            matched_statuses = ["Matched", "Settled on time", "Settled late", "Cancelled due to partial settlement", "Cancelled due to timeout", "Cancelled due to error"]
+            if not (pair_0_status in matched_statuses and pair_1_status in matched_statuses):
+                continue
+
+            # Process each pair only once
+            intended_amount = pair[0].get_amount()
+            total_original_pairs += 1
+            total_intended_value += intended_amount
 
             # Case 1: Fully settled directly
             if (pair_0_status in ["Settled on time"] and
