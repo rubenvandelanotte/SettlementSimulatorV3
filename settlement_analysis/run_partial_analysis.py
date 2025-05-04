@@ -7,6 +7,8 @@ from settlement_analysis.LatenessHoursAnalysis import LatenessHoursAnalyzer
 from settlement_analysis.RuntimeAnalysis import RuntimeAnalyzer
 from settlement_analysis.ConfidenceIntervalAnalysis import ConfidenceIntervalAnalyzer
 from settlement_analysis.RTPvsBatchAnalysis import RTPvsBatchAnalyzer
+from settlement_analysis.EfficiencyPerDay import EfficiencyPerDayAnalyzer
+from settlement_analysis.EfficiencyPerParticipant import EfficiencyPerParticipantAnalyzer
 
 
 class SettlementAnalysisSuite:
@@ -24,11 +26,13 @@ class SettlementAnalysisSuite:
         self.runtime_analyzer = RuntimeAnalyzer(self.input_dir, self.output_dir, self)
         self.ci_analyzer = ConfidenceIntervalAnalyzer(self.input_dir, self.output_dir, self)
         self.rtp_vs_batch_analyzer = RTPvsBatchAnalyzer(self.input_dir, self.output_dir, self)
+        self.eff_per_day_analyzer = EfficiencyPerDayAnalyzer(self.input_dir, self.output_dir, self)
+        self.eff_per_part_analyzer = EfficiencyPerParticipantAnalyzer(self.input_dir,self.output_dir,self)
 
     def analyze_all(self, analysis_types=None):
         if analysis_types is None:
             analysis_types = [
-                "depth", "lateness", "lateness_hours", "runtime", "confidence_intervals", "rtp_vs_batch"
+                "depth", "lateness", "lateness_hours", "runtime", "confidence_intervals", "rtp_vs_batch", "effi_per_day", "effi_per_part"
             ]
 
         # Load all inputs
@@ -48,6 +52,11 @@ class SettlementAnalysisSuite:
             self.ci_analyzer.run()
         if "rtp_vs_batch" in analysis_types:
             self.rtp_vs_batch_analyzer.run()
+        if "effi_per_day" in analysis_types:
+            self.eff_per_day_analyzer.run()
+        if "effi_per_part" in analysis_types:
+            self.eff_per_part_analyzer.run()
+
 
     def _load_statistics(self):
         stats_dir = os.path.join(self.input_dir, "results_all_analysis")
