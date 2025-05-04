@@ -289,6 +289,7 @@ class SettlementModel(Model):
     def remove_transaction(self,t):
         self.transactions.remove(t)
 
+
     def batch_processing(self):
         # --- Insert, validate & match all (needs max 3 loops) ---
         for i in range(3):
@@ -296,19 +297,51 @@ class SettlementModel(Model):
             self.random.shuffle(agents_to_step)
             for agent in agents_to_step:
                 agent.step()
+
         #settle transactions
+        def sequence_rule(t):
+            deliverer = t.get_deliverer()
+            if deliverer.get_priority() is None:
+                print(f"[WARNING] Instruction {deliverer.get_uniqueID()} has no priority assigned!")
+                print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
+
+
+            return (
+                deliverer.get_intended_settlement_date(),
+                -deliverer.get_priority(), 2,
+                not t.is_fully_settleable(),
+                -deliverer.get_amount(),
+                deliverer.get_creation_time()
+            )
         for attempt in range(10):
             agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
-            self.random.shuffle(agents_to_step)
-            for agent in agents_to_step:
+            #self.random.shuffle(agents_to_step)
+            for agent in sorted(agents_to_step, key=sequence_rule):
                 agent.step()
 
 
     def mini_batch_settlement(self):
         print(f"[INFO] Running mini-batch settlement at {self.simulated_time}")
+
+
+        def sequence_rule(t):
+            deliverer = t.get_deliverer()
+            if deliverer.get_priority() is None:
+                print(f"[WARNING] Instruction {deliverer.get_uniqueID()} has no priority assigned!")
+                print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
+
+            return (
+                deliverer.get_intended_settlement_date(),
+                -deliverer.get_priority(), 2,
+                not t.is_fully_settleable(),
+                -deliverer.get_amount(),
+                deliverer.get_creation_time()
+            )
+
+
         agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
-        self.random.shuffle(agents_to_step)
-        for agent in agents_to_step:
+        # self.random.shuffle(agents_to_step)
+        for agent in sorted(agents_to_step, key=sequence_rule):
             agent.step()
 
     def get_main_period_mothers_and_descendants(self):

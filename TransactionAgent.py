@@ -57,6 +57,12 @@ class TransactionAgent(Agent):
     def get_receiver(self):
         return self.receiver
 
+    def is_fully_settleable(self):
+        return (self.deliverer.securitiesAccount.checkBalance(self.deliverer.get_amount(),
+                                                              self.deliverer.get_securityType()) and
+                self.receiver.cashAccount.checkBalance(self.receiver.get_amount(), "Cash")
+        )
+
     def settle(self):
         self.retry_count += 1  # ✨ Count each attempt
 

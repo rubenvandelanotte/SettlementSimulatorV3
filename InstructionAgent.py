@@ -30,6 +30,7 @@ class InstructionAgent (Agent):
         self.intended_settlement_date = None
         self.depth = depth
         self.last_modified_time = creation_time
+        self.priority = None
 
         # Set original_mother_amount
         if original_mother_amount is None and not isChild:
@@ -131,6 +132,30 @@ class InstructionAgent (Agent):
 
     def set_intended_settlement_date(self, ts):
         self.intended_settlement_date = ts
+
+    def assign_priority(self):
+        amount = self.amount
+        isd = self.get_intended_settlement_date()
+        current_time = self.model.simulated_time
+        age_in_days = (isd - current_time).days
+
+        if amount >= 10000000:
+            self.priority = 3
+            return
+        elif age_in_days <= 0:
+            self.priority= 3
+            return
+        elif 1000000 <= amount < 10000000 and age_in_days <= 2:
+            self.priority= 2
+            return
+        else:
+            self.priority = 1
+
+    def get_priority(self):
+        return self.priority
+
+    def set_priority(self, new_priority):
+        self.priority = new_priority
 
     def cancel_timeout(self):
         return

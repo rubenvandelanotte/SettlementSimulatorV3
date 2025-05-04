@@ -162,6 +162,8 @@ class InstitutionAgent(Agent):
             #set isds
             new_instructionAgent.set_intended_settlement_date(isd)
             counter_instructionAgent.set_intended_settlement_date(isd)
+            new_instructionAgent.assign_priority()
+            counter_instructionAgent.assign_priority()
 
             self.model.instructions.append(new_instructionAgent)
             self.model.instructions.append(counter_instructionAgent)
@@ -172,6 +174,8 @@ class InstitutionAgent(Agent):
             #set isds
             new_instructionAgent.set_intended_settlement_date(isd)
             counter_instructionAgent.set_intended_settlement_date(isd)
+            new_instructionAgent.assign_priority()
+            counter_instructionAgent.assign_priority()
 
             self.model.instructions.append(new_instructionAgent)
             self.model.instructions.append(counter_instructionAgent)
