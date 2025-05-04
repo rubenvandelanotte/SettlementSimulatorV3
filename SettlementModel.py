@@ -648,6 +648,91 @@ class SettlementModel(Model):
 
         return instruction_efficiency, value_efficiency
 
+    def calculate_settlement_efficiency_without_partials(self):
+        """
+        Calculate settlement efficiency metrics considering only non-child (normal) instructions.
+        This gives us efficiency as if partial settlement was not enabled.
+
+        Returns:
+            tuple: (instruction_efficiency_percentage, value_efficiency_percentage)
+        """
+        # Get all relevant instructions
+        relevant_instructions = self.get_main_period_mothers_and_descendants_optimized()
+
+        # Pre-build maps and caches like in the optimized version
+        child_map = {}
+        status_cache = {}
+        amount_cache = {}
+        is_child_cache = {}  # Add this to track which instructions are children
+
+        for inst in relevant_instructions:
+            inst_id = inst.get_uniqueID()
+            status_cache[inst_id] = inst.get_status()
+            amount_cache[inst_id] = inst.get_amount()
+            is_child_cache[inst_id] = inst.isChild
+
+            if inst.isChild:
+                parent_id = inst.get_motherID()
+                if parent_id not in child_map:
+                    child_map[parent_id] = []
+                child_map[parent_id].append(inst_id)
+
+        # Group mothers by linkcode
+        original_pairs = {}
+        mother_instructions = []
+
+        for inst in relevant_instructions:
+            if inst.get_motherID() == "mother":
+                mother_instructions.append(inst)
+                linkcode = inst.get_linkcode()
+                if linkcode not in original_pairs:
+                    original_pairs[linkcode] = []
+                original_pairs[linkcode].append(inst)
+
+        # Initialize counters
+        total_original_pairs = 0
+        fully_settled_pairs = 0
+        total_intended_value = 0.0
+        total_settled_value = 0.0
+
+        # Process all pairs
+        for linkcode, pair in original_pairs.items():
+            if not pair or len(pair) < 2:
+                continue
+
+            # Get cached statuses
+            pair_0_id = pair[0].get_uniqueID()
+            pair_1_id = pair[1].get_uniqueID()
+            pair_0_status = status_cache[pair_0_id]
+            pair_1_status = status_cache[pair_1_id]
+
+            matched_statuses = ["Matched", "Settled on time", "Settled late", "Cancelled due to partial settlement",
+                                "Cancelled due to timeout", "Cancelled due to error"]
+            if not (pair_0_status in matched_statuses and pair_1_status in matched_statuses):
+                continue
+
+            # Count each pair only once
+            intended_amount = pair[0].get_amount()
+            total_original_pairs += 1
+            total_intended_value += intended_amount
+
+            # Case: Fully settled directly but ONLY if it's not a child instruction
+            # This is the key difference from the regular efficiency calculation
+            if (pair_0_status in ["Settled on time"] and
+                    pair_1_status in ["Settled on time"] and
+                    not is_child_cache.get(pair_0_id, False) and
+                    not is_child_cache.get(pair_1_id, False)):
+                fully_settled_pairs += 1
+                total_settled_value += intended_amount
+
+            # Skip partial settlement case as we're calculating without partials
+
+        # Calculate final metrics
+        instruction_efficiency = (fully_settled_pairs / total_original_pairs * 100) if total_original_pairs > 0 else 0
+        value_efficiency = (total_settled_value / total_intended_value * 100) if total_intended_value > 0 else 0
+
+        return instruction_efficiency, value_efficiency
+
     def calculate_daily_metrics_optimized(self, debug=False):
         """
         Compute per-day efficiency using the optimized settlement logic.
@@ -1237,6 +1322,7 @@ class SettlementModel(Model):
         import json
         depth_counts, depth_status_counts = self.generate_depth_counts_and_depth_status_counts()
         normal_amount, partial_amount = self.get_settlement_type_amounts()
+        normal_instr_eff, normal_value_eff = self.calculate_settlement_efficiency_without_partials()
 
         result = {
             # Efficiency & core metrics
@@ -1261,6 +1347,8 @@ class SettlementModel(Model):
             # Settlement type breakdown
             "normal_settled_amount": normal_amount,
             "partial_settled_amount": partial_amount,
+            "normal_instruction_efficiency": normal_instr_eff,
+            "normal_value_efficiency": normal_value_eff,
             # Volume & dynamics
             "instructions_settled_total": self.count_settled_instructions(),
             "avg_instruction_age_hours": self.get_avg_instruction_age_before_settlement(),
