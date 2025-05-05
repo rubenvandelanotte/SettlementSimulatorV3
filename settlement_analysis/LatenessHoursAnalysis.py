@@ -306,8 +306,8 @@ class LatenessHoursAnalyzer:
     def _plot_lateness_time_buckets(self):
         configs = sorted(self.config_lateness.keys(), key=lambda x: int(x.split()[1]))
         buckets = [
-            (0, 1, "<1h"), (1, 6, "1-6h"), (6, 12, "6-12h"),
-            (12, 24, "12-24h"), (24, 48, "1-2d"), (48, float('inf'), ">2d")
+            (1, 12, "1-12h"),
+            (12, 24, "12-24h"), (24, 48, "1-2d"), (48, 120, "2-5d"), (120, float('inf'), ">5d")
         ]
 
         # count
