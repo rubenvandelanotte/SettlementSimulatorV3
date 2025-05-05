@@ -57,6 +57,8 @@ class MaxDepthVisualizer:
                 "max_child_depth": int(depth),
                 "instruction_efficiency": data.get("instruction_efficiency"),
                 "value_efficiency": data.get("value_efficiency"),
+                "normal_instruction_efficiency": data.get("normal_instruction_efficiency"),
+                "normal_value_efficiency": data.get("normal_value_efficiency"),
                 "runtime_seconds": data.get("execution_time_seconds"),
                 "memory_usage_mb": data.get("memory_usage_mb"),
                 "settled_count": count,
@@ -457,6 +459,104 @@ class MaxDepthVisualizer:
         except Exception as e:
             warnings.warn(f"3D plot failed: {e}")
 
+    def plot_efficiency_with_without_partials(self):
+        """Plot efficiency with and without partial settlements"""
+        if not all(c in self.config_stats.columns for c in
+                   ['normal_instruction_efficiency_mean', 'instruction_efficiency_mean']):
+            print("WARNING: Missing normal efficiency metrics, skipping with/without partials comparison")
+            return
+
+        depths = self.config_stats.index.tolist()
+
+        # Create plots for instruction efficiency
+        plt.figure(figsize=(12, 8))
+        normal_inst = self.config_stats['normal_instruction_efficiency_mean']
+        total_inst = self.config_stats['instruction_efficiency_mean']
+        normal_inst_err = self.config_stats.get('normal_instruction_efficiency_std', None)
+        total_inst_err = self.config_stats.get('instruction_efficiency_std', None)
+
+        width = 0.35
+        x = np.arange(len(depths))
+
+        bars1 = plt.bar(x - width / 2, normal_inst, width,
+                        yerr=normal_inst_err, capsize=5,
+                        label="Without Partial Settlement", color="lightblue")
+        bars2 = plt.bar(x + width / 2, total_inst, width,
+                        yerr=total_inst_err, capsize=5,
+                        label="With Partial Settlement", color="green")
+
+        # Annotate bars
+        for bar in bars1:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2, height + 0.5,
+                     f"{height:.1f}%", ha="center", va="bottom", fontsize=9)
+
+        for i, bar in enumerate(bars2):
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2, height + 0.5,
+                     f"{height:.1f}%", ha="center", va="bottom", fontsize=9)
+
+            # Add annotation for the contribution
+            contribution = total_inst.iloc[i] - normal_inst.iloc[i]
+            if contribution > 1:
+                plt.text(bar.get_x() + bar.get_width() / 2, height - 1.5,
+                         f"+{contribution:.1f}%", ha="center", va="top",
+                         fontsize=8, color="darkgreen", fontweight="bold")
+
+        plt.xlabel('Max Child Depth', fontsize=14)
+        plt.ylabel('Instruction Efficiency (%)', fontsize=14)
+        plt.title('Instruction Efficiency Comparison: With vs Without Partial Settlement', fontsize=16)
+        plt.xticks(x, depths)
+        plt.legend(fontsize=12)
+        plt.grid(alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, 'instruction_efficiency_comparison.png'), dpi=300)
+        plt.close()
+
+        # Create plots for value efficiency
+        plt.figure(figsize=(12, 8))
+        normal_val = self.config_stats['normal_value_efficiency_mean']
+        total_val = self.config_stats['value_efficiency_mean']
+        normal_val_err = self.config_stats.get('normal_value_efficiency_std', None)
+        total_val_err = self.config_stats.get('value_efficiency_std', None)
+
+        bars1 = plt.bar(x - width / 2, normal_val, width,
+                        yerr=normal_val_err, capsize=5,
+                        label="Without Partial Settlement", color="lightblue")
+        bars2 = plt.bar(x + width / 2, total_val, width,
+                        yerr=total_val_err, capsize=5,
+                        label="With Partial Settlement", color="green")
+
+        # Annotate bars
+        for bar in bars1:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2, height + 0.5,
+                     f"{height:.1f}%", ha="center", va="bottom", fontsize=9)
+
+        for i, bar in enumerate(bars2):
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2, height + 0.5,
+                     f"{height:.1f}%", ha="center", va="bottom", fontsize=9)
+
+            # Add annotation for the contribution
+            contribution = total_val.iloc[i] - normal_val.iloc[i]
+            if contribution > 1:
+                plt.text(bar.get_x() + bar.get_width() / 2, height - 1.5,
+                         f"+{contribution:.1f}%", ha="center", va="top",
+                         fontsize=8, color="darkgreen", fontweight="bold")
+
+        plt.xlabel('Max Child Depth', fontsize=14)
+        plt.ylabel('Value Efficiency (%)', fontsize=14)
+        plt.title('Value Efficiency Comparison: With vs Without Partial Settlement', fontsize=16)
+        plt.xticks(x, depths)
+        plt.legend(fontsize=12)
+        plt.grid(alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, 'value_efficiency_comparison.png'), dpi=300)
+        plt.close()
+
+        print("Saved efficiency comparison plots")
+
     def generate_all_visualizations(self):
 
         print("Generating settled on-time plots...")
@@ -479,4 +579,6 @@ class MaxDepthVisualizer:
         self.plot_elbow_analysis()
         print("Generating 3D surface...")
         self.plot_3d_surface()
+        print("Generating efficiency with/without partials comparison...")
+        self.plot_efficiency_with_without_partials()
         print(f"All visualizations saved in {os.path.abspath(self.output_dir)}")
