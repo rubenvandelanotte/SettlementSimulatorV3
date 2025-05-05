@@ -139,14 +139,26 @@ class InstructionAgent (Agent):
         creation_time = self.creation_time
         age_in_days = (isd - creation_time).days
 
-        if amount >= self.get_securitiesAccount().get_original_balance() * 0.2:
+        if age_in_days < 0:
             self.priority = 3
-            return
-        elif amount >= self.get_securitiesAccount().get_original_balance() * 0.07:
-            self.priority= 2
-            return
+        elif age_in_days == 0 and amount >= 10000000:
+            self.priority = 3
+        elif amount >= 100000000 or self.get_securitiesAccount().get_original_balance() * 0.2 >= amount:
+            self.priority = 3
+        elif (
+                10000000 <= amount < 10000_000 or amount >= self.get_securitiesAccount().get_original_balance() * 0.07) and age_in_days <= 2:
+            self.priority = 2
         else:
             self.priority = 1
+
+    #       if amount >= self.get_securitiesAccount().get_original_balance() * 0.2 :
+    #           self.priority = 3
+    #           return
+    #       elif amount >= self.get_securitiesAccount().get_original_balance() * 0.07:
+    #           self.priority= 2
+    #           return
+    #       else:
+    #           self.priority = 1
 
     def get_priority(self):
         return self.priority
