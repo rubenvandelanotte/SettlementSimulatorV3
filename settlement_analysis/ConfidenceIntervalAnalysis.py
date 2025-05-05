@@ -63,7 +63,7 @@ class ConfidenceIntervalAnalyzer:
         grouped = df.groupby("config").agg(
             instruction_efficiency_mean=("instruction_efficiency", "mean"),
             instruction_efficiency_std=("instruction_efficiency", "std"),
-            mothers_settled_mean=("mothers_effectively_settled", "mean")
+            mothers_settled_mean=("mothers_on_time_settled", "mean")
         ).sort_index()
 
         configs = grouped.index.tolist()
@@ -92,7 +92,7 @@ class ConfidenceIntervalAnalyzer:
 
         ax1.set_xticks(x)
         ax1.set_xticklabels([f"Config {cfg}" for cfg in configs], rotation=45, ha='right')
-        ax1.set_title('Instruction Efficiency (95% CI) vs Mothers Settled (On Time or Late)')
+        ax1.set_title('Instruction Efficiency (95% CI) vs Mothers Settled On Time')
         ax1.grid(axis='y', linestyle='--', alpha=0.3)
 
         lines1, labels1 = ax1.get_legend_handles_labels()
