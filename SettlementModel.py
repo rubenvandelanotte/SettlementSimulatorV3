@@ -22,13 +22,13 @@ def generate_iban():
 
 
 class SettlementModel(Model):
-    def __init__(self, partialsallowed:tuple, seed: int = None):
+    def __init__(self, partialsallowed:tuple, seed: int = None, run_number: int = 1):
         super().__init__()
         self.partialsallowed= partialsallowed
         #parameters of the model
         self.statistics_tracker = SettlementStatisticsTracker()
         self.num_institutions = 10
-        self.min_total_accounts = 4
+        self.min_total_accounts = 10
         self.max_total_accounts = 10
         self.simulation_duration_days = 15 #number of measured days (so simulation is longer)
         self.min_settlement_percentage = 0.01
@@ -37,10 +37,15 @@ class SettlementModel(Model):
         self.logger = JSONOCELLogger()
         self.log_only_main_events= True
         self.seed = seed
+        self.run_number = run_number
+
+        self.main_rng = random.Random(seed)
+        self.account_rng = random.Random(run_number)
+
         if seed is not None:
             random.seed(seed)  # Set the random seed
             print(f"[INFO] Random seed set to: {seed}")
-
+            print(f"[INFO] Account generation using run_number seed: {run_number}")
 
 
         self.simulation_start = datetime(2025, 4, 1, 1, 30)
@@ -154,7 +159,7 @@ class SettlementModel(Model):
         """
         mu = 18.0857  # ln(median)
         sigma = 1  # controls skewness and std
-        amount = random.lognormvariate(mu, sigma)
+        amount = self.main_rng.lognormvariate(mu, sigma)
 
         # Apply a cap to further prevent extreme outliers (optional)
         cap = 2e9  # 2 billion cap
@@ -172,7 +177,7 @@ class SettlementModel(Model):
         """
         mu = 18.0857  # ln(median)
         sigma = 1  # controls skewness and std
-        amount = random.lognormvariate(mu, sigma)
+        amount = self.account_rng.lognormvariate(mu, sigma)
 
         # Apply a cap to further prevent extreme outliers (optional)
         cap = 2e9  # 2 billion cap
@@ -191,11 +196,11 @@ class SettlementModel(Model):
             inst_bondtypes= []
             inst_id = f"INST-{i}"
             inst_accounts = []
-            total_accounts = random.randint(self.min_total_accounts, self.max_total_accounts)
+            total_accounts = self.account_rng.randint(self.min_total_accounts, self.max_total_accounts)
             #generate cash account => there has to be at least 1 cash account
             new_cash_accountID = generate_iban()
             new_cash_accountType = "Cash"
-            new_cash_balance =  int(random.uniform(6e12, 9e12))  # Increased balance range
+            new_cash_balance =  int(self.account_rng.uniform(6e12, 9e12))  # Increased balance range
             new_cash_creditLimit = 0.1*new_cash_balance
             new_cash_Account = Account.Account(accountID=new_cash_accountID, accountType= new_cash_accountType, balance= new_cash_balance, creditLimit=new_cash_creditLimit)
             inst_accounts.append(new_cash_Account)
@@ -343,7 +348,11 @@ class SettlementModel(Model):
 
         agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
         # self.random.shuffle(agents_to_step)
-        for agent in sorted(agents_to_step, key=sequence_rule):
+        agents_to_step = sorted(agents_to_step, key=sequence_rule)
+
+        # Take only the first 10%
+        cutoff = max(1, int(len(agents_to_step) * 0.10))  # ensures at least one agent is selected
+        for agent in agents_to_step[:cutoff]:
             agent.step()
 
     def get_main_period_mothers_and_descendants(self):

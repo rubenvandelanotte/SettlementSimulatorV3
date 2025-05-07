@@ -63,7 +63,7 @@ def generate_partial_configs(base_seed, runs_per_config):
 
 def generate_depth_configs(base_seed, runs_per_config):
     partialsallowed = tuple([True] * 8 + [False] * 2)
-    for depth in [1, 2, 4, 6, 8]:
+    for depth in [0,1,2,3,5,8]:
         for run_number in range(1, runs_per_config + 1):
             seed = base_seed + (run_number - 1)
             yield {
@@ -125,8 +125,11 @@ def run_analysis(label, config_generator, runs_per_config, output_dir, base_seed
             start_time = time.time()
             start_mem = process.memory_info().rss / (1024 * 1024)
 
-
-            model = SettlementModel(partialsallowed=config["partialsallowed"], seed=config["seed"])
+            model = SettlementModel(
+                partialsallowed=config["partialsallowed"],
+                seed=config["seed"],
+                run_number=config.get("run_number", 1)  # Pass the run number explicitly
+            )
 
             if "max_child_depth" in config:
                 model.max_child_depth = config["max_child_depth"]

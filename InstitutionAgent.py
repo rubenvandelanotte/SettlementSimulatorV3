@@ -10,21 +10,21 @@ import DeliveryInstructionAgent
 import Account
 
 
-def get_creation_time(isd: datetime, delay: int, simulated_time:datetime) -> datetime:
+def get_creation_time(isd: datetime, delay: int, simulated_time:datetime, account_rng) -> datetime:
     creation_date = isd - timedelta(days=delay)
 
     #pick random time on that day
     start = timedelta(hours=1, minutes=30)
     end = timedelta(hours=19, minutes=30)
     delta_seconds = int((end - start).total_seconds())
-    random_offset = timedelta(seconds=random.randint(0, delta_seconds))
+    random_offset = timedelta(seconds=account_rng.randint(0, delta_seconds))
 
     #merge with the day chosen
     creation_time = creation_date.replace(hour=0, minute=0, second=0, microsecond=0) + start + random_offset
     #ensures no creations in the past
     return max(creation_time, simulated_time)
 
-def sample_instruction_creation_times_and_isd(simulated_time: datetime):
+def sample_instruction_creation_times_and_isd(simulated_time: datetime, account_rng):
     """
     Samples two distinct creation times and a shared ISD (intended settlement date),
     ensuring:
@@ -35,7 +35,7 @@ def sample_instruction_creation_times_and_isd(simulated_time: datetime):
     """
 
     # Step 1: Choose ISD 2–5 days from now and set it on 22:30
-    raw_isd_day = simulated_time + timedelta(days=random.randint(2, 5))
+    raw_isd_day = simulated_time + timedelta(days=account_rng.randint(2, 5))
     isd = raw_isd_day.replace(hour=22, minute=30, second=0, microsecond=0)
 
     # Step 2: Define delay distribution
@@ -43,13 +43,13 @@ def sample_instruction_creation_times_and_isd(simulated_time: datetime):
     weights = [0.01, 0.29, 0.22, 0.20, 0.07, 0.16, 0.05]  # Empirical weights
 
     # Step 3: Sample delays for both instruction legs
-    delay_a = random.choices(delays, weights=weights, k=1)[0]
-    delay_b = random.choices(delays, weights=weights, k=1)[0]
+    delay_a = account_rng.choices(delays, weights=weights, k=1)[0]
+    delay_b = account_rng.choices(delays, weights=weights, k=1)[0]
 
 
     # Step 4: Generate creation times
-    creation_time_a = get_creation_time(isd, delay_a, simulated_time)
-    creation_time_b = get_creation_time(isd, delay_b, simulated_time)
+    creation_time_a = get_creation_time(isd, delay_a, simulated_time, account_rng)
+    creation_time_b = get_creation_time(isd, delay_b, simulated_time, account_rng)
 
     return creation_time_a, creation_time_b, isd
 
@@ -106,22 +106,22 @@ class InstitutionAgent(Agent):
                 return account
 
     def create_instruction(self):
-        instruction_type = random.choice(['delivery', 'receipt'])
+        instruction_type = self.model.account_rng.choice(['delivery', 'receipt'])
         cash_account = self.getSecurityAccounts(securityType= "Cash")
         # Filter available security accounts from the institution's accounts
         security_accounts = [acc for acc in self.accounts if acc.accountType in self.model.bond_types]
         if not security_accounts:
             raise ValueError("No security accounts available for institution " + self.institutionID)
-        security_account = random.choice(security_accounts)
+        security_account = self.model.account_rng.choice(security_accounts)
         random_security = security_account.accountType  # Use the type from the chosen account
 
         original_balance = security_account.get_original_balance()
 
         # Creates a mix of regular and larger instructions
         if random.random() < 0.15:  # 15% chance for larger instructions
-            percentage = random.uniform(0.20, 0.30)
+            percentage = self.model.account_rng.uniform(0.20, 0.30)
         else:
-            percentage = random.uniform(0.03, 0.1)
+            percentage = self.model.account_rng.uniform(0.03, 0.1)
 
         # amount = self.model.sample_instruction_amount()
         amount = int(original_balance * percentage)
@@ -132,7 +132,7 @@ class InstitutionAgent(Agent):
         otherID = len(self.model.instructions) + 2
         motherID = "mother"
         institution = self
-        other_institution = random.choice([inst for inst in self.model.institutions if inst != self])
+        other_institution = self.model.account_rng.choice([inst for inst in self.model.institutions if inst != self])
         securityType = random_security
         other_institution_cash_account= other_institution.getSecurityAccounts(securityType= "Cash")
         other_institution_security_account = other_institution.getSecurityAccounts(securityType=securityType)
@@ -153,7 +153,7 @@ class InstitutionAgent(Agent):
         isChild = False
         status = "Exists"
         linkcode = f"LINK-{uniqueID}L{otherID}"
-        instruction_creation_time, counter_instruction_creation_time, isd = sample_instruction_creation_times_and_isd(self.model.simulated_time)
+        instruction_creation_time, counter_instruction_creation_time, isd = sample_instruction_creation_times_and_isd(self.model.simulated_time, self.model.account_rng)
 
         if instruction_type == 'delivery':
             new_instructionAgent = DeliveryInstructionAgent.DeliveryInstructionAgent(uniqueID=uniqueID, model = model, linkedTransaction = linkedTransaction, motherID=motherID, institution= institution, securitiesAccount = security_account, cashAccount = cash_account, securityType=securityType, amount= amount, isChild=isChild, status=status, linkcode=linkcode, creation_time = instruction_creation_time)
@@ -201,7 +201,7 @@ class InstitutionAgent(Agent):
         return
 
     def step(self):
-        if random.random() <0.1:
+        if self.model.account_rng.random() <0.1:
             self.create_instruction()
 
 
