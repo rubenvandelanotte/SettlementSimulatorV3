@@ -35,6 +35,7 @@ class ConfidenceIntervalAnalyzer:
             value_eff = stat_data.get("value_efficiency")
             mothers_effectively_settled = stat_data.get("mothers_effectively_settled", 0)
             settled_on_time_amount = stat_data.get("settled_on_time_amount", 0)
+            mothers_on_time_settled = stat_data.get("mothers_on_time_settled", 0)  # Add this line
             settled_late_amount = stat_data.get("settled_late_amount", 0)
             settled_amount = settled_on_time_amount + settled_late_amount
 
@@ -43,6 +44,7 @@ class ConfidenceIntervalAnalyzer:
                 "instruction_efficiency": instruction_eff,
                 "value_efficiency": value_eff,
                 "mothers_effectively_settled": mothers_effectively_settled,
+                "mothers_on_time_settled": mothers_on_time_settled,  # Add this line
                 "settled_on_time_amount": settled_on_time_amount,
                 "settled_amount": settled_amount
             })
@@ -137,7 +139,7 @@ class ConfidenceIntervalAnalyzer:
 
         ax1.set_xticks(x)
         ax1.set_xticklabels([f"Config {cfg}" for cfg in configs], rotation=45, ha='right')
-        plt.title('Value Efficiency (95% CI) vs Total Settled Amount (On Time or Late)')
+        plt.title('Value Efficiency (95% CI) vs Total Settled Amount On Time')
         ax1.grid(axis='y', linestyle='--', alpha=0.3)
 
         lines1, labels1 = ax1.get_legend_handles_labels()
@@ -218,7 +220,7 @@ class ConfidenceIntervalAnalyzer:
 
         ax1_twin = ax1.twinx()
         ax1_twin.plot(x, grouped['mothers_settled_mean'].values, 's-', color='green', label='Mothers Settled On Time')
-        ax1_twin.set_ylabel('Mothers Settled (On Time or Late)', color='green')
+        ax1_twin.set_ylabel('Mothers Settled On Time', color='green')
         ax1_twin.tick_params(axis='y', labelcolor='green')
 
         for i in range(len(x)):
@@ -227,7 +229,7 @@ class ConfidenceIntervalAnalyzer:
             ax1_twin.text(x[i], grouped['mothers_settled_mean'].values[i] + 1,
                           f"{int(grouped['mothers_settled_mean'].values[i])}", ha='center', fontsize=9, color='green')
 
-        ax1.set_title('Instruction Efficiency (95% CI) vs Mothers Settled (On Time or Late)')
+        ax1.set_title('Instruction Efficiency (95% CI) vs Mothers Settled On Time')
         ax1.grid(axis='y', linestyle='--', alpha=0.3)
 
         y_err2 = grouped['value_efficiency_std'] * ci_multiplier

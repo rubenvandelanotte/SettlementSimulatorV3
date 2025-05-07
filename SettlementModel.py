@@ -318,7 +318,7 @@ class SettlementModel(Model):
                 -deliverer.get_amount(),
                 deliverer.get_creation_time()
             )
-        for attempt in range(10):
+        for attempt in range(1):
             agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
             #self.random.shuffle(agents_to_step)
             for agent in sorted(agents_to_step, key=sequence_rule):
