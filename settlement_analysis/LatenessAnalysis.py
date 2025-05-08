@@ -151,11 +151,11 @@ class LatenessAnalyzer:
 
     def _plot_ontime_vs_late_amounts(self, df):
         # ---- aggregate and scale to billions
-        agg = df.groupby("config")[["ontime_amount","late_amount"]].mean()
+        agg = df.groupby("config")[["ontime_amount", "late_amount"]].mean()
         scale = 1e9
         agg_billions = agg / scale
 
-        fig, ax = plt.subplots(figsize=(12,6))
+        fig, ax = plt.subplots(figsize=(12, 6))
         x = agg_billions.index.to_numpy()
         w = 0.6
 
@@ -168,24 +168,36 @@ class LatenessAnalyzer:
                        width=w, label="Late (€ B)", color="orange",
                        bottom=agg_billions["ontime_amount"])  # This stacks them
 
-        # annotate in billions
-        for bar in (*bars1, *bars2):
+        # annotate on-time amounts (green bars)
+        for bar in bars1:
             h = bar.get_height()
             ax.text(
-                bar.get_x() + bar.get_width()/2,
-                h + agg_billions.values.max() * 0.01,
+                bar.get_x() + bar.get_width() / 2,
+                h / 2,  # Position in the middle of the green bar
                 f"{h:.2f} B",
-                ha="center", va="bottom", fontsize=8
+                ha="center", va="center", fontsize=8
+            )
+
+        # annotate late amounts (orange bars)
+        for i, bar in enumerate(bars2):
+            h = bar.get_height()  # Height of the orange part
+            # Position the text in the middle of the orange part
+            bottom = agg_billions["ontime_amount"].iloc[i]  # The bottom of the orange bar
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bottom + h / 2,  # Middle of the orange part
+                f"{h:.2f} B",
+                ha="center", va="center", fontsize=8
             )
 
         # format y-axis ticks as "1.2 B"
         ax.yaxis.set_major_formatter(
-            FuncFormatter(lambda y, _: f"{y:.1f} B")
+            FuncFormatter(lambda y, pos: f"{y:.1f} B")
         )
 
         ax.set_title("On-Time vs Late Settlement Amounts by Configuration")
         ax.set_xlabel("Number of Institutions Allowing Partial Settlement")
-        ax.set_ylabel("Settled Amount (€ Billions)")
+        ax.set_ylabel("Settled Amount (€ billions)")
         ax.set_xticks(x)
         ax.legend()
         ax.grid(axis="y", linestyle="--", alpha=0.3)

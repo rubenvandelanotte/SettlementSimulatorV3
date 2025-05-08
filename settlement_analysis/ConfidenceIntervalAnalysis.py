@@ -151,6 +151,7 @@ class ConfidenceIntervalAnalyzer:
         plt.close()
 
     def _plot_value_efficiency_ontime_only(self, df):
+
         grouped = df.groupby("config").agg(
             value_efficiency_mean=("value_efficiency", "mean"),
             value_efficiency_std=("value_efficiency", "std"),
@@ -169,8 +170,12 @@ class ConfidenceIntervalAnalyzer:
         ax1.set_ylabel('Value Efficiency (%)', color='salmon')
         ax1.tick_params(axis='y', labelcolor='salmon')
 
-        for i, (mean, err) in enumerate(zip(grouped['value_efficiency_mean'].values, y_err.values)):
-            ax1.text(x[i], mean + err + 0.5, f"{mean:.2f}%", ha='center', fontsize=9, color='salmon')
+        # Fixed label position for value efficiency
+        val_eff_mean = grouped['value_efficiency_mean'].values
+        val_eff_max = val_eff_mean.max()
+        val_eff_range = val_eff_max - val_eff_mean.min()
+        for i, (mean, err) in enumerate(zip(val_eff_mean, y_err.values)):
+            ax1.text(x[i], mean + err + val_eff_range * 0.04, f"{mean:.2f}%", ha='center', fontsize=9, color='salmon')
 
         ax2 = ax1.twinx()
         ontime_bil = grouped['settled_ontime_mean'].values / 1e9
@@ -179,8 +184,12 @@ class ConfidenceIntervalAnalyzer:
         ax2.set_ylabel('Amount Settled On Time (Billions €)', color='darkgreen')
         ax2.tick_params(axis='y', labelcolor='darkgreen')
 
+        # Fixed label position for amounts
+        ontime_max = ontime_bil.max()
+        ontime_range = ontime_max - ontime_bil.min()
         for i in range(len(x)):
-            ax2.text(x[i], ontime_bil[i] + 0.05, f"{ontime_bil[i]:.2f}B", ha='center', fontsize=9, color='teal')
+            ax2.text(x[i], ontime_bil[i] + ontime_range * 0.04, f"{ontime_bil[i]:.2f}B", ha='center', fontsize=9,
+                     color='teal')
 
         ax1.set_xticks(x)
         ax1.set_xticklabels([f"{cfg}" for cfg in configs], rotation=45, ha='right')
