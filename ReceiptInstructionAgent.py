@@ -16,7 +16,7 @@ import DeliveryInstructionAgent
 class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
     def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent",
                  securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool,
-                 status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0, original_mother_amount: int=None):
+                 status: str, linkcode: str, creation_time: datetime, original_creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0, original_mother_amount: int=None):
         super().__init__(
             model=model,
             linkedTransaction=linkedTransaction,
@@ -31,6 +31,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             status=status,
             linkcode=linkcode,
             creation_time=creation_time,
+            original_creation_time=original_creation_time,
             depth=depth,
             original_mother_amount=original_mother_amount
         )
