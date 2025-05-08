@@ -140,13 +140,21 @@ class DepthAnalyzer:
         # Group by config and depth, then calculate mean count
         avg_df = df.groupby(['config', 'depth'])['count'].mean().reset_index()
 
+        # Filter out depth level 0
+        avg_df = avg_df[avg_df['depth'] > 0]
+
         for cfg in configs:
             grp = avg_df[avg_df['config'] == cfg].sort_values('depth')
             ax.plot(grp['depth'], grp['count'], 'o-', label=cfg)
 
-        ax.set_title('Depth Distributions Across Configurations')
-        ax.set_xlabel('Depth')
-        ax.set_ylabel('Count')
+        # Get all unique depth values (excluding 0) and use them for x-ticks
+        all_depths = sorted(avg_df['depth'].unique())
+        ax.set_xticks(all_depths)
+        ax.set_xticklabels([str(d) for d in all_depths])
+
+        ax.set_title('Number of Settlements per Depth Across Configurations')
+        ax.set_xlabel('Instruction Depth')
+        ax.set_ylabel('Number of Instructions')
         ax.legend()
         ax.grid(axis='y', linestyle='--', alpha=0.7)
         plt.tight_layout()

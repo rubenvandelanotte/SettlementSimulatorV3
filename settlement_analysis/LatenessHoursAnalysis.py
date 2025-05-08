@@ -161,6 +161,7 @@ class LatenessHoursAnalyzer:
 
     def _plot_lateness_histogram(self):
         all_h = self.all_lateness_hours
+        all_h = [h for h in self.all_lateness_hours if h > 0]
         mean_h = np.mean(all_h)
         median_h = np.median(all_h)
 
@@ -175,9 +176,9 @@ class LatenessHoursAnalyzer:
                 plt.text(edge + (bins[1] - bins[0]) / 2, count + 0.5, str(int(count)),
                          ha='center', va='bottom', fontsize=7)
 
-        plt.title('Overall Distribution of Settlement Lateness Hours Over All Configurations')
+        plt.title('Overall Distribution of Late Settlements Over All Configurations')
         plt.xlabel('Hours Late')
-        plt.ylabel('Frequency')
+        plt.ylabel('Number of Instructions')
         plt.legend()
         plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()

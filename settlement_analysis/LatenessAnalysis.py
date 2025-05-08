@@ -121,7 +121,7 @@ class LatenessAnalyzer:
         agg["late_pct"] = 100 * agg["late_depth"] / (agg["ontime_depth"] + agg["late_depth"])
 
         fig, ax = plt.subplots(figsize=(12,6))
-        ax.plot(agg.index, agg["late_pct"], "o-", color="purple")
+        ax.plot(agg.index, agg["late_pct"], "o-", color="darkgreen")
         for d, pct in zip(agg.index, agg["late_pct"]):
             ax.text(d, pct+0.5, f"{pct:.1f}%", ha="center", va="bottom", fontsize=8)
 
@@ -157,7 +157,7 @@ class LatenessAnalyzer:
 
         fig, ax = plt.subplots(figsize=(12,6))
         x = agg_billions.index.to_numpy()
-        w = 0.5
+        w = 0.6
 
         # First set of bars (on-time)
         bars1 = ax.bar(x, agg_billions["ontime_amount"],
@@ -184,8 +184,8 @@ class LatenessAnalyzer:
         )
 
         ax.set_title("On-Time vs Late Settlement Amounts by Configuration")
-        ax.set_xlabel("Configuration")
-        ax.set_ylabel("Settled Amount (€ billions)")
+        ax.set_xlabel("Number of Institutions Allowing Partial Settlement")
+        ax.set_ylabel("Settled Amount (€ Billions)")
         ax.set_xticks(x)
         ax.legend()
         ax.grid(axis="y", linestyle="--", alpha=0.3)

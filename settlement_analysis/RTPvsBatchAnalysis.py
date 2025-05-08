@@ -104,8 +104,8 @@ class RTPvsBatchAnalyzer:
 
         x = np.arange(len(configs))
         plt.figure(figsize=(12, 8))
-        bars_rtp = plt.bar(x, rtp_pct, label='Real-Time %', color='skyblue')
-        bars_batch = plt.bar(x, batch_pct, bottom=rtp_pct, label='Batch %', color='salmon')
+        bars_rtp = plt.bar(x, rtp_pct, label='RTP %', color='darkgreen')
+        bars_batch = plt.bar(x, batch_pct, bottom=rtp_pct, label='OSSP %', color='salmon')
 
         # Annotate each segment
         for idx in range(len(configs)):
@@ -115,10 +115,10 @@ class RTPvsBatchAnalyzer:
             plt.text(x[idx], rtp_pct[idx] + batch_pct[idx]/2, f"{batch_pct[idx]:.1f}%",
                      ha='center', va='center', fontsize=8)
 
-        plt.xticks(x, [f"Config {c}" for c in configs])
-        plt.xlabel('Configuration')
-        plt.ylabel('Percentage of Settlements')
-        plt.title('RTP vs Batch: Settlement Percentages')
+        plt.xticks(x, [f"{c}" for c in configs])
+        plt.xlabel('Number of Institutions Allowing Partial Settlement')
+        plt.ylabel('Settlement Percentage')
+        plt.title('RTP vs OSSP: Settlement Percentages')
         plt.legend()
         plt.grid(axis='y', linestyle='--', alpha=0.3)
         plt.tight_layout()

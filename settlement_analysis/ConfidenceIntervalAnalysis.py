@@ -21,8 +21,6 @@ class ConfidenceIntervalAnalyzer:
         self._plot_value_efficiency_ontime_only(df)
         self._plot_combined_efficiency(df)
 
-
-
     def _build_dataframe(self):
         import re
         records = []
@@ -76,9 +74,9 @@ class ConfidenceIntervalAnalyzer:
 
         y_err = grouped['instruction_efficiency_std'] * ci_multiplier
         ax1.errorbar(x, grouped['instruction_efficiency_mean'].values, yerr=y_err.values,
-                     fmt='o', color='deepskyblue', capsize=5, label='Instruction Efficiency')
-        ax1.set_ylabel('Instruction Efficiency (%)', color='deepskyblue')
-        ax1.tick_params(axis='y', labelcolor='deepskyblue')
+                     fmt='o', color='salmon', capsize=5, label='Instruction Efficiency (%)')
+        ax1.set_ylabel('Instruction Efficiency (%)', color='salmon')
+        ax1.tick_params(axis='y', labelcolor='salmon')
 
         ax2 = ax1.twinx()
         ax2.plot(x, grouped['mothers_settled_mean'].values, 's-', color='green', label='Mothers Settled On Time')
@@ -88,13 +86,14 @@ class ConfidenceIntervalAnalyzer:
         for i in range(len(x)):
             ax1.text(x[i], grouped['instruction_efficiency_mean'].values[i] + y_err.values[i] + 0.5,
                      f"{grouped['instruction_efficiency_mean'].values[i]:.2f}%", ha='center', fontsize=9,
-                     color='deepskyblue')
+                     color='salmon')
             ax2.text(x[i], grouped['mothers_settled_mean'].values[i] + 1,
                      f"{int(grouped['mothers_settled_mean'].values[i])}", ha='center', fontsize=9, color='green')
 
         ax1.set_xticks(x)
-        ax1.set_xticklabels([f"Config {cfg}" for cfg in configs], rotation=45, ha='right')
+        ax1.set_xticklabels([f"{cfg}" for cfg in configs], rotation=45, ha='right')
         ax1.set_title('Instruction Efficiency (95% CI) vs Mothers Settled On Time')
+        ax1.set_xlabel("Number of Institutions Allowing Partial Settlement")
         ax1.grid(axis='y', linestyle='--', alpha=0.3)
 
         lines1, labels1 = ax1.get_legend_handles_labels()
@@ -130,16 +129,17 @@ class ConfidenceIntervalAnalyzer:
         ax2 = ax1.twinx()
         total_bil = grouped['settled_amount_mean'].values / 1e9
 
-        ax2.plot(x, total_bil, 's-', color='darkgreen', label='Total Settled')
-        ax2.set_ylabel('Settled Amount (Billions €)', color='darkgreen')
-        ax2.tick_params(axis='y', labelcolor='darkgreen')
+        ax2.plot(x, total_bil, 's-', color='green', label='Total Settled')
+        ax2.set_ylabel('Settled Amount (Billions €)', color='green')
+        ax2.tick_params(axis='y', labelcolor='green')
 
         for i in range(len(x)):
             ax2.text(x[i], total_bil[i] + 0.05, f"{total_bil[i]:.2f}B", ha='center', fontsize=9, color='darkgreen')
 
         ax1.set_xticks(x)
-        ax1.set_xticklabels([f"Config {cfg}" for cfg in configs], rotation=45, ha='right')
+        ax1.set_xticklabels([f"{cfg}" for cfg in configs], rotation=45, ha='right')
         plt.title('Value Efficiency (95% CI) vs Total Settled Amount On Time')
+        ax1.set_xlabel("Number of Institutions Allowing Partial Settlement")
         ax1.grid(axis='y', linestyle='--', alpha=0.3)
 
         lines1, labels1 = ax1.get_legend_handles_labels()
@@ -175,16 +175,17 @@ class ConfidenceIntervalAnalyzer:
         ax2 = ax1.twinx()
         ontime_bil = grouped['settled_ontime_mean'].values / 1e9
 
-        ax2.plot(x, ontime_bil, 'o--', color='teal', label='Settled On Time')
-        ax2.set_ylabel('Settled On Time Amount (Billions €)', color='teal')
-        ax2.tick_params(axis='y', labelcolor='teal')
+        ax2.plot(x, ontime_bil, 'o--', color='darkgreen', label='Amount Settled On Time')
+        ax2.set_ylabel('Amount Settled On Time (Billions €)', color='darkgreen')
+        ax2.tick_params(axis='y', labelcolor='darkgreen')
 
         for i in range(len(x)):
             ax2.text(x[i], ontime_bil[i] + 0.05, f"{ontime_bil[i]:.2f}B", ha='center', fontsize=9, color='teal')
 
         ax1.set_xticks(x)
-        ax1.set_xticklabels([f"Config {cfg}" for cfg in configs], rotation=45, ha='right')
-        plt.title('Value Efficiency (95% CI) vs Settled On Time Amount')
+        ax1.set_xticklabels([f"{cfg}" for cfg in configs], rotation=45, ha='right')
+        ax1.set_xlabel("Number of Institutions Allowing Partial Settlement")
+        plt.title('Value Efficiency (95% CI) vs Amount Settled On Time')
         ax1.grid(axis='y', linestyle='--', alpha=0.3)
 
         lines1, labels1 = ax1.get_legend_handles_labels()

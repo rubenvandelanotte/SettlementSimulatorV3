@@ -252,7 +252,6 @@ class SettlementTypeAnalyzer:
         scale = 1e9
         normal_amounts_b = [amt / scale for amt in normal_amounts]
         partial_amounts_b = [amt / scale for amt in partial_amounts]
-        intended_amounts_b = [amt / scale for amt in intended_amounts]
 
         fig, ax = plt.subplots(figsize=(14, 8))
 
@@ -269,11 +268,11 @@ class SettlementTypeAnalyzer:
             total = normal + partial
             ax.text(i, total + 0.1, f"{total:.2f}B", ha="center", va="bottom", fontsize=9)
 
-        ax.set_xlabel("Configuration (Number of Institutions Allowing Partials)")
-        ax.set_ylabel("Amount (€ Billions)")
+        ax.set_xlabel("Number of Institutions Allowing Partial Settlement")
+        ax.set_ylabel("Settled Amount (€ Billions)")
         ax.set_title("Total Settled Amount by Settlement Type")
         ax.set_xticks(x)
-        ax.set_xticklabels([f"Config {cfg}" for cfg in configs])
+        ax.set_xticklabels([f"{cfg}" for cfg in configs])
         ax.legend()
         ax.grid(axis="y", linestyle="--", alpha=0.3)
 
