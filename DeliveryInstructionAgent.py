@@ -87,11 +87,11 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             #instant matching and settlement of first child not yet possible, because receipt_child_1 does not yet exist
             delivery_child_1 = DeliveryInstructionAgent(self.model, f"{self.uniqueID}_1", self.uniqueID,
                                                 self.institution, self.securitiesAccount, self.cashAccount,
-                                                self.securityType, available_to_settle, True, "Validated", f"{self.linkcode}_1", self.model.simulated_time, None, depth = self.depth +1, original_mother_amount=self.original_mother_amount
+                                                self.securityType, available_to_settle, True, "Validated", f"{self.linkcode}_1", self.original_creation_time, self.original_creation_time, None, depth = self.depth +1, original_mother_amount=self.original_mother_amount
                                                 )
             delivery_child_2 = DeliveryInstructionAgent(self.model, f"{self.uniqueID}_2", self.uniqueID,
                                                 self.institution, self.securitiesAccount, self.cashAccount,
-                                                self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.model.simulated_time, None, depth = self.depth +1, original_mother_amount=self.original_mother_amount
+                                                self.securityType, self.amount - available_to_settle, True, "Validated", f"{self.linkcode}_2", self.original_creation_time, self.original_creation_time, None, depth = self.depth +1, original_mother_amount=self.original_mother_amount
                                                 )
 
             #add children to fast lookup list

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class InstructionAgent (Agent):
-    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool, status: str, linkcode: str, creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0, original_mother_amount: int = None):
+    def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool, status: str, linkcode: str, creation_time: datetime, original_creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0, original_mother_amount: int = None):
         super().__init__(model)
         self.uniqueID = uniqueID
         self.motherID = motherID
@@ -25,6 +25,7 @@ class InstructionAgent (Agent):
         self.status = status
         self.linkcode = linkcode
         self.creation_time = creation_time # track creation time for timeout
+        self.original_creation_time = original_creation_time
         self.linkedTransaction = linkedTransaction
         self.last_matched = creation_time
         self.intended_settlement_date = None

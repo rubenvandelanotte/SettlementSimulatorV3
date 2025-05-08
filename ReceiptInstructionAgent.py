@@ -92,14 +92,14 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             receipt_child_1 = ReceiptInstructionAgent(
                             self.model,f"{self.uniqueID}_1", self.uniqueID, self.institution,
                             self.securitiesAccount, self.cashAccount, self.securityType, available_to_settle,
-                            True,"Validated",f"{self.linkcode}_1", creation_time=self.model.simulated_time,
+                            True,"Validated",f"{self.linkcode}_1", self.original_creation_time, self.original_creation_time,
                             linkedTransaction=None, depth = self.depth + 1, original_mother_amount=self.original_mother_amount
                                 )
 
             receipt_child_2 = ReceiptInstructionAgent(
                             self.model,f"{self.uniqueID}_2", self.uniqueID, self.institution,
                              self.securitiesAccount, self.cashAccount, self.securityType, self.amount - available_to_settle,
-                                 True,"Validated",f"{self.linkcode}_2", creation_time=self.model.simulated_time,
+                                 True,"Validated",f"{self.linkcode}_2", self.original_creation_time, self.original_creation_time,
                                linkedTransaction=None, depth = self.depth + 1, original_mother_amount=self.original_mother_amount
                                 )
 
