@@ -745,11 +745,6 @@ class MaxDepthVisualizer:
         # Load lateness data from logs
         lateness_by_depth = self._load_lateness_data()
 
-        # If we couldn't get actual data, fall back to estimation
-        if not lateness_by_depth:
-            print("[WARNING] No lateness hours data found in logs. Using estimate instead.")
-            return self._plot_estimated_lateness_hours_by_depth()
-
         depths = sorted(lateness_by_depth.keys())
         avg_lateness = [np.mean(lateness_by_depth[d]) for d in depths]
 
