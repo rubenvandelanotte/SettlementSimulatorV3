@@ -365,8 +365,6 @@ class MaxDepthVisualizer:
         plt.close()
 
     def plot_memory_usage_vs_depth(self):
-        if 'memory_usage_mb_mean' not in self.config_stats:
-            return
         depths = self.config_stats.index.tolist()
         vals = self.config_stats['memory_usage_mb_mean']
         errs = self.config_stats['memory_usage_mb_std']
