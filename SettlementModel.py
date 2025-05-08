@@ -36,16 +36,16 @@ class SettlementModel(Model):
         self.bond_types = ["Bond-A", "Bond-B", "Bond-C", "Bond-D", "Bond-E", "Bond-F", "Bond-G", "Bond H", "Bond I"]
         self.logger = JSONOCELLogger()
         self.log_only_main_events= True
-        self.seed = seed
+        #self.seed = seed
         self.run_number = run_number
 
         self.main_rng = random.Random(seed)
         self.account_rng = random.Random(run_number)
 
-        if seed is not None:
-            random.seed(seed)  # Set the random seed
-            print(f"[INFO] Random seed set to: {seed}")
-            print(f"[INFO] Account generation using run_number seed: {run_number}")
+        #if seed is not None:
+        #    random.seed(seed)  # Set the random seed
+        #    print(f"[INFO] Random seed set to: {seed}")
+        #    print(f"[INFO] Account generation using run_number seed: {run_number}")
 
 
         self.simulation_start = datetime(2025, 4, 1, 1, 30)

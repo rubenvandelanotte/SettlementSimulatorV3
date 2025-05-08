@@ -342,8 +342,6 @@ class MaxDepthVisualizer:
         plt.close()
 
     def plot_avg_tree_depth_vs_max_depth(self):
-        if 'avg_tree_depth_mean' not in self.config_stats:
-            return
         depths = self.config_stats.index.tolist()
         vals = self.config_stats['avg_tree_depth_mean']
         errs = self.config_stats['avg_tree_depth_std']
@@ -367,8 +365,6 @@ class MaxDepthVisualizer:
         plt.close()
 
     def plot_memory_usage_vs_depth(self):
-        if 'memory_usage_mb_mean' not in self.config_stats:
-            return
         depths = self.config_stats.index.tolist()
         vals = self.config_stats['memory_usage_mb_mean']
         errs = self.config_stats['memory_usage_mb_std']
@@ -748,11 +744,6 @@ class MaxDepthVisualizer:
         """
         # Load lateness data from logs
         lateness_by_depth = self._load_lateness_data()
-
-        # If we couldn't get actual data, fall back to estimation
-        if not lateness_by_depth:
-            print("[WARNING] No lateness hours data found in logs. Using estimate instead.")
-            return self._plot_estimated_lateness_hours_by_depth()
 
         depths = sorted(lateness_by_depth.keys())
         avg_lateness = [np.mean(lateness_by_depth[d]) for d in depths]
