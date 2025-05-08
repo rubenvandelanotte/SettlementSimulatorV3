@@ -342,8 +342,6 @@ class MaxDepthVisualizer:
         plt.close()
 
     def plot_avg_tree_depth_vs_max_depth(self):
-        if 'avg_tree_depth_mean' not in self.config_stats:
-            return
         depths = self.config_stats.index.tolist()
         vals = self.config_stats['avg_tree_depth_mean']
         errs = self.config_stats['avg_tree_depth_std']
