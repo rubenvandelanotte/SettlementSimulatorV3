@@ -72,7 +72,7 @@ class SettlementModel(Model):
         #mini batching
         self.mini_batch_times = [
             timedelta(hours=h, minutes=0)
-            for h in range(2, 20, 3)
+            for h in range(2, 20, 1)
         ]
         self.mini_batches_processed = set()
 

@@ -307,8 +307,14 @@ class LatenessHoursAnalyzer:
         configs = sorted(self.config_lateness.keys(), key=lambda x: int(x.split()[1]))
         buckets = [
             (1, 12, "1-12h"),
-            (12, 24, "12-24h"), (24, 48, "1-2d"), (48, 120, "2-5d"), (120, float('inf'), ">5d")
+            (12, 24, "12-24h"),
+            (24, 48, "1-2d"),
+            (48, 120, "2-5d"),
+            (120, float('inf'), ">5d")
         ]
+
+        # Define a color gradient from green to orange to red
+        colors = ['#4CAF50', '#8BC34A', '#FFC107', '#FF9800', '#F44336']  # green->yellow->orange->red
 
         # count
         counts = {cfg: [0] * len(buckets) for cfg in configs}
@@ -330,9 +336,11 @@ class LatenessHoursAnalyzer:
 
         bottom = np.zeros(len(configs))
         plt.figure(figsize=(14, 8))
+
         for i, (_, _, label) in enumerate(buckets):
             heights = [pcts[cfg][i] for cfg in configs]
-            bars = plt.bar(configs, heights, bottom=bottom, label=label)
+            bars = plt.bar(configs, heights, bottom=bottom, label=label, color=colors[i])
+
             # annotate each segment
             for j, bar in enumerate(bars):
                 h = bar.get_height()

@@ -264,10 +264,6 @@ class SettlementTypeAnalyzer:
         bars2 = ax.bar(x, partial_amounts_b, width, bottom=normal_amounts_b, label="Partial Settlement",
                        color="darkorange")
 
-        # Plot intended amount line if different from actual settled
-        if not np.array_equal(np.array(intended_amounts_b), np.array(normal_amounts_b) + np.array(partial_amounts_b)):
-            ax.plot(x, intended_amounts_b, 'o--', color="red", label="Intended Amount", linewidth=2)
-
         # Annotate total (normal + partial)
         for i, (normal, partial) in enumerate(zip(normal_amounts_b, partial_amounts_b)):
             total = normal + partial

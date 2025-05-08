@@ -125,7 +125,7 @@ class LatenessAnalyzer:
         for d, pct in zip(agg.index, agg["late_pct"]):
             ax.text(d, pct+0.5, f"{pct:.1f}%", ha="center", va="bottom", fontsize=8)
 
-        ax.set_title("Late Settlement Percentage by Instruction Depth")
+        ax.set_title("Average Late Settlement Percentage by Instruction Depth")
         ax.set_xlabel("Instruction Depth")
         ax.set_ylabel("Late Settlements (%)")
         ax.set_xticks(agg.index)
@@ -157,12 +157,16 @@ class LatenessAnalyzer:
 
         fig, ax = plt.subplots(figsize=(12,6))
         x = agg_billions.index.to_numpy()
-        w = 0.4
+        w = 0.5
 
-        bars1 = ax.bar(x - w/2, agg_billions["ontime_amount"],
+        # First set of bars (on-time)
+        bars1 = ax.bar(x, agg_billions["ontime_amount"],
                        width=w, label="On-Time (€ B)", color="green")
-        bars2 = ax.bar(x + w/2, agg_billions["late_amount"],
-                       width=w, label="Late (€ B)",    color="orange")
+
+        # Second set of bars (late), stacked on top of the first set
+        bars2 = ax.bar(x, agg_billions["late_amount"],
+                       width=w, label="Late (€ B)", color="orange",
+                       bottom=agg_billions["ontime_amount"])  # This stacks them
 
         # annotate in billions
         for bar in (*bars1, *bars2):
