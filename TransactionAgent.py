@@ -90,6 +90,7 @@ class TransactionAgent(Agent):
                     if None in (delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2):
 
                         # Clean up created children in case that not all children where created successfully
+                        print(" # Clean up created children in case that not all children where created successfully_ this should never happen")
                         for child in [delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2]:
                             if child is not None:
                                 # Remove from model agent list and instruction list
@@ -127,6 +128,16 @@ class TransactionAgent(Agent):
                     min_amount_2 = self.deliverer.get_amount() - min_amount_1
                     delivery_child_2.set_amount(min_amount_2)
                     receipt_child_2.set_amount(min_amount_2)
+                    print("----------------------------------------------------------------------------------------------")
+                    print("delivery child 1 amount: " + delivery_child_1.get_amount() + "delivery child 2 amount: " + delivery_child_2.get_amount())
+                    print("receipt ")
+                    correctly_created_delivery = (delivery_child_1.get_amount() + delivery_child_2.get_amount == self.deliverer.get_amount())
+                    correctly_created_receipt = (receipt_child_1.get_amount() + receipt_child_2.get_amount == self.receiver.get_amount())
+                    if correctly_created_delivery and correctly_created_receipt:
+                        print("-----------------------------------------------------------True-----------------------------------------------------------------------------------------")
+                    else:
+                        print("-----------------------------------------------------------False----------------------------------------------------------------------------------------")
+
 
                     # ✨ Recursively create and settle children
                     child_transaction_1 = TransactionAgent(
