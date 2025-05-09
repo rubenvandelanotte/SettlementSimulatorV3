@@ -129,11 +129,14 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             self.model.instructions.append(receipt_child_2)
             self.model.log_event(
                 event_type="Receipt Children Created",
-                object_ids=[self.uniqueID],
+                object_ids=[self.uniqueID, receipt_child_1.uniqueID, receipt_child_2.uniqueID],
                 attributes={"parentInstructionID": self.uniqueID,
                             "parent_depth": self.depth,
                             "child1_depth": self.depth + 1,
-                            "child2_depth": self.depth + 1
+                            "child2_depth": self.depth + 1,
+                            "parent_status": self.status,
+                            "child1_status": receipt_child_1.get_status(),
+                            "child2_status": receipt_child_2.get_status()
                             }
             )
             return (receipt_child_1, receipt_child_2)
