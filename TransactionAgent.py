@@ -130,7 +130,7 @@ class TransactionAgent(Agent):
                     receipt_child_2.set_amount(min_amount_2)
                     print("----------------------------------------------------------------------------------------------")
                     print("delivery child 1 amount: " + str(delivery_child_1.get_amount()) + "delivery child 2 amount: " + str(delivery_child_2.get_amount()))
-                    print("receipt child 1 amount: " + str(receipt_child_1.get_amount()) + "delivery child 2 amount: " + str(receipt_child_1.get_amount()))
+                    print("receipt child 1 amount: " + str(receipt_child_1.get_amount()) + "receipt child 2 amount: " + str(receipt_child_2.get_amount()))
                     correctly_created_delivery = (delivery_child_1.get_amount() + delivery_child_2.get_amount() == self.deliverer.get_amount())
                     correctly_created_receipt = (receipt_child_1.get_amount() + receipt_child_2.get_amount() == self.receiver.get_amount())
                     if correctly_created_delivery and correctly_created_receipt:
