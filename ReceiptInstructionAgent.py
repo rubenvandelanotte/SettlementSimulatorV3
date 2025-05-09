@@ -70,18 +70,20 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
     def createReceiptChildren(self):
 
         if self.depth >= self.model.max_child_depth:
+            print(f"[CHILD CREATION BLOCKED] ReceiptInstruction {self.uniqueID} | Depth {self.depth} exceeds max_child_depth {self.model.max_child_depth}")
             return (None, None)
-
         min_settlement_amount = self.original_mother_amount * self.model.min_settlement_percentage
         # Calculate the actual available amounts using getBalance(), ensuring correct account types.
         if self.cashAccount.getAccountType() != "Cash":
             available_cash = 0
+            print(f"[CHILD CREATION BLOCKED] ReceiptInstruction {self.uniqueID} | Cash account type mismatch.")
         else:
             available_cash = self.cashAccount.getEffectiveAvailableCash()
 
         deliverer = self.linkedTransaction.deliverer
         if deliverer.securitiesAccount.getAccountType() != self.securityType:
             available_securities = 0
+            print(f"[CHILD CREATION BLOCKED] ReceiptInstruction {self.uniqueID} | Deliverer account type mismatch.")
         else:
             available_securities = deliverer.securitiesAccount.getBalance()
 
@@ -146,6 +148,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             #     object_ids=[self.uniqueID],
             #     attributes={"status": self.status}
             # )
+            print(f"[CHILD CREATION ABORTED] ReceiptInstruction {self.uniqueID} | Available to settle ({available_to_settle}) <= min required ({min_settlement_amount})")
             return (None, None)
 
     def match(self):

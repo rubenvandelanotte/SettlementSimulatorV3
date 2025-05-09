@@ -91,11 +91,17 @@ class TransactionAgent(Agent):
 
                         # Clean up created children in case that not all children where created successfully
                         print(" # Clean up created children in case that not all children where created successfully_ this should never happen")
+                        #print(delivery_child_1.get_amount())
+                        #print(delivery_child_2.get_amount())
+                        #print(receipt_child_1.get_amount())
+                        #print(receipt_child_2.get_amount())
                         for child in [delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2]:
                             if child is not None:
                                 # Remove from model agent list and instruction list
+                                print("child: " + str(child.get_linkcode()) + " " + str(child))
                                 if child in self.model.agents:
                                     self.model.agents.remove(child)
+
                                 if child in self.model.instructions:
                                     self.model.instructions.remove(child)
 

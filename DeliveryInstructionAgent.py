@@ -64,18 +64,21 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
 
     def createDeliveryChildren(self):
         if self.depth >= self.model.max_child_depth:
+            print(f"[CHILD CREATION BLOCKED] DeliveryInstruction {self.uniqueID} | Depth {self.depth} exceeds max_child_depth {self.model.max_child_depth}")
             return(None, None)
 
         min_settlement_amount = self.original_mother_amount * self.model.min_settlement_percentage
 
         if self.securitiesAccount.getAccountType() != self.securityType:
             available_securities = 0
+            print(f"[CHILD CREATION BLOCKED] DeliveryInstruction {self.uniqueID} | Security account type mismatch.")
         else:
             available_securities = self.securitiesAccount.getBalance()
 
         receiver = self.linkedTransaction.receiver
         if receiver.cashAccount.getAccountType() != "Cash":
             available_cash = 0
+            print(f"[CHILD CREATION BLOCKED] DeliveryInstruction {self.uniqueID} | Receiver has no valid cash account.")
         else:
             available_cash = receiver.cashAccount.getEffectiveAvailableCash()
 
@@ -135,6 +138,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             #     object_ids=[self.uniqueID],
             #     attributes={"status": self.status}
             # )
+            print(f"[CHILD CREATION ABORTED] DeliveryInstruction {self.uniqueID} | Available to settle ({available_to_settle}) <= min required ({min_settlement_amount})")
             return (None, None)
 
     def match(self):
