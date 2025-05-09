@@ -34,8 +34,8 @@ def sample_instruction_creation_times_and_isd(simulated_time: datetime, account_
     - No creation occurs before simulated_time
     """
 
-    # Step 1: Choose ISD 2–5 days from now and set it on 22:30
-    raw_isd_day = simulated_time + timedelta(days=account_rng.randint(2, 5))
+    # Step 1: Choose ISD always 5 days in future & then create some negative delaus
+    raw_isd_day = simulated_time + timedelta(days=5)
     isd = raw_isd_day.replace(hour=22, minute=30, second=0, microsecond=0)
 
     # Step 2: Define delay distribution
