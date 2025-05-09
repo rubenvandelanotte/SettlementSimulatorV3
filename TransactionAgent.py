@@ -207,7 +207,7 @@ class TransactionAgent(Agent):
                 )
                 return
 
-            if self.deliverer.get_intended_settlement_date() < self.model.simulated_time or self.receiver.get_intended_settlement_date() < self.model.simulated_time:
+            if self.deliverer.get_intended_settlement_date() < self.model.simulated_time and self.receiver.get_intended_settlement_date() < self.model.simulated_time:
                 self.deliverer.set_status("Settled late")
                 self.receiver.set_status("Settled late")
                 self.status = "Settled late"
