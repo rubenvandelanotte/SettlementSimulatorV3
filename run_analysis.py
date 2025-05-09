@@ -50,9 +50,9 @@ def finalize_visualizations(output_dir, label):
 
 
 def generate_partial_configs(base_seed, runs_per_config):
-    for true_count in range(1, 11):
+    for true_count in [1, 20, 40, 60, 80, 100]:
         for run_number in range(1, runs_per_config + 1):
-            partialsallowed = tuple([True] * true_count + [False] * (10 - true_count))
+            partialsallowed = tuple([True] * true_count + [False] * (100 - true_count))
             seed = base_seed + (run_number - 1)
             yield {
                 "partialsallowed": partialsallowed,
@@ -62,8 +62,8 @@ def generate_partial_configs(base_seed, runs_per_config):
             }
 
 def generate_depth_configs(base_seed, runs_per_config):
-    partialsallowed = tuple([True] * 8 + [False] * 2)
-    for depth in [0,1,2,3,5,8]:
+    partialsallowed = tuple([True] * 80 + [False] * 20)
+    for depth in [0,1,3,5,8]:
         for run_number in range(1, runs_per_config + 1):
             seed = base_seed + (run_number - 1)
             yield {

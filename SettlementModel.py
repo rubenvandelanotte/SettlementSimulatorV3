@@ -27,7 +27,7 @@ class SettlementModel(Model):
         self.partialsallowed= partialsallowed
         #parameters of the model
         self.statistics_tracker = SettlementStatisticsTracker()
-        self.num_institutions = 10
+        self.num_institutions = 100
         self.min_total_accounts = 10
         self.max_total_accounts = 10
         self.simulation_duration_days = 15 #number of measured days (so simulation is longer)

@@ -201,7 +201,7 @@ class InstitutionAgent(Agent):
         return
 
     def step(self):
-        if self.model.account_rng.random() <0.1:
+        if self.model.account_rng.random() <0.015:
             self.create_instruction()
 
 
