@@ -116,7 +116,7 @@ class SettlementModel(Model):
         self.logger.log_object(oid=object_id, otype=object_type, attributes=attributes_list)
 
     def log_event(self, event_type: str, object_ids: list, attributes: dict = None):
-        #allow for logging only in the main period (no warm-up / cooldown
+        #allow for logging only in the main period (no warm-up / cooldown)
         if not self.log_only_main_events:
             return
 
@@ -625,6 +625,8 @@ class SettlementModel(Model):
 
         # Process all pairs
         for linkcode, pair in original_pairs.items():
+
+
             if not pair:
                 continue
 
