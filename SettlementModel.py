@@ -242,7 +242,7 @@ class SettlementModel(Model):
         print("Accounts & Institutions generated")
 
     def step(self):
-            print(f"Running simulation step {self.steps}...")
+            #print(f"Running simulation step {self.steps}...")
             main_start = self.simulation_start + self.warm_up_period
             main_end = self.simulation_end - self.cool_down_period
             if self.simulated_time < main_start:
@@ -251,7 +251,7 @@ class SettlementModel(Model):
                 current_period = "cool-down"
             else:
                 current_period = "main"
-            print("Current simulation period:", current_period)
+            #print("Current simulation period:", current_period)
 
             # Reset mini-batch tracker
             if self.simulated_time.time() == self.trading_start:
@@ -269,7 +269,7 @@ class SettlementModel(Model):
                 for agent in agents_to_step:
                     agent.step()
 
-                print(f"{len(self.agents)} Agents executed their step module")
+                #print(f"{len(self.agents)} Agents executed their step module")
 
                 for batch_time in self.mini_batch_times:
                     key = (self.simulated_time.date(), batch_time)
