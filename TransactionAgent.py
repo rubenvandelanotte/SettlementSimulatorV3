@@ -207,7 +207,22 @@ class TransactionAgent(Agent):
                 )
                 return
 
+            #check isd of both deliverer and receiver are close by => should be the same so should be an and
             if self.deliverer.get_intended_settlement_date() < self.model.simulated_time and self.receiver.get_intended_settlement_date() < self.model.simulated_time:
+                if self.deliverer.get_intended_settlement_date() != self.receiver.get_intended_settlement_date():
+                    self.status = "Cancelled due to error"
+                    self.model.log_event(
+                        event_type="Transaction Settlement failed: ISDs do not match",
+                        object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
+                        attributes={
+                            "deliverer_amount": self.deliverer.get_amount(),
+                            "receiver_amount": self.receiver.get_amount(),
+                            "status": self.status,
+                            "isd_deliverer": self.deliverer.get_intended_settlement_date(),
+                            "isd_receiver": self.receiver.get_intended_settlement_date()
+                        }
+                    )
+                    return
                 self.deliverer.set_status("Settled late")
                 self.receiver.set_status("Settled late")
                 self.status = "Settled late"
