@@ -166,8 +166,8 @@ class TransactionAgent(Agent):
                     delivery_child_2.set_status("Matched")
                     receipt_child_2.set_status("Matched")
 
-                    if child_transaction_1:
-                        child_transaction_1.settle()
+                    #settle first child
+                    child_transaction_1.settle()
 
                     self.cancel_partial()
                     return
