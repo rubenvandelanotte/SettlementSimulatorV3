@@ -188,6 +188,8 @@ class SettlementModel(Model):
         return int(amount*10)
 
 
+
+
     def generate_data(self):
         print("Generate Accounts & Institutions:")
         print("-----------------------------------------")
@@ -320,8 +322,9 @@ class SettlementModel(Model):
             )
         for attempt in range(1):
             agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
+            selected_agents = [a for a in agents_to_step if a.meets_selection_criteria()]
             #self.random.shuffle(agents_to_step)
-            for agent in sorted(agents_to_step, key=sequence_rule):
+            for agent in sorted(selected_agents, key=sequence_rule):
                 agent.step()
 
 
@@ -345,10 +348,15 @@ class SettlementModel(Model):
                 deliverer.get_creation_time()
             )
 
-
+        #filter transactions
         agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
+
+        #filter selection criteria
+        selected_agents = [a for a in agents_to_step if a.meets_selection_criteria()]
         # self.random.shuffle(agents_to_step)
-        agents_to_step = sorted(agents_to_step, key=sequence_rule)
+
+        #sequencing of selected agents
+        agents_to_step = sorted(selected_agents, key=sequence_rule)
 
         # Take only the first 10%
         cutoff = max(1, int(len(agents_to_step) * 0.10))  # ensures at least one agent is selected
