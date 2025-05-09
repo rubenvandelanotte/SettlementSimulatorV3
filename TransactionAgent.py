@@ -63,6 +63,13 @@ class TransactionAgent(Agent):
                 self.receiver.cashAccount.checkBalance(self.receiver.get_amount(), "Cash")
         )
 
+    def meets_selection_criteria(self):
+        isd_close = (self.model.simulated_time >= self.get_deliverer().get_intended_settlement_date() - timedelta(days=1, minutes=35))
+        new_securities_available = self.get_deliverer().get_securitiesAccount().get_newSecurities()
+        is_selected = (isd_close and new_securities_available)
+        return is_selected
+
+
     def settle(self):
         self.retry_count += 1  # ✨ Count each attempt
 
@@ -178,13 +185,15 @@ class TransactionAgent(Agent):
 
                     #cancel the mother transaction
                     self.cancel_partial()
+                    self.deliverer.get_securitiesAccount().set_newSecurities(False)
+                    #self.receiver.get_cashAccount().set_newSecurities(False)
                     return
 
                 # ✨ Fallback to retry if not enough funds
 
 
                 self.deliverer.get_securitiesAccount().set_newSecurities(False)
-                self.receiver.get_cashAccount().set_newSecurities(False)
+                #self.receiver.get_cashAccount().set_newSecurities(False)
 
                 self.model.log_event(
                     event_type= "Settlement Failed: Insufficient Funds",
@@ -245,7 +254,7 @@ class TransactionAgent(Agent):
             self.model.agents.remove(self)
 
             self.deliverer.get_cashAccount().set_newSecurities(True)
-            self.receiver.get_securitiesAccount().set_newSecurities(True)
+            #self.receiver.get_securitiesAccount().set_newSecurities(True)
 
     def step(self):
         # ✨ Retry settlement on every step if allowed
