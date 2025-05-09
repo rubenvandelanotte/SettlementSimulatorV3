@@ -65,10 +65,10 @@ class TransactionAgent(Agent):
 
     def meets_selection_criteria(self):
         isd_close = (self.model.simulated_time >= self.get_deliverer().get_intended_settlement_date() - timedelta(days=1, minutes=35))
-        new_securities_available = self.get_deliverer().get_securitiesAccount().get_newSecurities()
+        #new_securities_available = self.get_deliverer().get_securitiesAccount().get_newSecurities()
         is_matched = (self.status == "Matched")
-        is_selected = (isd_close and new_securities_available and is_matched)
-        #is_selected = (isd_close and is_matched)
+        #is_selected = (isd_close and new_securities_available and is_matched)
+        is_selected = (isd_close and is_matched)
         return is_selected
 
 

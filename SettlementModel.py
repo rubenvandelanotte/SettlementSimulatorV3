@@ -198,7 +198,7 @@ class SettlementModel(Model):
             inst_bondtypes= []
             inst_id = f"INST-{i}"
             inst_accounts = []
-            total_accounts = self.account_rng.randint(self.min_total_accounts, self.max_total_accounts)
+            total_accounts = self.max_total_accounts
             #generate cash account => there has to be at least 1 cash account
             new_cash_accountID = generate_iban()
             new_cash_accountType = "Cash"
@@ -314,6 +314,7 @@ class SettlementModel(Model):
 
 
             return (
+                not deliverer.get_securitiesAccount().get_newSecurities(),
                 deliverer.get_intended_settlement_date(),
                 -deliverer.get_priority(),
                 not t.is_fully_settleable(),
@@ -323,8 +324,13 @@ class SettlementModel(Model):
         for attempt in range(1):
             agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
             selected_agents = [a for a in agents_to_step if a.meets_selection_criteria()]
-            #self.random.shuffle(agents_to_step)
-            for agent in sorted(selected_agents, key=sequence_rule):
+
+            selected_agents = sorted(selected_agents, key=sequence_rule)
+            #self.random.shuffle(selected_agents)
+            for agent in selected_agents:
+
+            #for agent in sorted(selected_agents, key=sequence_rule):
+
                 agent.step()
 
 
@@ -341,6 +347,7 @@ class SettlementModel(Model):
                 print(f"  Status: {deliverer.get_status()}, Depth: {deliverer.get_depth()}, Amount: {deliverer.get_amount()}, Creation: {deliverer.get_creation_time()}")
 
             return (
+                not deliverer.get_securitiesAccount().get_newSecurities(),
                 deliverer.get_intended_settlement_date(),
                 -deliverer.get_priority(),
                 not t.is_fully_settleable(),
@@ -353,14 +360,14 @@ class SettlementModel(Model):
 
         #filter selection criteria
         selected_agents = [a for a in agents_to_step if a.meets_selection_criteria()]
-        # self.random.shuffle(agents_to_step)
+        #self.random.shuffle(selected_agents)
 
         #sequencing of selected agents
-        agents_to_step = sorted(selected_agents, key=sequence_rule)
+        selected_agents = sorted(selected_agents, key=sequence_rule)
 
         # Take only the first 10%
-        cutoff = max(1, int(len(agents_to_step) * 0.10))  # ensures at least one agent is selected
-        for agent in agents_to_step[:cutoff]:
+        cutoff = max(1, int(len(selected_agents) * 0.10))  # ensures at least one agent is selected
+        for agent in selected_agents[:cutoff]:
             agent.step()
 
     def get_main_period_mothers_and_descendants(self):
