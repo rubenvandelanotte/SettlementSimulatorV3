@@ -117,13 +117,17 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
             self.model.instructions.append(delivery_child_2)
             self.model.log_event(
                 event_type="Delivery Children Created",
-                object_ids=[self.uniqueID],
+                object_ids=[self.uniqueID, delivery_child_1.uniqueID, delivery_child_2.uniqueID],
                 attributes={"parentInstructionID": self.uniqueID,
                             "parent_depth": self.depth,
-                            "child1_depth": self.depth +1,
-                            "child2_depth": self.depth +1
+                            "child1_depth": self.depth + 1,
+                            "child2_depth": self.depth + 1,
+                            "parent_status": self.status,
+                            "child1_status": delivery_child_1.get_status(),
+                            "child2_status": delivery_child_2.get_status()
                             }
             )
+
             return (delivery_child_1, delivery_child_2)
         else:
             # self.model.log_event(
