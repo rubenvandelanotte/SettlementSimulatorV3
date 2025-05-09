@@ -39,7 +39,7 @@ class SettlementModel(Model):
         #self.seed = seed
         self.run_number = run_number
 
-        self.main_rng = random.Random(seed)
+        #self.main_rng = random.Random(seed)
         self.account_rng = random.Random(run_number)
 
         #if seed is not None:
@@ -159,15 +159,15 @@ class SettlementModel(Model):
         """
         mu = 18.0857  # ln(median)
         sigma = 1  # controls skewness and std
-        amount = self.main_rng.lognormvariate(mu, sigma)
+        #amount = self.main_rng.lognormvariate(mu, sigma)
 
         # Apply a cap to further prevent extreme outliers (optional)
         cap = 2e9  # 2 billion cap
-        amount = min(amount, cap)
+       # amount = min(amount, cap)
 
         #0.88 klein bedrag 10e7 en 12 kans groot 10e9
 
-        return int(amount)
+       # return int(amount)
 
     def sample_initial_balance_amount(self):
         """
