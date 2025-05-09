@@ -68,6 +68,7 @@ class TransactionAgent(Agent):
         new_securities_available = self.get_deliverer().get_securitiesAccount().get_newSecurities()
         is_matched = (self.status == "Matched")
         is_selected = (isd_close and new_securities_available and is_matched)
+        #is_selected = (isd_close and is_matched)
         return is_selected
 
 
@@ -254,8 +255,8 @@ class TransactionAgent(Agent):
             self.model.agents.remove(self.receiver)
             self.model.agents.remove(self)
 
-            self.deliverer.get_cashAccount().set_newSecurities(True)
-            #self.receiver.get_securitiesAccount().set_newSecurities(True)
+            #self.deliverer.get_cashAccount().set_newSecurities(True)
+            self.receiver.get_securitiesAccount().set_newSecurities(True)
 
     def step(self):
         # ✨ Retry settlement on every step if allowed
