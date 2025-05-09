@@ -169,6 +169,8 @@ class TransactionAgent(Agent):
                     #settle first child
                     child_transaction_1.settle()
 
+
+                    #cancel the mother transaction
                     self.cancel_partial()
                     return
 
