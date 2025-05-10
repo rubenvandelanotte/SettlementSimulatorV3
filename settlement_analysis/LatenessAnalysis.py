@@ -109,7 +109,7 @@ class LatenessAnalyzer:
                     ha="center", va="bottom", fontsize= 9)
 
         ax.set_title("Late Settlement Percentage by Configuration")
-        ax.set_xlabel("Configuration")
+        ax.set_xlabel("Number of Institutions Allowing Partial Settlement")
         ax.set_ylabel("Late Settlements (%)")
         ax.set_xticks(x)
         ax.set_xticklabels(agg.index)
