@@ -266,30 +266,17 @@ class MaxDepthVisualizer:
 
     def plot_efficiency_vs_depth(self):
         depths = self.config_stats.index.tolist()
-        instr = self.config_stats['instruction_efficiency_mean']
-        instr_err = self.config_stats['instruction_efficiency_std']
         val = self.config_stats['value_efficiency_mean']
         val_err = self.config_stats['value_efficiency_std']
 
-        fig, ax1 = plt.subplots(figsize=(12, 8))
-        color = 'blue'
-        ax1.errorbar(depths, instr, yerr=instr_err, fmt='o-', capsize=5,
-                     color=color, label='Instruction')
-        ax1.set_xlabel('Max Child Depth', fontsize=14)
-        ax1.set_ylabel('Instruction Efficiency (%)', color=color, fontsize=14)
-        ax1.tick_params(axis='y', labelcolor=color)
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.errorbar(depths, val, yerr=val_err, fmt='s-', capsize=5,
+                    color='green', label='Value Efficiency')
+        ax.set_xlabel('Maximum Child Depth', fontsize=14)
+        ax.set_ylabel('Value Efficiency (%)', fontsize=14)
 
-        ax2 = ax1.twinx()
-        color = 'green'
-        ax2.errorbar(depths, val, yerr=val_err, fmt='s--', capsize=5,
-                     color=color, label='Value')
-        ax2.set_ylabel('Value Efficiency (%)', color=color, fontsize=14)
-        ax2.tick_params(axis='y', labelcolor=color)
-
-        lines1, labels1 = ax1.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc='best', fontsize=12)
-        plt.title('Efficiency Metrics vs Max Child Depth', fontsize=16)
+        ax.legend(loc='best', fontsize=12)
+        plt.title('Value Efficiency (95% CI) vs Maximum Child Depth', fontsize=16)
         plt.grid(alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, 'efficiency_vs_depth.png'), dpi=300)
@@ -723,8 +710,8 @@ class MaxDepthVisualizer:
             FuncFormatter(lambda y, _: f"{y:.1f} B")
         )
 
-        ax.set_title("On-Time vs Late Settlement Amounts by Max Child Depth")
-        ax.set_xlabel("Max Child Depth")
+        ax.set_title("On-Time vs Late Settlement Amounts by Maximum Child Depth")
+        ax.set_xlabel("Maximum Child Depth")
         ax.set_ylabel("Settled Amount (€ Billions)")
         ax.set_xticks(depths)
         ax.legend()
