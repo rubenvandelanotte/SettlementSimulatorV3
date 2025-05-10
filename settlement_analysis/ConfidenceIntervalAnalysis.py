@@ -92,7 +92,7 @@ class ConfidenceIntervalAnalyzer:
 
         ax1.set_xticks(x)
         ax1.set_xticklabels([f"{cfg}" for cfg in configs], rotation=45, ha='right')
-        ax1.set_title('Instruction Efficiency (95% CI) vs Mothers Settled On Time')
+        ax1.set_title('Instruction Efficiency (95% CI) vs Number of Allowing Institutions')
         ax1.set_xlabel("Number of Institutions Allowing Partial Settlement")
         ax1.grid(axis='y', linestyle='--', alpha=0.3)
 

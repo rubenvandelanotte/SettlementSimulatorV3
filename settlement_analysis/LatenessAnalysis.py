@@ -3,6 +3,7 @@ import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 from matplotlib.ticker import FuncFormatter
 
 class LatenessAnalyzer:
@@ -100,7 +101,8 @@ class LatenessAnalyzer:
         agg["late_pct"] = 100 * agg["late_count"] / (agg["ontime_count"] + agg["late_count"])
 
         fig, ax = plt.subplots(figsize=(12,6))
-        bars = ax.bar(agg.index, agg["late_pct"], color="tomato")
+        x = np.arange(len(agg))
+        bars = ax.bar(x, agg["late_pct"], color="tomato")
         for cfg, bar in zip(agg.index, bars):
             pct = bar.get_height()
             ax.text(bar.get_x()+bar.get_width()/2, pct+0.5, f"{pct:.1f}%",
@@ -109,7 +111,8 @@ class LatenessAnalyzer:
         ax.set_title("Late Settlement Percentage by Configuration")
         ax.set_xlabel("Configuration")
         ax.set_ylabel("Late Settlements (%)")
-        ax.set_xticks(agg.index)
+        ax.set_xticks(x)
+        ax.set_xticklabels(agg.index)
         ax.grid(axis="y", linestyle="--", alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "late_settlement_percentage.png"))
@@ -156,7 +159,7 @@ class LatenessAnalyzer:
         agg_billions = agg / scale
 
         fig, ax = plt.subplots(figsize=(12, 6))
-        x = agg_billions.index.to_numpy()
+        x = np.arange(len(agg_billions))
         w = 0.6
 
         # First set of bars (on-time)
@@ -199,6 +202,7 @@ class LatenessAnalyzer:
         ax.set_xlabel("Number of Institutions Allowing Partial Settlement")
         ax.set_ylabel("Settled Amount (€ billions)")
         ax.set_xticks(x)
+        ax.set_xticklabels(agg_billions.index)
         ax.legend()
         ax.grid(axis="y", linestyle="--", alpha=0.3)
         plt.tight_layout()

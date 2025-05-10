@@ -145,14 +145,15 @@ class DepthAnalyzer:
 
         for cfg in configs:
             grp = avg_df[avg_df['config'] == cfg].sort_values('depth')
-            ax.plot(grp['depth'], grp['count'], 'o-', label=cfg)
+            label_text = cfg.replace('Config ', '') if isinstance(cfg, str) else cfg
+            ax.plot(grp['depth'], grp['count'], 'o-', label=f'{label_text} Allowing Institutions')
 
         # Get all unique depth values (excluding 0) and use them for x-ticks
         all_depths = sorted(avg_df['depth'].unique())
         ax.set_xticks(all_depths)
         ax.set_xticklabels([str(d) for d in all_depths])
 
-        ax.set_title('Number of Settlements per Depth Across Configurations')
+        ax.set_title('Number of Settlements per Instruction Depth Across Configurations')
         ax.set_xlabel('Instruction Depth')
         ax.set_ylabel('Number of Instructions')
         ax.legend()

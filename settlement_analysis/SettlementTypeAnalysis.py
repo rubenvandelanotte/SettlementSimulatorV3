@@ -192,9 +192,9 @@ class SettlementTypeAnalyzer:
                 ax.text(i, normal + partial / 2, f"{partial:.1f}%", ha="center",
                         va="center", color="white", fontweight="bold", fontsize=9)
 
-        ax.set_xlabel("Configuration (Number of Institutions Allowing Partials)")
-        ax.set_ylabel("Percentage of Total Settled Amount")
-        ax.set_title("Percentage of Settlement Amount by Type")
+        ax.set_xlabel("Number of Institutions Allowing Partial Settlement")
+        ax.set_ylabel("Percentage of Amount Settled On Time")
+        ax.set_title("Percentage of Amount Settled On Time by Settlement Type")
         ax.set_xticks(x)
         ax.set_xticklabels([f"Config {cfg}" for cfg in configs])
         ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=2)
