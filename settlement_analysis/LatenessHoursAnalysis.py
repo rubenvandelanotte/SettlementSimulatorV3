@@ -199,7 +199,7 @@ class LatenessHoursAnalyzer:
         # **Ensure every depth** appears on x-axis
         plt.xticks(depths, [str(d) for d in depths])
 
-        plt.title('Average Lateness Hours by Instruction Depth')
+        plt.title('Average Numbers of Hours Late by Instruction Depth')
         plt.xlabel('Instruction Depth')
         plt.ylabel('Hours Late')
         plt.grid(axis='y', linestyle='--', alpha=0.3)
