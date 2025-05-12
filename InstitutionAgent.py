@@ -70,30 +70,6 @@ class InstitutionAgent(Agent):
             }
         )
 
-    def opt_out_partial(self):
-        if not self.allowPartial:
-            print("Institution Already opted out, cannot opt out again")
-        else:
-            self.allowPartial = False
-            print("Institution opted out of partial settlement")
-            self.model.log_event(
-                event_type="institution_opt_out_partial",
-                object_ids=[self.institutionID],
-                attributes={"allowPartial": self.allowPartial}
-            )
-
-    def opt_in_partial(self):
-        if self.allowPartial:
-            print("Institution Already opted in, cannot opt in again")
-        else:
-            self.allowPartial = True
-            print("Institution opted in of partial settlements")
-            self.model.log_event(
-                event_type="institution_opt_in_partial",
-                object_ids=[self.institutionID],
-                attributes={"allowPartial": self.allowPartial}
-            )
-
     def check_partial_allowed(self):
         if self.allowPartial == True:
             return True
@@ -119,7 +95,7 @@ class InstitutionAgent(Agent):
 
         # Creates a mix of regular and larger instructions
         if self.model.account_rng.random() < 0.15:  # 15% chance for larger instructions
-            percentage = self.model.account_rng.uniform(0.20, 0.30)
+            percentage = self.model.account_rng.uniform(0.35, 0.45)
         else:
             percentage = self.model.account_rng.uniform(0.03, 0.1)
 
