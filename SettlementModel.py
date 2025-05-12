@@ -401,15 +401,28 @@ class SettlementModel(Model):
         main_start = self.simulation_start + self.warm_up_period
         main_end = self.simulation_end - self.cool_down_period
 
-        # Get mother instructions from main period
+        # Identify mothers and children within and outside main period
         mother_instructions = [
-            inst for inst in self.instructions
-            if inst.get_motherID() == "mother" and main_start <= inst.get_creation_time() <= main_end
+            inst for inst in self.instructions if inst.get_motherID() == "mother"
         ]
+
+        # Map mother instructions by linkcode to easily find pairs
+        linkcode_to_instructions = {}
+        for inst in mother_instructions:
+            linkcode = inst.get_linkcode()
+            if linkcode not in linkcode_to_instructions:
+                linkcode_to_instructions[linkcode] = []
+            linkcode_to_instructions[linkcode].append(inst)
+
+        # Select pairs with at least one instruction in the main period
+        relevant_mothers = []
+        for pair in linkcode_to_instructions.values():
+            if any(main_start <= inst.get_creation_time() <= main_end for inst in pair):
+                relevant_mothers.extend(pair)
 
 
         # Use a set for faster membership testing
-        descendants = set(mother_instructions)
+        descendants = set(relevant_mothers)
 
         # Create a mapping from parent ID to children for faster lookup
         parent_to_children = {}
@@ -421,7 +434,7 @@ class SettlementModel(Model):
                 parent_to_children[parent_id].append(inst)
 
         # Use queue for breadth-first traversal
-        queue = [inst for inst in mother_instructions]
+        queue = [inst for inst in relevant_mothers]
         while queue:
             current = queue.pop(0)
             current_id = current.get_uniqueID()
