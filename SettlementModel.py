@@ -151,24 +151,6 @@ class SettlementModel(Model):
         random_time = self.simulation_start + timedelta(seconds=random_seconds)
         return random_time  # Now returns a datetime object
 
-    def sample_instruction_amount(self):
-        """
-        Samples an instruction amount (in EUR) from a log-normal distribution
-        that approximates the mean (€324M), std (€829M), and median (€20M)
-        of the original two-point distribution.
-        """
-        mu = 18.5857  # ln(median)
-        sigma = 1  # controls skewness and std
-        #amount = self.main_rng.lognormvariate(mu, sigma)
-
-        # Apply a cap to further prevent extreme outliers (optional)
-        cap = 2e9  # 2 billion cap
-       # amount = min(amount, cap)
-
-        #0.88 klein bedrag 10e7 en 12 kans groot 10e9
-
-       # return int(amount)
-
     def sample_initial_balance_amount(self):
         """
         Samples an instruction amount (in EUR) from a log-normal distribution
