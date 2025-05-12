@@ -322,7 +322,7 @@ class MaxDepthVisualizer:
         plt.plot(depths, vals, 'ro-', alpha=0.7)
         plt.xlabel('Maximum Child Depth', fontsize=14)
         plt.ylabel('Avgerage Partial Settlements', fontsize=14)
-        plt.title('Average Partial Settlements by Maximum Child Depth', fontsize=16)
+        plt.title('Average Number of Partial Settlements by Maximum Child Depth', fontsize=16)
         plt.grid(axis='y', alpha=0.3)
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, 'partial_settlements_vs_depth.png'), dpi=300)
