@@ -157,7 +157,7 @@ class SettlementModel(Model):
         that approximates the mean (€324M), std (€829M), and median (€20M)
         of the original two-point distribution.
         """
-        mu = 18.0857  # ln(median)
+        mu = 18.5857  # ln(median)
         sigma = 1  # controls skewness and std
         #amount = self.main_rng.lognormvariate(mu, sigma)
 
@@ -175,7 +175,7 @@ class SettlementModel(Model):
         that approximates the mean (€324M), std (€829M), and median (€20M)
         of the original two-point distribution.
         """
-        mu = 18.0857  # ln(median)
+        mu = 18.5857  # ln(median)
         sigma = 1  # controls skewness and std
         amount = self.account_rng.lognormvariate(mu, sigma)
 
