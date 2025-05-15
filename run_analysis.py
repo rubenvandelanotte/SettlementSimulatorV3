@@ -50,7 +50,7 @@ def finalize_visualizations(output_dir, label):
 
 
 def generate_partial_configs(base_seed, runs_per_config):
-    for true_count in [1, 20, 40, 60, 80, 100]:
+    for true_count in [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]:
         for run_number in range(1, runs_per_config + 1):
             partialsallowed = tuple([True] * true_count + [False] * (100 - true_count))
             seed = base_seed + (run_number - 1)
