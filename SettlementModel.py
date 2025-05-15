@@ -299,9 +299,9 @@ class SettlementModel(Model):
                 not deliverer.get_securitiesAccount().get_newSecurities(),
                 deliverer.get_intended_settlement_date(),
                 -deliverer.get_priority(),
-                not t.is_fully_settleable(),
+                #not t.is_fully_settleable(),
                 -deliverer.get_amount(),
-                deliverer.get_creation_time()
+                #deliverer.get_creation_time()
             )
         for attempt in range(1):
             agents_to_step = [a for a in self.agents if isinstance(a, (TransactionAgent))]
@@ -332,9 +332,9 @@ class SettlementModel(Model):
                 not deliverer.get_securitiesAccount().get_newSecurities(),
                 deliverer.get_intended_settlement_date(),
                 -deliverer.get_priority(),
-                not t.is_fully_settleable(),
+                #not t.is_fully_settleable(),
                 -deliverer.get_amount(),
-                deliverer.get_creation_time()
+                #deliverer.get_creation_time()
             )
 
         #filter transactions
