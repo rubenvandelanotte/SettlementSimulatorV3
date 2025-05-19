@@ -5,11 +5,9 @@ from datetime import datetime
 
 
 class RuntimeTracker:
-    """
-    A simple class to track the runtime of different simulation configurations
-    and save the results to a JSON file.
-    """
+    # Not used in final version of thesis
 
+    #Tracks the runtime of different simulation configurations and save the results to a JSON file.
     def __init__(self, output_file="runtime_results.json"):
         """
         Initialize the runtime tracker.
