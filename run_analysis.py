@@ -50,7 +50,7 @@ def finalize_visualizations(output_dir, label):
 
 
 def generate_partial_configs(base_seed, runs_per_config):
-    for true_count in [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]:
+    for true_count in [1, 100]:
         for run_number in range(1, runs_per_config + 1):
             partialsallowed = tuple([True] * true_count + [False] * (100 - true_count))
             seed = base_seed + (run_number - 1)
@@ -63,7 +63,7 @@ def generate_partial_configs(base_seed, runs_per_config):
 
 def generate_depth_configs(base_seed, runs_per_config):
     partialsallowed = tuple([True] * 80 + [False] * 20)
-    for depth in [0,1,2,3,4,6,8]:
+    for depth in [0,1,2,4,6,8]:
         for run_number in range(1, runs_per_config + 1):
             seed = base_seed + (run_number - 1)
             yield {
@@ -193,7 +193,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.analysis == "partial":
-        run_analysis("partial", generate_partial_configs, args.runs, "partial_allowance_files", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
+        run_analysis("partial", generate_partial_configs, args.runs, "partial_allowance_files_2", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
     elif args.analysis == "depth":
         run_analysis("depth", generate_depth_configs, args.runs, "max_depth_files", args.seed, visualize_only=args.visualize_only, no_visualization=args.no_visualization)
     elif args.analysis == "amount":
