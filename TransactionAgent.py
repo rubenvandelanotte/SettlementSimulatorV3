@@ -14,9 +14,7 @@ class TransactionAgent(Agent):
         self.transactionID = transactionID
         self.deliverer = deliverer
         self.receiver = receiver
-        self.retry_count = 0  # ✨ Track number of settlement attempts
-
-        # ✨ Early cancel if instruction amounts mismatch
+        self.retry_count = 0
         if self.deliverer.get_amount() != self.receiver.get_amount():
             self.status = "Cancelled due to error"
             self.model.log_event(
@@ -29,9 +27,7 @@ class TransactionAgent(Agent):
                 }
             )
             return
-
         self.status = status
-
         self.model.log_object(
             object_id=self.transactionID,
             object_type="Transaction",
@@ -42,9 +38,6 @@ class TransactionAgent(Agent):
             }
         )
 
-    def get_transactionID(self):
-        return self.transactionID
-
     def get_status(self):
         return self.status
 
@@ -54,41 +47,30 @@ class TransactionAgent(Agent):
     def get_deliverer(self):
         return self.deliverer
 
-    def get_receiver(self):
-        return self.receiver
-
-    def is_fully_settleable(self):
-        return (self.deliverer.securitiesAccount.checkBalance(self.deliverer.get_amount(),
-                                                              self.deliverer.get_securityType()) and
-                self.receiver.cashAccount.checkBalance(self.receiver.get_amount(), "Cash")
-        )
-
     def meets_selection_criteria(self):
-        isd_close = (self.model.simulated_time >= self.get_deliverer().get_intended_settlement_date() - timedelta(days=1, minutes=35))
-        #new_securities_available = self.get_deliverer().get_securitiesAccount().get_newSecurities()
+        # Checks if transaction meets selection criteria
+        isd_close = (self.model.get_simulated_time() >= self.get_deliverer().get_intended_settlement_date() - timedelta(days=1, minutes=35))
         is_matched = (self.status == "Matched")
-        #is_selected = (isd_close and new_securities_available and is_matched)
         is_selected = (isd_close and is_matched)
         return is_selected
 
-
     def settle(self):
-        self.retry_count += 1  # ✨ Count each attempt
-
+        # Settles transaction
+        self.retry_count += 1
         self.model.log_event(
             event_type="Attempting to Settle",
             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
-            attributes={"status": self.status, "retry": self.retry_count}  # ✨ Log retry count
+            attributes={"status": self.status, "retry": self.retry_count}
         )
 
         if self.deliverer.get_status() in ["Matched"] and self.receiver.get_status() in ["Matched"] and self.status in ["Matched"]:
 
-            # ✨ Pre-transfer check to avoid partial mutations
+            # Checks if transaction can be settled fully
             if not (
                 self.deliverer.securitiesAccount.checkBalance(self.deliverer.get_amount(), self.deliverer.get_securityType()) and
                 self.receiver.cashAccount.checkBalance(self.receiver.get_amount(), "Cash")
             ):
-                # ✨ Try partial if allowed
+                # Partial settlement
                 if self.deliverer.get_institution().check_partial_allowed() and self.receiver.get_institution().check_partial_allowed():
                     delivery_children = self.deliverer.createDeliveryChildren()
                     receipt_children = self.receiver.createReceiptChildren()
@@ -97,23 +79,13 @@ class TransactionAgent(Agent):
                     receipt_child_1, receipt_child_2 = receipt_children
 
                     if None in (delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2):
-
-                        # Clean up created children in case that not all children where created successfully
-                        print(" # Clean up created children in case that not all children where created successfully_ this should never happen")
-                        #print(delivery_child_1.get_amount())
-                        #print(delivery_child_2.get_amount())
-                        #print(receipt_child_1.get_amount())
-                        #print(receipt_child_2.get_amount())
                         for child in [delivery_child_1, delivery_child_2, receipt_child_1, receipt_child_2]:
                             if child is not None:
                                 # Remove from model agent list and instruction list
-                                print("child: " + str(child.get_linkcode()) + " " + str(child))
                                 if child in self.model.agents:
                                     self.model.agents.remove(child)
-
                                 if child in self.model.instructions:
                                     self.model.instructions.remove(child)
-
                                 # Remove from validated instruction dict
                                 linkcode_dict = (
                                     self.model.validated_delivery_instructions
@@ -129,32 +101,19 @@ class TransactionAgent(Agent):
                             object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                             attributes={"status": self.status}
                         )
-
                         return
 
-
-                    # ✨ Sync child amounts to prevent mismatch
+                    # Checks if child amounts are equal
                     min_amount_1 = min(delivery_child_1.get_amount(), receipt_child_1.get_amount())
                     delivery_child_1.set_amount(min_amount_1)
                     receipt_child_1.set_amount(min_amount_1)
 
-                    #ensure that sum of amounts of 2 child transactions equals parent that will be cancelled
-
+                    # Ensure that sum of amounts of 2 child transactions equals parent that will be cancelled
                     min_amount_2 = self.deliverer.get_amount() - min_amount_1
                     delivery_child_2.set_amount(min_amount_2)
                     receipt_child_2.set_amount(min_amount_2)
-                    print("----------------------------------------------------------------------------------------------")
-                    print("delivery child 1 amount: " + str(delivery_child_1.get_amount()) + "delivery child 2 amount: " + str(delivery_child_2.get_amount()))
-                    print("receipt child 1 amount: " + str(receipt_child_1.get_amount()) + "receipt child 2 amount: " + str(receipt_child_2.get_amount()))
-                    correctly_created_delivery = (delivery_child_1.get_amount() + delivery_child_2.get_amount() == self.deliverer.get_amount())
-                    correctly_created_receipt = (receipt_child_1.get_amount() + receipt_child_2.get_amount() == self.receiver.get_amount())
-                    if correctly_created_delivery and correctly_created_receipt:
-                        print("-----------------------------------------------------------True-----------------------------------------------------------------------------------------")
-                    else:
-                        print("-----------------------------------------------------------False----------------------------------------------------------------------------------------")
 
-
-                    # ✨ Recursively create and settle children
+                    # Create child transaction 1
                     child_transaction_1 = TransactionAgent(
                         model=self.model,
                         transactionID=f"trans{delivery_child_1.uniqueID}_{receipt_child_1.uniqueID}",
@@ -163,11 +122,12 @@ class TransactionAgent(Agent):
                         status="Matched"
                     )
                     self.model.register_transaction(child_transaction_1)
-                    delivery_child_1.linkedTransaction = child_transaction_1
-                    receipt_child_1.linkedTransaction = child_transaction_1
+                    delivery_child_1.set_linkedTransaction(child_transaction_1)
+                    receipt_child_1.set_linkedTransaction(child_transaction_1)
                     delivery_child_1.set_status("Matched")
                     receipt_child_1.set_status("Matched")
 
+                    # Create child transaction 2
                     child_transaction_2 = TransactionAgent(
                         model=self.model,
                         transactionID=f"trans{delivery_child_2.uniqueID}_{receipt_child_2.uniqueID}",
@@ -176,27 +136,20 @@ class TransactionAgent(Agent):
                         status="Matched"
                     )
                     self.model.register_transaction(child_transaction_2)
-                    delivery_child_2.linkedTransaction = child_transaction_2
-                    receipt_child_2.linkedTransaction = child_transaction_2
+                    delivery_child_2.set_linkedTransaction(child_transaction_2)
+                    receipt_child_2.set_linkedTransaction(child_transaction_2)
                     delivery_child_2.set_status("Matched")
                     receipt_child_2.set_status("Matched")
 
                     #settle first child
                     child_transaction_1.settle()
 
-
                     #cancel the mother transaction
                     self.cancel_partial()
                     self.deliverer.get_securitiesAccount().set_newSecurities(False)
-                    #self.receiver.get_cashAccount().set_newSecurities(False)
                     return
 
-                # ✨ Fallback to retry if not enough funds
-
-
                 self.deliverer.get_securitiesAccount().set_newSecurities(False)
-                #self.receiver.get_cashAccount().set_newSecurities(False)
-
                 self.model.log_event(
                     event_type= "Settlement Failed: Insufficient Funds",
                     object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
@@ -204,7 +157,7 @@ class TransactionAgent(Agent):
                 )
                 return
 
-            # ✅ Safe to mutate accounts now
+            # Set new cash and securities balances
             delivered_securities = self.deliverer.securitiesAccount.deductBalance(
                 self.deliverer.get_amount(), self.deliverer.get_securityType())
             received_securities = self.receiver.securitiesAccount.addBalance(
@@ -216,7 +169,6 @@ class TransactionAgent(Agent):
                 self.deliverer.get_amount(), "Cash")
 
             if not (delivered_securities == received_securities == delivered_cash == received_cash == self.deliverer.get_amount()):
-
                 self.model.log_event(
                     event_type="Settlement Failed: Insufficient Funds",
                     object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
@@ -225,12 +177,12 @@ class TransactionAgent(Agent):
                 return
 
             #check isd of both deliverer and receiver are close by => should be the same so should be an and
-            if self.deliverer.get_intended_settlement_date() < self.model.simulated_time and self.receiver.get_intended_settlement_date() < self.model.simulated_time:
+            if self.deliverer.get_intended_settlement_date() < self.model.get_simulated_time() and self.receiver.get_intended_settlement_date() < self.model.get_simulated_time():
                 self.deliverer.set_status("Settled late")
                 self.receiver.set_status("Settled late")
                 self.status = "Settled late"
                 label = "Settled Late"
-                lateness_seconds = (self.model.simulated_time - self.deliverer.get_intended_settlement_date()).total_seconds()
+                lateness_seconds = (self.model.get_simulated_time() - self.deliverer.get_intended_settlement_date()).total_seconds()
                 lateness_hours = math.ceil(lateness_seconds / 3600)
                 depth = max(self.deliverer.get_depth(), self.receiver.get_depth())
                 is_child = self.deliverer.isChild
@@ -248,28 +200,26 @@ class TransactionAgent(Agent):
                 object_ids=[self.transactionID, self.deliverer.uniqueID, self.receiver.uniqueID],
                 attributes={"status": self.status, "lateness_hours": lateness_hours, "depth": depth, "is_child": is_child, "amount": self.deliverer.get_amount()}
             )
-
-
             self.model.remove_transaction(self)
             self.model.agents.remove(self.deliverer)
             self.model.agents.remove(self.receiver)
             self.model.agents.remove(self)
 
-            #self.deliverer.get_cashAccount().set_newSecurities(True)
             self.receiver.get_securitiesAccount().set_newSecurities(True)
 
     def step(self):
-        # ✨ Retry settlement on every step if allowed
+        # Step method for transactions
         if self.deliverer.is_instruction_time_out():
             self.deliverer.cancel_timeout()
         elif self.receiver.is_instruction_time_out():
             self.receiver.cancel_timeout()
         elif self.status in ["Matched"]:
             if (self.get_deliverer().get_securitiesAccount().get_newSecurities()):
-                if self.model.simulated_time >= self.get_deliverer().get_intended_settlement_date() - timedelta(days=1,minutes=35):
+                if self.model.get_simulated_time() >= self.get_deliverer().get_intended_settlement_date() - timedelta(days=1,minutes=35):
                     self.settle()
 
     def cancel_partial(self):
+        # Cancel transaction and instructions due to partial settlement
         self.status = "Cancelled due to partial settlement"
         self.deliverer.set_status("Cancelled due to partial settlement")
         self.receiver.set_status("Cancelled due to partial settlement")

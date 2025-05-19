@@ -116,7 +116,7 @@ class InstitutionAgent(Agent):
         isChild = False
         status = "Exists"
         linkcode = f"LINK-{uniqueID}L{otherID}"
-        instruction_creation_time, counter_instruction_creation_time, isd = sample_instruction_creation_times_and_isd(self.model.simulated_time, self.model.account_rng)
+        instruction_creation_time, counter_instruction_creation_time, isd = sample_instruction_creation_times_and_isd(self.model.get_simulated_time(), self.model.account_rng)
 
         if instruction_type == 'delivery':
             new_instructionAgent = DeliveryInstructionAgent.DeliveryInstructionAgent(uniqueID=uniqueID, model = model, linkedTransaction = linkedTransaction, motherID=motherID, institution= institution, securitiesAccount = security_account, cashAccount = cash_account, securityType=securityType, amount= amount, isChild=isChild, status=status, linkcode=linkcode, creation_time = instruction_creation_time, original_creation_time = instruction_creation_time)

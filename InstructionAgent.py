@@ -78,7 +78,7 @@ class InstructionAgent (Agent):
         # Sets status to new_status
         old_status = self.status
         self.status = new_status
-        self.last_modified_time = self.model.simulated_time
+        self.last_modified_time = self.model.get_simulated_time()
 
         # Clean up from indices when status changes from "Validated"
         if old_status == "Validated" and new_status != "Validated":
@@ -99,6 +99,9 @@ class InstructionAgent (Agent):
 
     def set_intended_settlement_date(self, ts):
         self.intended_settlement_date = ts
+
+    def set_linkedTransaction(self, lt):
+        self.linkedTransaction = lt
 
     def assign_priority(self):
         amount = self.amount
@@ -129,7 +132,7 @@ class InstructionAgent (Agent):
 
     def insert(self):
         # Insert Instruction
-        if self.creation_time < self.model.simulated_time:
+        if self.creation_time < self.model.get_simulated_time():
             if self.status == 'Exists':
                 self.status = 'Pending'
 
@@ -165,7 +168,7 @@ class InstructionAgent (Agent):
             )
 
     def is_instruction_time_out(self):
-        return self.intended_settlement_date + timedelta(days = 14) <= self.model.simulated_time
+        return self.intended_settlement_date + timedelta(days = 14) <= self.model.get_simulated_time()
 
     def step(self):
        # Step method for Instructions
@@ -177,8 +180,8 @@ class InstructionAgent (Agent):
            elif self.status == 'Pending':
                self.validate()
            elif self.status == "Validated":
-               if self.last_matched+ timedelta(hours=1) <= self.model.simulated_time:
+               if self.last_matched+ timedelta(hours=1) <= self.model.get_simulated_time():
                 self.match()
-                self.last_matched = self.model.simulated_time
+                self.last_matched = self.model.get_simulated_time()
 
 

@@ -67,6 +67,9 @@ class SettlementModel(Model):
         self.partial_settled_amount = 0  # Settlement via child instructions
         self.generate_data()
 
+    def get_simulated_time(self):
+        return self.simulated_time
+
     def in_main_period(self):
         # Method to determine if the current simulated time is within the main period.
         main_start = self.simulation_start + self.warm_up_period
