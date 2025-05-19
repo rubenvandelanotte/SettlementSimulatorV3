@@ -6,12 +6,9 @@ if TYPE_CHECKING:
     from SettlementModel import SettlementModel
     from InstitutionAgent import InstitutionAgent
     from Account import Account
-    #from TransactionAgent import TransactionAgent
+    from TransactionAgent import TransactionAgent
 
 import TransactionAgent
-import DeliveryInstructionAgent
-
-
 
 class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
     def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent",
@@ -62,28 +59,24 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             }
         )
 
-
-
     def get_creation_time(self):
         return self.creation_time
 
     def createReceiptChildren(self):
-
+        # Creates the delivery children when partial settlement is triggered
         if self.depth >= self.model.max_child_depth:
-            print(f"[CHILD CREATION BLOCKED] ReceiptInstruction {self.uniqueID} | Depth {self.depth} exceeds max_child_depth {self.model.max_child_depth}")
             return (None, None)
+
         min_settlement_amount = self.original_mother_amount * self.model.min_settlement_percentage
-        # Calculate the actual available amounts using getBalance(), ensuring correct account types.
+
         if self.cashAccount.getAccountType() != "Cash":
             available_cash = 0
-            print(f"[CHILD CREATION BLOCKED] ReceiptInstruction {self.uniqueID} | Cash account type mismatch.")
         else:
             available_cash = self.cashAccount.getEffectiveAvailableCash()
 
         deliverer = self.linkedTransaction.deliverer
         if deliverer.securitiesAccount.getAccountType() != self.securityType:
             available_securities = 0
-            print(f"[CHILD CREATION BLOCKED] ReceiptInstruction {self.uniqueID} | Deliverer account type mismatch.")
         else:
             available_securities = deliverer.securitiesAccount.getBalance()
 
@@ -115,7 +108,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
                 self.model.validated_receipt_instructions[receipt_child_2.get_linkcode()] = []
             self.model.validated_receipt_instructions[receipt_child_2.get_linkcode()].append(receipt_child_2)
 
-            #ensures that the intended_settlement_time of children = mother
+            #pass intended settlement time of mother to the children
             receipt_child_1.set_intended_settlement_date(self.get_intended_settlement_date())
             receipt_child_2.set_intended_settlement_date(self.get_intended_settlement_date())
             receipt_child_1.set_priority(self.get_priority())
@@ -126,7 +119,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             self.model.agents.add(receipt_child_1)
             self.model.agents.add(receipt_child_2)
 
-            #add agents to the instruction list
+            # Add agents to the instruction list
             self.model.instructions.append(receipt_child_1)
             self.model.instructions.append(receipt_child_2)
             self.model.log_event(
@@ -143,19 +136,10 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             )
             return (receipt_child_1, receipt_child_2)
         else:
-            # self.model.log_event(
-            #     event_type="Partial Settlement Failed: Insufficient Funds",
-            #     object_ids=[self.uniqueID],
-            #     attributes={"status": self.status}
-            # )
-            print(f"[CHILD CREATION ABORTED] ReceiptInstruction {self.uniqueID} | Available to settle ({available_to_settle}) <= min required ({min_settlement_amount})")
             return (None, None)
 
     def match(self):
-        """Matches this ReceiptInstructionAgent with a DeliveryInstructionAgent
-        that has the same link code and creates a TransactionAgent."""
-
-        #new logging
+        # Matches this ReceiptInstructionAgent with a DeliveryInstructionAgent that has the same link code and creates a TransactionAgent
         self.model.log_event(
             event_type="Attempting to Match",
             object_ids=[self.uniqueID],
@@ -163,7 +147,6 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         )
 
         if self.status != "Validated":
-            #new logging
             self.model.log_event(
                 event_type="Matching Failed: Incorrect State",
                 object_ids=[self.uniqueID],
@@ -207,7 +190,6 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         self.set_status("Matched")
         other_instruction.set_status("Matched")
 
-        #new logging
         self.model.log_event(
             event_type="Matched",
             object_ids=[self.uniqueID, other_instruction.uniqueID, transaction.transactionID],
@@ -216,28 +198,25 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
         return transaction
 
     def cancel_timeout(self):
+        # Implementation for when a DeliveryInstruction times out
         if self.status == "Exists" or self.status == "Pending" or self.status == "Validated":
             self.set_status("Cancelled due to timeout")
             self.model.agents.remove(self)
 
-            #new logging
             self.model.log_event(
                 event_type="Cancelled due to timeout",
                 object_ids=[self.uniqueID],
                 attributes={"status": "Cancelled due to timeout"}
             )
-
         if self.status == "Matched":
             self.set_status("Cancelled due to timeout")
             self.linkedTransaction.deliverer.set_status("Cancelled due to timeout")
             self.linkedTransaction.set_status("Cancelled due to timeout")
-            #new logging
             self.model.log_event(
                 event_type="Cancelled due to timeout",
                 object_ids=[self.uniqueID,self.linkedTransaction.deliverer.uniqueID, self.linkedTransaction.transactionID],
                 attributes={"status": "Cancelled due to timeout"}
             )
-
             self.model.remove_transaction(self.linkedTransaction)
             self.model.agents.remove(self.linkedTransaction.deliverer)
             self.model.agents.remove(self.linkedTransaction)
