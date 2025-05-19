@@ -28,6 +28,7 @@ class JSONOCELLogger:
         self.temp_file_prefix = temp_file_prefix
         self.temp_files = []
         self.event_count = 0
+        self.total_event_count = 0
 
     def log_object(self, oid, otype, attributes=None):
         attributes = attributes if attributes else []
@@ -38,12 +39,12 @@ class JSONOCELLogger:
         })
 
     def log_event(self, event_type, object_ids, event_attributes=None, relationships=None, timestamp=None):
-        import uuid
-        from datetime import datetime
+
+
 
         event_attributes = event_attributes if event_attributes else {}
         relationships = relationships if relationships else []
-        timestamp = timestamp or datetime.now().isoformat() + "Z"
+        timestamp = timestamp
 
         attributes_list = [{"name": key, "value": value} for key, value in event_attributes.items()]
 
@@ -51,7 +52,7 @@ class JSONOCELLogger:
             relationships.append({"objectId": oid, "qualifier": "involved"})
 
         event = {
-            "id": str(uuid.uuid4()),
+            "id": str(self.total_event_count),
             "type": event_type,
             "time": timestamp,
             "attributes": attributes_list,
@@ -59,6 +60,7 @@ class JSONOCELLogger:
         }
         self.events.append(event)
         self.event_count += 1
+        self.total_event_count += 1
 
         # When buffer is full, flush to disk
         if self.event_count >= self.buffer_size:
