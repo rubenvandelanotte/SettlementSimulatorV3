@@ -9,8 +9,8 @@ import InstructionAgent
 import DeliveryInstructionAgent
 import Account
 
-
 def get_creation_time(isd: datetime, delay: int, simulated_time:datetime, account_rng) -> datetime:
+    #returns a random creation time for an instruction
     creation_date = isd - timedelta(days=delay)
 
     #pick random time on that day
@@ -25,43 +25,32 @@ def get_creation_time(isd: datetime, delay: int, simulated_time:datetime, accoun
     return max(creation_time, simulated_time)
 
 def sample_instruction_creation_times_and_isd(simulated_time: datetime, account_rng):
-    """
-    Samples two distinct creation times and a shared ISD (intended settlement date),
-    ensuring:
-    - ISD is 2–5 days in the future
-    - ISD always falls at 22:30
-    - Creation times are generated using empirical delay distribution
-    - No creation occurs before simulated_time
-    """
+    # Creates ISD for delivery and receipt instruction, based on predetermined distribution
 
-    # Step 1: Choose ISD always 5 days in future & then create some negative delaus
+    # Choose ISD always 5 days in future, on 22:30
     raw_isd_day = simulated_time + timedelta(days=5)
     isd = raw_isd_day.replace(hour=22, minute=30, second=0, microsecond=0)
 
-    # Step 2: Define delay distribution
+    # Define delay distribution
     delays = [-1, 0, 1, 2, 3, 4, 5]  # Delay in days from ISD
     weights = [0.01, 0.29, 0.22, 0.20, 0.07, 0.16, 0.05]  # Empirical weights
 
-    # Step 3: Sample delays for both instruction legs
+    # Implement delays for both instructions
     delay_a = account_rng.choices(delays, weights=weights, k=1)[0]
     delay_b = account_rng.choices(delays, weights=weights, k=1)[0]
 
-
-    # Step 4: Generate creation times
+    # Generate creation times
     creation_time_a = get_creation_time(isd, delay_a, simulated_time, account_rng)
     creation_time_b = get_creation_time(isd, delay_b, simulated_time, account_rng)
 
     return creation_time_a, creation_time_b, isd
 
 class InstitutionAgent(Agent):
-
     def __init__(self, model:SettlementModel, institutionID:str, accounts:list[Account] = [], allowPartial:bool = True):
         super().__init__(model)
-
         self.institutionID = institutionID
         self.accounts = accounts
         self.allowPartial = allowPartial
-
         self.model.log_object(
             object_id=self.institutionID,
             object_type="Institution",
@@ -71,37 +60,35 @@ class InstitutionAgent(Agent):
         )
 
     def check_partial_allowed(self):
+        # Checks if partail settlement is allowed
         if self.allowPartial == True:
             return True
         else:
             return False
 
     def getSecurityAccounts(self, securityType:str):
+        # Returns all security accounts for a cerain security type (can only be 1)
         for account in self.accounts:
             if account.accountType == securityType:
                 return account
 
     def create_instruction(self):
+        # Creates an Instruction
         instruction_type = self.model.account_rng.choice(['delivery', 'receipt'])
         cash_account = self.getSecurityAccounts(securityType= "Cash")
-        # Filter available security accounts from the institution's accounts
         security_accounts = [acc for acc in self.accounts if acc.accountType in self.model.bond_types]
         if not security_accounts:
             raise ValueError("No security accounts available for institution " + self.institutionID)
         security_account = self.model.account_rng.choice(security_accounts)
         random_security = security_account.accountType  # Use the type from the chosen account
-
         original_balance = security_account.get_original_balance()
 
         # Creates a mix of regular and larger instructions
-        if self.model.account_rng.random() < 0.15:  # 15% chance for larger instructions
+        if self.model.account_rng.random() < 0.15:
             percentage = self.model.account_rng.uniform(0.35, 0.45)
         else:
             percentage = self.model.account_rng.uniform(0.03, 0.1)
-
-        # amount = self.model.sample_instruction_amount()
         amount = int(original_balance * percentage)
-
         model = self.model
         linkedTransaction = None
         uniqueID = len(self.model.instructions) + 1
@@ -114,8 +101,8 @@ class InstitutionAgent(Agent):
         other_institution_security_account = other_institution.getSecurityAccounts(securityType=securityType)
         if other_institution_security_account is None:
             # Create a new security account for the counterparty institution
-            new_security_account_id = SettlementModel.generate_iban()  # Generates an IBAN-like string
-            new_security_balance = self.model.sample_initial_balance_amount()  # Mimic the balance generation logic
+            new_security_account_id = SettlementModel.generate_iban()
+            new_security_balance = self.model.sample_initial_balance_amount()
             new_security_account = Account.Account(
                 accountID=new_security_account_id,
                 accountType=securityType,
@@ -156,7 +143,6 @@ class InstitutionAgent(Agent):
             self.model.instructions.append(new_instructionAgent)
             self.model.instructions.append(counter_instructionAgent)
 
-        #new logging
         self.model.log_event(
             event_type="Instruction Pair Initialised",
             object_ids=[
@@ -173,6 +159,7 @@ class InstitutionAgent(Agent):
         )
 
     def step(self):
+        # Step method of the institution class. 1,5% chance to create an instruction per activation
         if self.model.account_rng.random() <0.015:
             self.create_instruction()
 
