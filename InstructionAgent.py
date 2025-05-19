@@ -209,7 +209,7 @@ class InstructionAgent (Agent):
             )
 
     def is_instruction_time_out(self):
-        return self.creation_time + timedelta(days = 14) <= self.model.simulated_time
+        return self.intended_settlement_date + timedelta(days = 14) <= self.model.simulated_time
 
     def step(self):
        if self.is_instruction_time_out():
