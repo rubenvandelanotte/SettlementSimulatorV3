@@ -50,7 +50,7 @@ class ReceiptInstructionAgent(InstructionAgent.InstructionAgent):
             }
         )
         self.model.log_event(
-            event_type="ReceiptInstruction Created",
+            event_type="ReceiptInstruction Initialised",
             object_ids=[self.uniqueID, self.institution.institutionID, self.securitiesAccount.getAccountID()],
             attributes={
                 "securityType": self.securityType,

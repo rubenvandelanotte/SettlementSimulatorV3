@@ -47,7 +47,7 @@ class DeliveryInstructionAgent(InstructionAgent.InstructionAgent):
         )
 
         self.model.log_event(
-            event_type="DeliveryInstruction Created",
+            event_type="DeliveryInstruction Initialised",
             object_ids=[self.uniqueID, self.institution.institutionID, self.securitiesAccount.getAccountID()],
             attributes={
                 "securityType": self.securityType,

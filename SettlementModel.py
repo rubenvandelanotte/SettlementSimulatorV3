@@ -120,6 +120,25 @@ class SettlementModel(Model):
         if not self.log_only_main_events:
             return
 
+        if not self.in_main_period():
+            main_start = self.simulation_start + self.warm_up_period
+            main_end = self.simulation_end - self.cool_down_period
+
+            # Check if any instruction in object_ids was created in main period
+            instruction_created_in_main = False
+            for obj_id in object_ids:
+                # Try to find the instruction with this ID
+                for instruction in self.instructions:
+                    if instruction.get_uniqueID() == obj_id and main_start <= instruction.get_creation_time() <= main_end:
+                        instruction_created_in_main = True
+                        break
+                if instruction_created_in_main:
+                    break
+
+            # If not in main period and no instruction was created in main period, don't log
+            if not instruction_created_in_main:
+                return
+
         if attributes is None:
             attributes = {}
 

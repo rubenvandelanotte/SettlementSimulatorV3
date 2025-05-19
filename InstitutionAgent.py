@@ -158,7 +158,7 @@ class InstitutionAgent(Agent):
 
         #new logging
         self.model.log_event(
-            event_type="instruction_pair_created",
+            event_type="Instruction Pair Initialised",
             object_ids=[
                 new_instructionAgent.uniqueID,
                 counter_instructionAgent.uniqueID,
