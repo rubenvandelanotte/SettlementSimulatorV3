@@ -3,13 +3,11 @@ import random
 
 from mesa import Agent
 from typing import TYPE_CHECKING, Optional
-
 if TYPE_CHECKING:
     from TransactionAgent import TransactionAgent
     from SettlementModel import SettlementModel
     from InstitutionAgent import InstitutionAgent
     from Account import Account
-
 
 class InstructionAgent (Agent):
     def __init__(self, model: "SettlementModel", uniqueID: str, motherID: str, institution: "InstitutionAgent", securitiesAccount: "Account", cashAccount: "Account", securityType: str, amount: float, isChild: bool, status: str, linkcode: str, creation_time: datetime, original_creation_time: datetime, linkedTransaction: Optional["TransactionAgent"] = None, depth: int=0, original_mother_amount: int = None):
@@ -32,7 +30,6 @@ class InstructionAgent (Agent):
         self.depth = depth
         self.last_modified_time = creation_time
         self.priority = None
-
         # Set original_mother_amount
         if original_mother_amount is None and not isChild:
             # If this is a mother instruction, set to its own amount
@@ -41,83 +38,52 @@ class InstructionAgent (Agent):
             # If this is a child, use the provided value
             self.original_mother_amount = original_mother_amount
 
-#getter methods
-    def get_model(self):
-        """Returns the model associated with the agent."""
-        return self.model
-
-    def get_linkedTransaction(self):
-        """Returns the linked transaction agent."""
-        return self.linkedTransaction
-
     def get_uniqueID(self):
-        """Returns the unique ID of the instruction."""
         return self.uniqueID
 
     def get_motherID(self):
-        """Returns the mother ID of the instruction (if it's a child instruction)."""
         return self.motherID
 
     def get_institution(self):
-        """Returns the institution associated with the instruction."""
         return self.institution
 
     def get_securitiesAccount(self):
-        """Returns the securities account linked to the instruction."""
         return self.securitiesAccount
 
-    def get_cashAccount(self):
-        """Returns the cash account linked to the instruction."""
-        return self.cashAccount
-
     def get_securityType(self):
-        """Returns the type of security involved in the instruction."""
         return self.securityType
 
     def get_amount(self):
-        """Returns the amount of securities or cash involved in the instruction."""
         return self.amount
 
     def set_amount(self, new_amount:str):
         self.amount = new_amount
 
-    def get_isChild(self):
-        """Returns whether the instruction is a child instruction."""
-        return self.isChild
-
     def get_status(self):
-        """Returns the current status of the instruction."""
         return self.status
 
     def get_linkcode(self):
-        """Returns the link code associated with the instruction."""
         return self.linkcode
 
     def get_creation_time(self):
-        """Returns the creation time of the instruction."""
         return self.creation_time
 
     def get_depth(self):
         return self.depth
 
-    def get_original_mother_amount(self):
-        """Returns the original amount from the mother instruction."""
-        return self.original_mother_amount
-
     def get_intended_settlement_date(self):
         return self.intended_settlement_date
 
     def set_status(self, new_status: str):
+        # Sets status to new_status
         old_status = self.status
         self.status = new_status
-
         self.last_modified_time = self.model.simulated_time
 
         # Clean up from indices when status changes from "Validated"
         if old_status == "Validated" and new_status != "Validated":
             import DeliveryInstructionAgent
             import ReceiptInstructionAgent
-
             if isinstance(self, DeliveryInstructionAgent.DeliveryInstructionAgent):
                 if self.linkcode in self.model.validated_delivery_instructions:
                     if self in self.model.validated_delivery_instructions[self.linkcode]:
@@ -152,15 +118,6 @@ class InstructionAgent (Agent):
         else:
             self.priority = 1
 
-    #       if amount >= self.get_securitiesAccount().get_original_balance() * 0.2 :
-    #           self.priority = 3
-    #           return
-    #       elif amount >= self.get_securitiesAccount().get_original_balance() * 0.07:
-    #           self.priority= 2
-    #           return
-    #       else:
-    #           self.priority = 1
-
     def get_priority(self):
         return self.priority
 
@@ -171,12 +128,11 @@ class InstructionAgent (Agent):
         return
 
     def insert(self):
+        # Insert Instruction
         if self.creation_time < self.model.simulated_time:
             if self.status == 'Exists':
                 self.status = 'Pending'
-                # logging
-                #self.model.log_event(f"Instruction {self.uniqueID} inserted.", self.uniqueID, is_transaction=True)
-                #new logging
+
                 self.model.log_event(
                     event_type="Instruction Inserted",
                     object_ids=[self.uniqueID],
@@ -185,6 +141,7 @@ class InstructionAgent (Agent):
 
 
     def validate(self):
+        #Validate Instruction
         if self.status == 'Pending':
             self.set_status('Validated')
 
@@ -201,7 +158,6 @@ class InstructionAgent (Agent):
                     self.model.validated_receipt_instructions[self.linkcode] = []
                 self.model.validated_receipt_instructions[self.linkcode].append(self)
 
-            #new logging
             self.model.log_event(
                 event_type="Instruction Validated",
                 object_ids=[self.uniqueID],
@@ -212,8 +168,9 @@ class InstructionAgent (Agent):
         return self.intended_settlement_date + timedelta(days = 14) <= self.model.simulated_time
 
     def step(self):
+       # Step method for Instructions
        if self.is_instruction_time_out():
-           self.cancel_timeout() #applies to mother and children
+           self.cancel_timeout()
        else:
            if self.status == 'Exists':
                self.insert()
@@ -221,9 +178,7 @@ class InstructionAgent (Agent):
                self.validate()
            elif self.status == "Validated":
                if self.last_matched+ timedelta(hours=1) <= self.model.simulated_time:
-              #     if random.random() < 0.1:
                 self.match()
                 self.last_matched = self.model.simulated_time
-                #else:
-                    #return
+
 
