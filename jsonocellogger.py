@@ -38,7 +38,7 @@ class JSONOCELLogger:
             "attributes": attributes
         })
 
-    def log_event(self, event_type, object_ids, event_attributes=None, relationships=None, timestamp=None):
+    def log_event(self, event_type, object_ids, timestamp, event_attributes=None, relationships=None)
 
 
 
