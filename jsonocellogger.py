@@ -42,12 +42,13 @@ class JSONOCELLogger:
 
 
 
-
+        #event types are always passed from settlement model, thus here mandatory
         relationships = relationships if relationships else []
         timestamp = timestamp
 
         attributes_list = [{"name": key, "value": value} for key, value in event_attributes.items()]
 
+        #just a default relationship, to specifiy later
         for oid in object_ids:
             relationships.append({"objectId": oid, "qualifier": "involved"})
 
