@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 # Load OCEL file
-input_file_path = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_files\logs\log_partial_truecount10_run1.jsonocel"
+input_file_path = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_files_2\logs\log_partial_truecount100_run1.jsonocel"
 with open(input_file_path) as f:
     ocel_data = json.load(f)
 
@@ -46,8 +46,8 @@ for event in ocel_data.get("events", []):
         is_target = False
         if isinstance(object_id, int) and object_id % 2 == 1 and TARGET_OBJECT_TYPE == "DeliveryInstruction":
             is_target = True
-        elif isinstance(object_id, int) and object_id % 2 == 0 and TARGET_OBJECT_TYPE == "ReceiptInstruction":
-            is_target = True
+        #elif isinstance(object_id, int) and object_id % 2 == 0 and TARGET_OBJECT_TYPE == "ReceiptInstruction":
+         #   is_target = True
 
         if is_target:
             object_event_map.setdefault(object_id, []).append(event)
@@ -86,7 +86,7 @@ for obj_id, events in object_event_map.items():
             flattened_ocel["ocel:events"][event_id]["ocel:vmap"][attr["name"]] = attr["value"]
 
 # Create a new directory for flattened logs if it doesn't exist
-output_dir = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_files\flattened_logs"
+output_dir = r"C:\Users\matth\Documents\GitHub\SettlementSimulatorV3\partial_allowance_files_2\flattened_logs"
 os.makedirs(output_dir, exist_ok=True)
 
 # Create the output filename
